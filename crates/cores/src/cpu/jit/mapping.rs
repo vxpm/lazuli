@@ -54,7 +54,6 @@ pub struct Table(
 );
 
 impl Table {
-    #[inline(always)]
     pub fn insert(&mut self, addr: Address, mapping: Mapping) {
         let (idx0, idx1, idx2) = addr_to_mapping_idx(addr);
         let level1 = self.0.get_or_default(idx0);
@@ -62,7 +61,6 @@ impl Table {
         level2.insert(idx2, mapping);
     }
 
-    #[inline(always)]
     pub fn remove(&mut self, addr: Address) -> Option<Mapping> {
         let (idx0, idx1, idx2) = addr_to_mapping_idx(addr);
         let level1 = self.0.get_mut(idx0)?;
@@ -70,7 +68,6 @@ impl Table {
         level2.remove(idx2)
     }
 
-    #[inline(always)]
     pub fn get(&self, addr: Address) -> Option<&Mapping> {
         let (idx0, idx1, idx2) = addr_to_mapping_idx(addr);
         let level1 = self.0.get(idx0)?;
@@ -84,7 +81,6 @@ pub struct DepsTable(BaseTable<BaseTable<IndexSet<Address>, DEPS_TBL_L1_COUNT>, 
 
 impl DepsTable {
     /// Marks address `addr` as dependent on the pages that cover the given range.
-    #[inline(always)]
     pub fn mark(&mut self, addr: Address, range: Range<Address>) {
         let start_page = range.start.value() as usize / DEPS_PAGE_LEN;
         let end_page = range.end.value() as usize / DEPS_PAGE_LEN;
@@ -98,7 +94,6 @@ impl DepsTable {
     }
 
     /// Unmarks address `addr` as dependent on the pages that cover the given range.
-    #[inline(always)]
     pub fn unmark(&mut self, addr: Address, range: Range<Address>) {
         let start_page = range.start.value() as usize / DEPS_PAGE_LEN;
         let end_page = range.end.value() as usize / DEPS_PAGE_LEN;
@@ -112,7 +107,6 @@ impl DepsTable {
     }
 
     /// Returns the set of dependencies of the page that contains the given address.
-    #[inline(always)]
     pub fn get(&self, addr: Address) -> Option<&IndexSet<Address>> {
         let page = addr.value() as usize / DEPS_PAGE_LEN;
         let (idx0, idx1) = page_to_deps_idx(page);
