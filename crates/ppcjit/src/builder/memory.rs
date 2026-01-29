@@ -1172,6 +1172,15 @@ impl BlockBuilder<'_> {
         STORE_INFO
     }
 
+    pub fn stwcx(&mut self, ins: Ins) -> InstructionInfo {
+        self.stwx(ins);
+
+        let zero = self.ir_value(0);
+        self.update_cr0_cmpz(zero);
+
+        STORE_INFO
+    }
+
     pub fn psq_l(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
