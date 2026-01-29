@@ -39,7 +39,7 @@ impl Default for Cache {
 
 impl Cache {
     fn create_texture_data_indirect(
-        indirect: &Vec<u16>,
+        indirect: &[u16],
         palette: &[u16],
         format: ClutFormat,
     ) -> Vec<Rgba8> {

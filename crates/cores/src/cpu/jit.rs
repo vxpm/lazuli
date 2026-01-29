@@ -144,11 +144,8 @@ impl Blocks {
         deps.clone_into(&mut temp_deps);
 
         for dep in temp_deps.iter() {
-            let mapping = match self.remove_mapping_if_contains(logical, *dep, target) {
-                Ok(mapping) => mapping,
-                Err(_) => {
-                    panic!("mapping {dep} is listed as dependent on a page but it does not exist");
-                }
+            let Ok(mapping) = self.remove_mapping_if_contains(logical, *dep, target) else {
+                panic!("mapping {dep} is listed as dependent on a page but it does not exist");
             };
 
             let Some(mapping) = mapping else {

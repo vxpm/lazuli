@@ -40,8 +40,8 @@ impl Cache {
                 let base = physical.align_down(32);
 
                 let mut cacheline = [0; 8];
-                for index in 0..8 {
-                    cacheline[index] = sys.read_phys_slow::<u32>(base + 4 * index as u32);
+                for (index, word) in cacheline.iter_mut().enumerate() {
+                    *word = sys.read_phys_slow::<u32>(base + 4 * index as u32);
                 }
 
                 level2.insert(idx2, cacheline)
