@@ -133,8 +133,8 @@ impl<'ctx> ParserBuilder<'ctx> {
         let mtx_idx = self.bd.ins().uextend(ir::types::I64, mtx_idx);
         let bit_idx = if is_normal {
             let masked = self.bd.ins().band_imm(mtx_idx, 0x3F);
-            let offset = self.bd.ins().iadd_imm(masked, 64);
-            offset
+            
+            self.bd.ins().iadd_imm(masked, 64)
         } else {
             mtx_idx
         };

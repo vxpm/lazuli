@@ -82,7 +82,7 @@ impl Cache {
 
                 owned_data = data
                     .iter()
-                    .map(|lod| Self::create_texture_data_indirect(&lod, &clut, settings.clut_fmt))
+                    .map(|lod| Self::create_texture_data_indirect(lod, clut, settings.clut_fmt))
                     .collect::<Vec<_>>();
 
                 owned_data
@@ -148,7 +148,7 @@ impl Cache {
         );
 
         if let Some(old) = old {
-            for dep in old.deps.into_iter() {
+            for dep in old.deps {
                 self.textures.remove(&dep);
             }
 
