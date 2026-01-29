@@ -1,9 +1,9 @@
+mod icache;
 mod mapping;
 mod table;
 
 use indexmap::IndexSet;
 use lazuli::cores::{CpuCore, Executed};
-use lazuli::gekko::disasm::{Extensions, Ins};
 use lazuli::gekko::{self, Cpu, DEQUANTIZATION_LUT, QUANTIZATION_LUT, QuantReg, QuantizedType};
 use lazuli::system::{self, System};
 use lazuli::{Address, Cycles, Primitive};
@@ -11,7 +11,6 @@ use mapping::Mapping;
 use ppcjit::block::{BlockFn, Info, LinkData, Pattern};
 use ppcjit::hooks::*;
 use ppcjit::{Block, FastmemLut};
-use table::Table;
 
 #[rustfmt::skip]
 pub use ppcjit;
@@ -189,7 +188,7 @@ struct Context<'a> {
     /// The block mapping, so that write operations can invalidate blocks.
     blocks: &'a mut Blocks,
     /// ICache
-    icache: &'a mut ICache,
+    icache: &'a mut icache::Cache,
     /// Amount of cycles we are trying to execute.
     target_cycles: u32,
     /// Maximum instructions we should execute.
@@ -363,12 +362,12 @@ const CTX_HOOKS: Hooks = {
     }
 
     extern "sysv64-unwind" fn invalidate_icache(ctx: &mut Context, addr: Address) {
-        let line_addr = addr.align_down(32);
+        let cacheline_base = addr.align_down(32);
         let is_logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
 
         if is_logical {
             for offset in 0..32 {
-                let logical = line_addr + offset;
+                let logical = cacheline_base + offset;
                 let physical = ctx.sys.translate_inst_addr(logical);
 
                 ctx.blocks.invalidate(true, logical);
@@ -377,27 +376,21 @@ const CTX_HOOKS: Hooks = {
                 }
             }
 
-            if let Some(physical) = ctx.sys.translate_inst_addr(line_addr) {
-                let (idx0, idx1, idx2) = addr_to_icache_idx(physical);
-                if let Some(level1) = ctx.icache.get_mut(idx0)
-                    && let Some(level2) = level1.get_mut(idx1)
-                {
-                    level2.remove(idx2);
-                }
+            if let Some(physical) = ctx.sys.translate_inst_addr(cacheline_base) {
+                ctx.icache.invalidate(physical);
             }
         } else {
             for offset in 0..32 {
-                let physical = line_addr + offset;
+                let physical = cacheline_base + offset;
                 ctx.blocks.invalidate(false, physical);
             }
 
-            let (idx0, idx1, idx2) = addr_to_icache_idx(addr);
-            if let Some(level1) = ctx.icache.get_mut(idx0)
-                && let Some(level2) = level1.get_mut(idx1)
-            {
-                level2.remove(idx2);
-            }
+            ctx.icache.invalidate(cacheline_base);
         }
+    }
+
+    extern "sysv64-unwind" fn clear_icache(ctx: &mut Context) {
+        ctx.icache.clear();
     }
 
     extern "sysv64-unwind" fn dcache_dma(ctx: &mut Context) {
@@ -424,10 +417,6 @@ const CTX_HOOKS: Hooks = {
 
         ctx.sys.cpu.supervisor.config.dma.lower.set_trigger(false);
         ctx.sys.cpu.supervisor.config.dma.lower.set_flush(false);
-    }
-
-    extern "sysv64-unwind" fn clear_icache(ctx: &mut Context) {
-        *ctx.icache = Table::new();
     }
 
     extern "sysv64-unwind" fn msr_changed(ctx: &mut Context) {
@@ -576,34 +565,11 @@ pub struct Config {
     pub jit_settings: ppcjit::Settings,
 }
 
-const ICACHE_L0_BITS: usize = 11;
-const ICACHE_L0_COUNT: usize = 1 << ICACHE_L0_BITS;
-const ICACHE_L0_MASK: usize = ICACHE_L0_COUNT - 1;
-const ICACHE_L1_BITS: usize = 8;
-const ICACHE_L1_COUNT: usize = 1 << ICACHE_L1_BITS;
-const ICACHE_L1_MASK: usize = ICACHE_L1_COUNT - 1;
-const ICACHE_L2_BITS: usize = 8;
-const ICACHE_L2_COUNT: usize = 1 << ICACHE_L2_BITS;
-const ICACHE_L2_MASK: usize = ICACHE_L2_COUNT - 1;
-
-type CacheLine = [u32; 8];
-type ICache = Table<Table<Table<CacheLine, ICACHE_L2_COUNT>, ICACHE_L1_COUNT>, ICACHE_L0_COUNT>;
-
-#[inline(always)]
-fn addr_to_icache_idx(addr: Address) -> (usize, usize, usize) {
-    let base = (addr.value() >> 5) as usize;
-    (
-        base >> (27 - ICACHE_L0_BITS) & ICACHE_L0_MASK,
-        (base >> (27 - ICACHE_L0_BITS - ICACHE_L1_BITS)) & ICACHE_L1_MASK,
-        (base >> (27 - ICACHE_L0_BITS - ICACHE_L1_BITS - ICACHE_L2_BITS)) & ICACHE_L2_MASK,
-    )
-}
-
 pub struct Core {
     pub config: Config,
     pub compiler: ppcjit::Jit,
     pub blocks: Blocks,
-    pub icache: ICache,
+    pub icache: icache::Cache,
 }
 
 fn closest_breakpoint(pc: Address, breakpoints: &[Address]) -> Address {
@@ -651,25 +617,7 @@ impl Core {
                 return None;
             };
 
-            let (idx0, idx1, idx2) = addr_to_icache_idx(physical);
-            let level1 = self.icache.get_or_default(idx0);
-            let level2 = level1.get_or_default(idx1);
-            let cacheline = match level2.get(idx2) {
-                Some(cacheline) => cacheline,
-                None => {
-                    let base = physical.align_down(32);
-
-                    let mut cacheline = [0; 8];
-                    for index in 0..8 {
-                        cacheline[index] = sys.read_phys_slow::<u32>(base + 4 * index as u32);
-                    }
-
-                    level2.insert(idx2, cacheline)
-                }
-            };
-
-            let offset = (physical.value() % 32) / 4;
-            let ins = Ins::new(cacheline[offset as usize], Extensions::gekko_broadway());
+            let ins = self.icache.get(sys, physical);
             count += 1;
 
             Some(ins)
