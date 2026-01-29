@@ -2,10 +2,9 @@ use bytesize::ByteSize;
 use eframe::egui::{self, Color32};
 use egui_extras::{Column, TableBuilder};
 use indexmap::IndexMap;
-use lazuli::Address;
 use lazuli::system::eabi::CallStack;
 use lazuli::system::os::Thread;
-use lazuli::system::{self};
+use lazuli::{Address, system};
 use serde::{Deserialize, Serialize};
 
 use crate::State;

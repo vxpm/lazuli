@@ -43,6 +43,7 @@ pub enum HookKind {
     ReadQuant,
     WriteQuant,
     InvICache,
+    ClearICache,
     DCacheDma,
     MsrChanged,
     IBatChanged,
@@ -80,6 +81,7 @@ pub struct Hooks {
 
     // cache
     pub invalidate_icache: InvalidateICache,
+    pub clear_icache: GenericHook,
     pub dcache_dma: GenericHook,
 
     // msr

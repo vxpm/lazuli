@@ -38,8 +38,8 @@ fn coord_int(
     };
 
     // 05. multiply by scale
-    let value = parser.bd.ins().fmul(value, scale);
-    value
+
+    parser.bd.ins().fmul(value, scale)
 }
 
 /// Parses a single vector coordinate encoded as F32.
@@ -52,12 +52,11 @@ fn coord_float(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
 
     // 02. byteswap and bitcast
     let value = parser.bd.ins().bswap(value);
-    let value = parser
+
+    parser
         .bd
         .ins()
-        .bitcast(ir::types::F32, ir::MemFlags::new(), value);
-
-    value
+        .bitcast(ir::types::F32, ir::MemFlags::new(), value)
 }
 
 /// Parses a vec2/vec3 with components encoded as U8/I8/U16/I16.
@@ -356,7 +355,8 @@ fn rgb6666(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
     //
     // we could avoid the mul by instead using division by 2 (shift right), but i bet thats way
     // slower than a mul
-    const MUL_CONST: [u32; 4] = [1 << (18 - 0), 1 << (18 - 6), 1 << (18 - 12), 1 << (18 - 18)];
+    #[allow(clippy::eq_op)]
+    const MUL_CONST: [u32; 4] = [1 << 18, 1 << (18 - 6), 1 << (18 - 12), 1 << (18 - 18)];
     let mul_const = parser
         .bd
         .func
@@ -456,7 +456,8 @@ fn rgb565(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
     //
     // we could avoid the mul by instead using division by 2 (shift right), but i bet thats way
     // slower than a mul
-    const MUL_CONST: [u32; 4] = [1 << (11 - 0), 1 << (11 - 5), 1 << (11 - 11), 0];
+    #[allow(clippy::eq_op)]
+    const MUL_CONST: [u32; 4] = [1 << 11, 1 << (11 - 5), 1 << (11 - 11), 0];
     const AND_CONST: [u32; 4] = [0x1F, 0x3F, 0x1F, 0];
     const RECIP_CONST: [f32; 4] = [1.0 / 31.0, 1.0 / 63.0, 1.0 / 31.0, 0.0];
 

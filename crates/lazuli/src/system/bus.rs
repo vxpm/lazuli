@@ -56,7 +56,7 @@ impl System {
 
     /// Translates an instruction logical address into a physical address.
     #[inline(always)]
-    pub fn translate_instr_addr(&self, addr: Address) -> Option<Address> {
+    pub fn translate_inst_addr(&self, addr: Address) -> Option<Address> {
         if !self.cpu.supervisor.config.msr.instr_addr_translation() {
             return Some(addr);
         }

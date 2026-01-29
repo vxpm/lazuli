@@ -1,8 +1,8 @@
 use eframe::egui::{self, Color32};
 use egui_extras::{Column, TableBuilder};
 use lazuli::modules::debug::Location;
+use lazuli::system;
 use lazuli::system::eabi::CallStack;
-use lazuli::system::{self};
 use serde::{Deserialize, Serialize};
 
 use crate::State;

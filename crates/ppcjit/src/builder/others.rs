@@ -49,6 +49,12 @@ const INV_ICACHE_INFO: InstructionInfo = InstructionInfo {
     action: Action::FlushAndPrologue,
 };
 
+const SYNC_ICACHE_INFO: InstructionInfo = InstructionInfo {
+    cycles: 2,
+    auto_pc: true,
+    action: Action::FlushAndPrologue,
+};
+
 fn generate_mask(control: u8) -> u32 {
     let mut mask = 0;
     for i in 0..8 {
@@ -422,5 +428,13 @@ impl BlockBuilder<'_> {
             .call(self.hooks.inv_icache, &[self.consts.ctx_ptr, addr]);
 
         INV_ICACHE_INFO
+    }
+
+    pub fn isync(&mut self, _: Ins) -> InstructionInfo {
+        self.bd
+            .ins()
+            .call(self.hooks.clear_icache, &[self.consts.ctx_ptr]);
+
+        SYNC_ICACHE_INFO
     }
 }

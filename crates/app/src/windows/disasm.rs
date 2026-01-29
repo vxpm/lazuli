@@ -77,7 +77,7 @@ impl AppWindow for Window {
         for _ in 0..self.rows {
             let translated = emulator
                 .sys
-                .translate_instr_addr(current)
+                .translate_inst_addr(current)
                 .unwrap_or_default();
 
             let code = emulator.sys.read_phys_pure(translated).unwrap_or(0);

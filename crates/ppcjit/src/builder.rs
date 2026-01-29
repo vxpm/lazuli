@@ -121,6 +121,7 @@ struct HookFuncs {
     inv_icache: ir::FuncRef,
 
     // generic
+    clear_icache: ir::FuncRef,
     dcache_dma: ir::FuncRef,
     msr_changed: ir::FuncRef,
     ibat_changed: ir::FuncRef,
@@ -263,6 +264,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             read_quant: hook(sigs.read_quant_hook, HookKind::ReadQuant),
             write_quant: hook(sigs.write_quant_hook, HookKind::WriteQuant),
             inv_icache: hook(sigs.invalidate_icache_hook, HookKind::InvICache),
+            clear_icache: hook(sigs.generic_hook, HookKind::ClearICache),
             dcache_dma: hook(sigs.generic_hook, HookKind::DCacheDma),
             msr_changed: hook(sigs.generic_hook, HookKind::MsrChanged),
             ibat_changed: hook(sigs.generic_hook, HookKind::IBatChanged),
@@ -651,7 +653,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Fsub => self.fsub(ins),
             Opcode::Fsubs => self.fsubs(ins),
             Opcode::Icbi => self.icbi(ins),
-            Opcode::Isync => self.nop(Action::FlushAndPrologue),
+            Opcode::Isync => self.isync(ins),
             Opcode::Lbz => self.lbz(ins),
             Opcode::Lbzu => self.lbzu(ins),
             Opcode::Lbzux => self.lbzux(ins),

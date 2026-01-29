@@ -524,7 +524,7 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
     });
 
     let alpha_comparison = texenv::get_alpha_comparison(&texenv.alpha_func);
-    let depth_texture = texenv::get_depth_texture(&texenv);
+    let depth_texture = texenv::get_depth_texture(texenv);
 
     wesl_quote::quote_declaration! {
         @fragment

@@ -251,6 +251,7 @@ impl Compiler {
                         HookKind::ReadQuant => self.hooks.read_quantized as usize,
                         HookKind::WriteQuant => self.hooks.write_quantized as usize,
                         HookKind::InvICache => self.hooks.invalidate_icache as usize,
+                        HookKind::ClearICache => self.hooks.clear_icache as usize,
                         HookKind::DCacheDma => self.hooks.dcache_dma as usize,
                         HookKind::MsrChanged => self.hooks.msr_changed as usize,
                         HookKind::IBatChanged => self.hooks.ibat_changed as usize,

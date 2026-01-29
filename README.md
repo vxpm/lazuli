@@ -31,7 +31,7 @@ On a more technical note, here's what `lazuli` currently offers:
 - `wgpu` based renderer backend
 - `cpal` based audio backend
 - `wesl` based shader generator/compiler
-- HLE IPL used to boot games
+- IPL HLE used to boot games without an IPL ROM
 - A very simple UI for debugging
 
 # Building
@@ -56,16 +56,17 @@ you can run it in the terminal with a path to the ROM you want to run (supports 
 lazuli --rom path/to/gamecube/game.iso
 ```
 
-You do not need an IPL ROM (the "bios") to run games, but some games might use its embedded font (in
-which case you won't see anything if you don't have one). To pass an IPL:
+You do not need an IPL ROM (the "bios") to run games, as game loading is HLEd by `lazuli`. However,
+some games might use IPL's embedded font (in which case the game might not even boot without it).
+To pass an IPL:
 
 ```sh
 lazuli --ipl path/to/ipl.bin --rom path/to/gamecube/game.iso
 ```
 
 You can also pass `--ipl-lle` to skip the high-level emulation of the IPL (IPL-HLE) and instead
-use the provided IPL ROM to boot. Beware this currently has issues and will likely crash after the 
-animation.
+use the provided IPL ROM to boot. This will take you to the system menu, from where you can boot 
+the game.
 
 For more CLI options, `--help` is your friend.
 

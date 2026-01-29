@@ -114,13 +114,14 @@ impl BlockBuilder<'_> {
             .brif(success, continue_block, &[], exit_block, &[]);
 
         self.bd.seal_block(exit_block);
-        self.bd.seal_block(continue_block);
 
         self.switch_to_bb(exit_block);
-        self.set(SPR::DAR, addr);
-        self.raise_exception(Exception::DSI);
-        self.prologue_with(STORE_INFO);
+        self.bd.ins().jump(continue_block, &[]);
+        // self.set(SPR::DAR, addr);
+        // self.raise_exception(Exception::DSI);
+        // self.prologue_with(STORE_INFO);
 
+        self.bd.seal_block(continue_block);
         self.switch_to_bb(continue_block);
     }
 

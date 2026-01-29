@@ -198,7 +198,7 @@ fn ipl_transfer(sys: &mut System) {
 fn update_sram_checksum(sys: &mut System) {
     let mut c1 = 0u16;
     let mut c2 = 0u16;
-    sys.external.sram[0x13] = 0x2C;
+    sys.external.sram[0x13] = 0b0110_1100;
 
     for i in 0..4 {
         let word = u16::read_be_bytes(&sys.external.sram[0xC + 2 * i..]);
