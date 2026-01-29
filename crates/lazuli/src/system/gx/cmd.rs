@@ -670,14 +670,16 @@ pub fn consume(sys: &mut System) {
 
 /// Process consumed CP commands until the queue is either empty or incomplete.
 pub fn process(sys: &mut System) {
-    let current_token = sys.gpu.pix.token;
+    let initial_token = sys.gpu.pix.token;
+    let was_draw_done = sys.gpu.pix.interrupt.finish();
     loop {
         let draw_done = sys.gpu.pix.interrupt.finish();
-        if draw_done {
+        if !was_draw_done && draw_done {
+            // println!("draw done i guess");
             break;
         }
 
-        if current_token != sys.gpu.pix.token {
+        if initial_token != sys.gpu.pix.token {
             break;
         }
 

@@ -234,6 +234,25 @@ impl Window {
                     ui.label(text);
                 });
             });
+
+            body.row(20.0, |mut row| {
+                let dec = self.cpu.supervisor.misc.dec;
+                row.col(|ui| {
+                    let text = egui::RichText::new("DEC".to_string())
+                        .family(egui::FontFamily::Monospace)
+                        .color(Color32::LIGHT_BLUE);
+
+                    ui.label(text);
+                });
+
+                row.col(|ui| {
+                    let text = egui::RichText::new(format!("{dec}"))
+                        .family(egui::FontFamily::Monospace)
+                        .color(Color32::LIGHT_GREEN);
+
+                    ui.label(text);
+                });
+            });
         });
     }
 }
