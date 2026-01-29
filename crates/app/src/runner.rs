@@ -31,6 +31,7 @@ impl State {
 struct Shared {
     state: Mutex<State>,
     advance: AtomicBool,
+    hit_breakpoint: AtomicBool,
 }
 
 const STEP: Duration = Duration::from_millis(1);
@@ -81,6 +82,7 @@ fn worker(runner_state: Arc<Shared>) {
         emulated += delta;
 
         if executed.hit_breakpoint {
+            runner_state.hit_breakpoint.store(true, Ordering::SeqCst);
             runner_state.advance.store(false, Ordering::SeqCst);
         }
 
@@ -106,6 +108,7 @@ impl Runner {
                 cycles_history: VecDeque::new(),
             }),
             advance: AtomicBool::new(false),
+            hit_breakpoint: AtomicBool::new(false),
         };
 
         let state = Arc::new(state);
@@ -120,12 +123,16 @@ impl Runner {
         Self { shared: state }
     }
 
-    pub fn start(&mut self) {
-        self.shared.advance.store(true, Ordering::Release);
+    pub fn start(&mut self) -> bool {
+        self.shared.advance.swap(true, Ordering::SeqCst)
     }
 
-    pub fn stop(&mut self) {
-        self.shared.advance.store(false, Ordering::Relaxed);
+    pub fn stop(&mut self) -> bool {
+        self.shared.advance.swap(false, Ordering::SeqCst)
+    }
+
+    pub fn hit_breakpoint(&mut self) -> bool {
+        self.shared.hit_breakpoint.swap(false, Ordering::SeqCst)
     }
 
     pub fn step(&mut self) {
@@ -136,7 +143,7 @@ impl Runner {
     }
 
     pub fn running(&mut self) -> bool {
-        self.shared.advance.load(Ordering::Relaxed)
+        self.shared.advance.load(Ordering::SeqCst)
     }
 
     pub fn get(&mut self) -> MutexGuard<'_, State> {
