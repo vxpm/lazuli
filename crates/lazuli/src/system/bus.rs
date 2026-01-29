@@ -429,7 +429,7 @@ impl System {
 
             // === Pixel Engine ===
             Mmio::PixelInterruptStatus => {
-                let mut written = 0;
+                let mut written = gx::pix::InterruptStatus::from_bits(0);
                 ne!(written.as_mut_bytes());
                 self.gpu.pix.write_interrupt(written);
             }

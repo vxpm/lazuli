@@ -209,6 +209,10 @@ impl CopyCmd {
 #[bitos(16)]
 #[derive(Debug, Default)]
 pub struct InterruptStatus {
+    #[bits(0)]
+    pub token_enable: bool,
+    #[bits(1)]
+    pub finish_enable: bool,
     #[bits(2)]
     pub token: bool,
     #[bits(3)]
@@ -330,7 +334,12 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn write_interrupt(&mut self, status: u16) {
-        self.interrupt = InterruptStatus::from_bits(self.interrupt.to_bits() & !status)
+    pub fn write_interrupt(&mut self, status: InterruptStatus) {
+        self.interrupt.set_token_enable(status.token_enable());
+        self.interrupt.set_finish_enable(status.finish_enable());
+
+        self.interrupt.set_token(status.token() & !status.token());
+        self.interrupt
+            .set_finish(self.interrupt.finish() & !status.finish());
     }
 }

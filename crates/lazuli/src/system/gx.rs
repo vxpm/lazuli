@@ -668,8 +668,12 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
                 ));
         }
         Reg::PixelDone => {
-            sys.gpu.pix.interrupt.set_finish(true);
-            sys.scheduler.schedule_now(pi::check_interrupts);
+            if masked.bit(1) {
+                sys.gpu.pix.interrupt.set_finish(true);
+                sys.scheduler.schedule_now(pi::check_interrupts);
+            } else {
+                tracing::warn!("draw done without bit 1 set");
+            }
         }
         Reg::PixelToken => write_masked!(0xFFFF; sys.gpu.pix.token),
         Reg::PixelTokenInt => {
