@@ -268,8 +268,8 @@ impl eframe::App for App {
             });
         });
 
-        let running = self.runner.running();
-        self.runner.stop();
+        let was_running = self.runner.stop();
+        self.runner.clear_breakpoint();
 
         {
             let mut state = self.runner.get();
@@ -285,13 +285,13 @@ impl eframe::App for App {
                 * 2;
         }
 
-        if running {
+        if was_running {
             self.runner.start();
         }
 
         let mut context = windows::Ctx {
             step: false,
-            running,
+            running: was_running,
             renderer: &mut self.renderer,
         };
 
@@ -323,8 +323,7 @@ impl eframe::App for App {
             }
         });
 
-        let running = self.runner.running();
-        if context.running != running {
+        if context.running != was_running {
             if context.running {
                 self.runner.start();
             } else {
