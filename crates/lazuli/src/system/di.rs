@@ -144,10 +144,20 @@ impl Interface {
 
         match opcode {
             Opcode::Identify => Command::Identify,
-            Opcode::Read => Command::Read {
-                offset: self.command_buffer[1] << 2,
-                length: self.command_buffer[2],
-            },
+            Opcode::Read => {
+                if buf[3] == 0x40 {
+                    assert_eq!(self.command_buffer[1], 0);
+                    assert_eq!(self.command_buffer[2], 0x20);
+                    assert_eq!(self.dma_length, 0x20);
+                }
+
+                assert!(self.dma_length.is_multiple_of(32));
+
+                Command::Read {
+                    offset: self.command_buffer[1] << 2,
+                    length: self.command_buffer[2],
+                }
+            }
             Opcode::Seek => Command::Seek {
                 offset: self.command_buffer[1] << 2,
             },
@@ -221,6 +231,8 @@ pub fn write_control(sys: &mut System, value: Control) {
             }
             Command::Read { offset, length } => {
                 assert!(sys.disk.control.dma());
+                assert_eq!(sys.disk.control.mode(), TransferMode::Read);
+                assert_eq!(sys.disk.dma_length, length);
 
                 // load from disk!
                 let target = sys.disk.dma_base;
@@ -236,7 +248,7 @@ pub fn write_control(sys: &mut System, value: Control) {
                     "reading 0x{length:08X} bytes from disk at 0x{offset:08X} into {target}"
                 );
 
-                let target = target.value().with_bit(31, false);
+                let target = target.value().with_bits(26, 32, 0);
                 let slice = &mut sys.mem.ram_mut()[target as usize..][..length as usize];
 
                 if !sys.modules.disk.has_disk() {
