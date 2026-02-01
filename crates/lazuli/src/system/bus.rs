@@ -127,7 +127,11 @@ impl System {
             Mmio::CpFifoReadPtrHigh => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[2..4]),
 
             // === Pixel Engine ===
-            Mmio::PixelInterruptStatus => ne!(self.gpu.pix.interrupt.as_bytes()),
+            Mmio::PixelInterruptStatus => {
+                // NOTE: the interrupt bits always read back as zero!
+                let to_read = self.gpu.pix.interrupt.with_token(false).with_finish(false);
+                ne!(to_read.as_bytes())
+            }
             Mmio::PixelToken => ne!((self.gpu.pix.token as u16).as_bytes()),
 
             // === Video Interface ===

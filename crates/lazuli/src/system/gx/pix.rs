@@ -1,6 +1,6 @@
 //! Pixel engine (PE).
 use bitos::integer::{u2, u3, u4, u10};
-use bitos::{Bits, bitos};
+use bitos::{BitUtils, Bits, bitos};
 use color::Abgr8;
 use gekko::Address;
 
@@ -207,8 +207,12 @@ impl CopyCmd {
 }
 
 #[bitos(16)]
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct InterruptStatus {
+    #[bits(0)]
+    pub token_enabled: bool,
+    #[bits(1)]
+    pub finish_enabled: bool,
     #[bits(2)]
     pub token: bool,
     #[bits(3)]
@@ -331,6 +335,11 @@ pub struct Interface {
 
 impl Interface {
     pub fn write_interrupt(&mut self, status: u16) {
-        self.interrupt = InterruptStatus::from_bits(self.interrupt.to_bits() & !status)
+        self.interrupt.set_token_enabled(status.bit(0));
+        self.interrupt.set_finish_enabled(status.bit(1));
+        self.interrupt
+            .set_token(self.interrupt.token() & !status.bit(2));
+        self.interrupt
+            .set_finish(self.interrupt.finish() & !status.bit(3));
     }
 }

@@ -138,8 +138,8 @@ pub fn get_active_interrupts(sys: &System) -> InterruptSources {
     sources.set_video_interface(video);
 
     // PE
-    sources.set_pe_token(sys.gpu.pix.interrupt.token());
-    sources.set_pe_finish(sys.gpu.pix.interrupt.finish());
+    sources.set_pe_token(sys.gpu.pix.interrupt.token() && sys.gpu.pix.interrupt.token_enabled());
+    sources.set_pe_finish(sys.gpu.pix.interrupt.finish() && sys.gpu.pix.interrupt.finish_enabled());
 
     // AI
     sources.set_audio_interface(
