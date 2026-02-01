@@ -26,7 +26,7 @@ pub struct Meta {
     pub stream_buffer_size: u8,
     #[brw(pad_before = 0x12)]
     pub magic: MagicWord,
-    #[brw(assert(game_name.len() <= 48))]
+    #[brw(assert(game_name.len() <= 0x3E0))]
     pub game_name: NullString,
 }
 
