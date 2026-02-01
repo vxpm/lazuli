@@ -828,7 +828,6 @@ impl Interpreter {
 
             sys.dsp.dsp_dma.length = 0;
             sys.dsp.dsp_dma.control.set_transfer_ongoing(false);
-            sys.dsp.control.set_dsp_dma_ongoing(false);
         }
     }
 
@@ -1013,7 +1012,6 @@ impl Interpreter {
             0xCB => {
                 sys.dsp.dsp_dma.length = value;
                 sys.dsp.dsp_dma.control.set_transfer_ongoing(true);
-                sys.dsp.control.set_dsp_dma_ongoing(true);
             }
             0xCD => sys.dsp.dsp_dma.dsp_base = value,
             0xCE => {

@@ -46,7 +46,7 @@ pub struct Control {
     #[bits(8)]
     pub dsp_interrupt_mask: bool,
     #[bits(9)]
-    pub dsp_dma_ongoing: bool,
+    pub aram_dma_ongoing: bool,
     #[bits(10)]
     pub unknown: bool,
     #[bits(11)]
@@ -211,5 +211,6 @@ pub fn aram_dma(sys: &mut System) {
 
         sys.dsp.aram_dma.control.set_length(u31::new(0));
         sys.dsp.control.set_aram_interrupt(true);
+        sys.dsp.control.set_aram_dma_ongoing(false);
     }
 }
