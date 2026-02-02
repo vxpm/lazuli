@@ -199,6 +199,7 @@ impl System {
                 data
             }
             Mmio::DspControl => ne!(self.dsp.control.as_bytes()),
+            Mmio::DspAramSize => ne!(self.dsp.aram_len.as_bytes()),
             Mmio::DspAramMode => ne!((!0u64).as_mut_bytes()), // TODO: figure out this register
             Mmio::DspAramDmaRamBase => ne!(self.dsp.aram_dma.ram_base.as_bytes()),
             Mmio::DspAramDmaAramBase => ne!(self.dsp.aram_dma.aram_base.as_bytes()),
@@ -535,6 +536,7 @@ impl System {
                 ne!(written.as_mut_bytes());
                 dspi::write_control(self, written);
             }
+            Mmio::DspAramSize => ne!(self.dsp.aram_len.as_mut_bytes()),
             Mmio::DspAramDmaRamBase => ne!(self.dsp.aram_dma.ram_base.as_mut_bytes()),
             Mmio::DspAramDmaAramBase => ne!(self.dsp.aram_dma.aram_base.as_mut_bytes()),
             Mmio::DspAramDmaControl => {

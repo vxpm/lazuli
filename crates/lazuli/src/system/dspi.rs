@@ -132,6 +132,7 @@ pub struct Dsp {
     pub cpu_mailbox: Mailbox,
     pub dsp_dma: DspDma,
     pub aram_dma: AramDma,
+    pub aram_len: u32,
     pub aram: Box<[u8; ARAM_LEN]>,
 }
 
@@ -143,6 +144,7 @@ impl Dsp {
             cpu_mailbox: Default::default(),
             dsp_dma: Default::default(),
             aram_dma: Default::default(),
+            aram_len: 0,
             aram: boxed_array(0),
         }
     }
@@ -183,28 +185,40 @@ pub fn write_control(sys: &mut System, value: Control) {
 
 /// Performs the ARAM DMA if length is not zero.
 pub fn aram_dma(sys: &mut System) {
-    let length = sys.dsp.aram_dma.control.length().value() as usize;
     let ram_base = sys.dsp.aram_dma.ram_base.value().with_bits(26, 32, 0);
-    let aram_base = sys.dsp.aram_dma.aram_base & 0x00FF_FFFF;
+    let aram_base = sys.dsp.aram_dma.aram_base as usize;
+
+    if aram_base >= ARAM_LEN {
+        // software will try to DMA from out-of-bounds ARAM regions to test for ARAM expansion. in
+        // this case, just ignore it
+        sys.dsp.aram_dma.control.set_length(u31::new(0));
+        sys.dsp.control.set_aram_interrupt(true);
+        sys.dsp.control.set_aram_dma_ongoing(false);
+        return;
+    }
+
+    let max_length = ARAM_LEN - aram_base;
+    let length = sys.dsp.aram_dma.control.length().value() as usize;
+    let effective_length = length.min(max_length);
 
     match sys.dsp.aram_dma.control.direction() {
         AramDmaDirection::FromRamToAram => {
             tracing::debug!(
-                "ARAM DMA {length} bytes from RAM {} to ARAM {aram_base:08X}",
+                "ARAM DMA {effective_length} bytes from RAM {} to ARAM {aram_base:08X}",
                 Address(ram_base)
             );
 
-            let aram = &mut sys.dsp.aram[aram_base as usize..][..length];
-            aram.copy_from_slice(&sys.mem.ram()[ram_base as usize..][..length]);
+            let aram = &mut sys.dsp.aram[aram_base as usize..][..effective_length];
+            aram.copy_from_slice(&sys.mem.ram()[ram_base as usize..][..effective_length]);
         }
         AramDmaDirection::FromAramToRam => {
             tracing::debug!(
-                "ARAM DMA {length} bytes from ARAM {aram_base:08X} to RAM {}",
+                "ARAM DMA {effective_length} bytes from ARAM {aram_base:08X} to RAM {}",
                 Address(ram_base)
             );
 
-            sys.mem.ram_mut()[ram_base as usize..][..length]
-                .copy_from_slice(&sys.dsp.aram[aram_base as usize..][..length]);
+            sys.mem.ram_mut()[ram_base as usize..][..effective_length]
+                .copy_from_slice(&sys.dsp.aram[aram_base as usize..][..effective_length]);
         }
     }
 
