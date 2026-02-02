@@ -54,4 +54,9 @@ impl<T, const LEN: usize> Table<T, LEN> {
 
         self.insert(index, T::default())
     }
+
+    #[inline(always)]
+    pub fn clear(&mut self) {
+        self.entries.fill_with(|| None);
+    }
 }

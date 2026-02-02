@@ -165,10 +165,10 @@ impl Blocks {
 
     /// Clears all mappings.
     pub fn clear(&mut self) {
-        self.logical_mappings = mapping::Table::default();
-        self.physical_mappings = mapping::Table::default();
-        self.logical_deps = mapping::DepsTable::default();
-        self.physical_deps = mapping::DepsTable::default();
+        self.logical_mappings.clear();
+        self.physical_mappings.clear();
+        self.logical_deps.clear();
+        self.physical_deps.clear();
     }
 }
 

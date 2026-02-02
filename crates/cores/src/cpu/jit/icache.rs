@@ -4,10 +4,10 @@ use lazuli::system::System;
 
 use crate::cpu::jit::table::Table;
 
-const ICACHE_L0_BITS: usize = 11;
+const ICACHE_L0_BITS: usize = 8;
 const ICACHE_L0_COUNT: usize = 1 << ICACHE_L0_BITS;
 const ICACHE_L0_MASK: usize = ICACHE_L0_COUNT - 1;
-const ICACHE_L1_BITS: usize = 8;
+const ICACHE_L1_BITS: usize = 11;
 const ICACHE_L1_COUNT: usize = 1 << ICACHE_L1_BITS;
 const ICACHE_L1_MASK: usize = ICACHE_L1_COUNT - 1;
 const ICACHE_L2_BITS: usize = 8;
@@ -65,6 +65,6 @@ impl Cache {
     }
 
     pub fn clear(&mut self) {
-        self.0 = Table::new();
+        self.0.clear();
     }
 }

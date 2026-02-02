@@ -74,6 +74,10 @@ impl Table {
         let level2 = level1.get(idx1)?;
         level2.get(idx2)
     }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
 }
 
 #[derive(Default)]
@@ -112,5 +116,9 @@ impl DepsTable {
         let (idx0, idx1) = page_to_deps_idx(page);
         let level1 = self.0.get(idx0)?;
         level1.get(idx1)
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
     }
 }
