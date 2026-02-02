@@ -6,15 +6,12 @@ use lazuli::Address;
 use crate::cpu::jit::BlockId;
 use crate::cpu::jit::table::Table as BaseTable;
 
-const MAP_TBL_L0_BITS: usize = 12;
+const MAP_TBL_L0_BITS: usize = 14;
 const MAP_TBL_L0_COUNT: usize = 1 << MAP_TBL_L0_BITS;
 const MAP_TBL_L0_MASK: usize = MAP_TBL_L0_COUNT - 1;
-const MAP_TBL_L1_BITS: usize = 8;
+const MAP_TBL_L1_BITS: usize = 16;
 const MAP_TBL_L1_COUNT: usize = 1 << MAP_TBL_L1_BITS;
 const MAP_TBL_L1_MASK: usize = MAP_TBL_L1_COUNT - 1;
-const MAP_TBL_L2_BITS: usize = 10;
-const MAP_TBL_L2_COUNT: usize = 1 << MAP_TBL_L2_BITS;
-const MAP_TBL_L2_MASK: usize = MAP_TBL_L2_COUNT - 1;
 
 const DEPS_PAGE_LEN: usize = 1 << 12;
 const DEPS_TBL_L0_BITS: usize = 12;
@@ -25,12 +22,11 @@ const DEPS_TBL_L1_COUNT: usize = 1 << DEPS_TBL_L1_BITS;
 const DEPS_TBL_L1_MASK: usize = DEPS_TBL_L1_COUNT - 1;
 
 #[inline(always)]
-fn addr_to_mapping_idx(addr: Address) -> (usize, usize, usize) {
+fn addr_to_mapping_idx(addr: Address) -> (usize, usize) {
     let base = (addr.value() >> 2) as usize;
     (
         base >> (30 - MAP_TBL_L0_BITS) & MAP_TBL_L0_MASK,
         (base >> (30 - MAP_TBL_L0_BITS - MAP_TBL_L1_BITS)) & MAP_TBL_L1_MASK,
-        (base >> (30 - MAP_TBL_L0_BITS - MAP_TBL_L1_BITS - MAP_TBL_L2_BITS)) & MAP_TBL_L2_MASK,
     )
 }
 
@@ -49,30 +45,25 @@ pub struct Mapping {
 }
 
 #[derive(Default)]
-pub struct Table(
-    BaseTable<BaseTable<BaseTable<Mapping, MAP_TBL_L2_COUNT>, MAP_TBL_L1_COUNT>, MAP_TBL_L0_COUNT>,
-);
+pub struct Table(BaseTable<BaseTable<Mapping, MAP_TBL_L1_COUNT>, MAP_TBL_L0_COUNT>);
 
 impl Table {
     pub fn insert(&mut self, addr: Address, mapping: Mapping) {
-        let (idx0, idx1, idx2) = addr_to_mapping_idx(addr);
+        let (idx0, idx1) = addr_to_mapping_idx(addr);
         let level1 = self.0.get_or_default(idx0);
-        let level2 = level1.get_or_default(idx1);
-        level2.insert(idx2, mapping);
+        level1.insert(idx1, mapping);
     }
 
     pub fn remove(&mut self, addr: Address) -> Option<Mapping> {
-        let (idx0, idx1, idx2) = addr_to_mapping_idx(addr);
+        let (idx0, idx1) = addr_to_mapping_idx(addr);
         let level1 = self.0.get_mut(idx0)?;
-        let level2 = level1.get_mut(idx1)?;
-        level2.remove(idx2)
+        level1.remove(idx1)
     }
 
     pub fn get(&self, addr: Address) -> Option<&Mapping> {
-        let (idx0, idx1, idx2) = addr_to_mapping_idx(addr);
+        let (idx0, idx1) = addr_to_mapping_idx(addr);
         let level1 = self.0.get(idx0)?;
-        let level2 = level1.get(idx1)?;
-        level2.get(idx2)
+        level1.get(idx1)
     }
 
     pub fn clear(&mut self) {
