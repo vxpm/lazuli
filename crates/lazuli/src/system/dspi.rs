@@ -217,7 +217,7 @@ pub fn aram_dma(sys: &mut System) {
                 Address(ram_base)
             );
 
-            let aram = &mut sys.dsp.aram[aram_base as usize..][..effective_length];
+            let aram = &mut sys.dsp.aram[aram_base..][..effective_length];
             aram.copy_from_slice(&sys.mem.ram()[ram_base as usize..][..effective_length]);
         }
         AramDmaDirection::FromAramToRam => {
@@ -227,7 +227,7 @@ pub fn aram_dma(sys: &mut System) {
             );
 
             sys.mem.ram_mut()[ram_base as usize..][..effective_length]
-                .copy_from_slice(&sys.dsp.aram[aram_base as usize..][..effective_length]);
+                .copy_from_slice(&sys.dsp.aram[aram_base..][..effective_length]);
         }
     }
 

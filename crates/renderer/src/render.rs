@@ -1004,7 +1004,7 @@ impl Renderer {
                 height: height as u32,
                 depth_or_array_layers: 1,
             },
-            &copy_target,
+            copy_target,
             &mut encoder,
         );
 
@@ -1120,7 +1120,7 @@ impl Renderer {
                 height: height as u32,
                 depth_or_array_layers: 1,
             },
-            &copy_target,
+            copy_target,
             &mut encoder,
         );
 
