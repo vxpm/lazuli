@@ -690,7 +690,7 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             sys.scheduler.schedule_now(pi::check_interrupts);
         }
         Reg::PixelCopySrc => write_masked!(sys.gpu.pix.copy_src),
-        Reg::PixelCopyDimensions => write_masked!(sys.gpu.pix.copy_dimensions),
+        Reg::PixelCopyDimensions => write_masked!(sys.gpu.pix.copy_dims),
         Reg::PixelCopyDst => {
             let mut value = sys.gpu.pix.copy_dst.value() >> 5;
             write_masked!(value);
@@ -1100,63 +1100,60 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
         sys.modules
             .render
             .exec(render::Action::XfbCopy { clear: cmd.clear() });
+
         return;
     }
 
     if sys.gpu.pix.control.format().is_depth() {
         let (sender, receiver) = oneshot::channel();
-        let x = sys.gpu.pix.copy_src.x().value();
-        let y = sys.gpu.pix.copy_src.y().value();
-        let width = sys.gpu.pix.copy_dimensions.width();
-        let height = sys.gpu.pix.copy_dimensions.height();
-        let stride = sys.gpu.pix.copy_stride;
-        let dst = sys.gpu.pix.copy_dst;
-
-        sys.modules.render.exec(render::Action::DepthCopy {
-            x,
-            y,
-            width,
-            height,
+        let params = render::CopyArgs {
+            src: sys.gpu.pix.copy_src,
+            dims: sys.gpu.pix.copy_dims,
             half: cmd.half(),
             clear: cmd.clear(),
+        };
+
+        sys.modules.render.exec(render::Action::DepthCopy {
+            args: params,
             response: sender,
         });
+
         let Ok(pixels) = receiver.recv() else {
-            tracing::warn!("render module did not answer depth copy request");
+            tracing::error!("render module did not answer depth copy request");
             return;
         };
 
         let divisor = if cmd.half() { 2 } else { 1 };
-        let width = width as u32 / divisor;
-        let height = height as u32 / divisor;
+        let width = params.dims.width() as u32 / divisor;
+        let height = params.dims.height() as u32 / divisor;
+        let dst = sys.gpu.pix.copy_dst;
+        let stride = sys.gpu.pix.copy_stride;
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_depth_texture(pixels, cmd.depth_format(), stride, width, height, output);
     } else {
         let (sender, receiver) = oneshot::channel();
-        let x = sys.gpu.pix.copy_src.x().value();
-        let y = sys.gpu.pix.copy_src.y().value();
-        let width = sys.gpu.pix.copy_dimensions.width();
-        let height = sys.gpu.pix.copy_dimensions.height();
-        let stride = sys.gpu.pix.copy_stride;
-        let dst = sys.gpu.pix.copy_dst;
-
-        sys.modules.render.exec(render::Action::ColorCopy {
-            x,
-            y,
-            width,
-            height,
+        let params = render::CopyArgs {
+            src: sys.gpu.pix.copy_src,
+            dims: sys.gpu.pix.copy_dims,
             half: cmd.half(),
             clear: cmd.clear(),
+        };
+
+        sys.modules.render.exec(render::Action::ColorCopy {
+            args: params,
             response: sender,
         });
+
         let Ok(pixels) = receiver.recv() else {
-            tracing::warn!("render module did not answer color copy request");
+            tracing::error!("render module did not answer color copy request");
             return;
         };
 
         let divisor = if cmd.half() { 2 } else { 1 };
-        let width = width as u32 / divisor;
-        let height = height as u32 / divisor;
+        let width = params.dims.width() as u32 / divisor;
+        let height = params.dims.height() as u32 / divisor;
+        let dst = sys.gpu.pix.copy_dst;
+        let stride = sys.gpu.pix.copy_stride;
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
     }

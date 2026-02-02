@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 
 use glam::{Mat4, Vec2};
 use lazuli::modules::render::{
-    Action, Clut, ClutAddress, Sampler, Scaling, TexEnvConfig, TexGenConfig, Texture, TextureId,
-    Viewport, oneshot,
+    Action, Clut, ClutAddress, CopyArgs, Sampler, Scaling, TexEnvConfig, TexGenConfig, Texture,
+    TextureId, Viewport, oneshot,
 };
 use lazuli::system::gx::color::{Rgba, Rgba8};
 use lazuli::system::gx::pix::{
@@ -267,26 +267,8 @@ impl Renderer {
             Action::SetColorChannel(idx, control) => self.set_color_channel(idx, control),
             Action::SetAlphaChannel(idx, control) => self.set_alpha_channel(idx, control),
             Action::SetLight(idx, light) => self.set_light(idx, light),
-            Action::ColorCopy {
-                x,
-                y,
-                width,
-                height,
-                half,
-                clear,
-                response,
-            } => self.color_copy(x, y, width, height, half, clear, response),
-            Action::DepthCopy {
-                x,
-                y,
-                width,
-                height,
-                half,
-                clear,
-                response,
-            } => {
-                self.depth_copy(x, y, width, height, half, clear, response);
-            }
+            Action::ColorCopy { args, response } => self.color_copy(args, response),
+            Action::DepthCopy { args, response } => self.depth_copy(args, response),
             Action::XfbCopy { clear } => {
                 self.debug("XFB copy requested");
                 self.next_pass(clear, true);
@@ -1185,41 +1167,59 @@ impl Renderer {
         depth
     }
 
-    pub fn color_copy(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-        clear: bool,
-        response: oneshot::Sender<Vec<Rgba8>>,
-    ) {
+    pub fn color_copy(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<Rgba8>>) {
+        let CopyArgs {
+            src,
+            dims,
+            half,
+            clear,
+        } = args;
+
         self.debug(format!(
-            "color copy requested: ({x}, {y}) [{width}x{height}] (mip: {half})"
+            "color copy requested: ({}, {}) [{}x{}] (mip: {})",
+            src.x().value(),
+            src.y().value(),
+            dims.width(),
+            dims.height(),
+            half
         ));
 
         self.next_pass(clear, false);
-        let data = self.get_color_data(x, y, width, height, half);
+        let data = self.get_color_data(
+            src.x().value(),
+            src.y().value(),
+            dims.width(),
+            dims.height(),
+            half,
+        );
         response.send(data).unwrap();
     }
 
-    pub fn depth_copy(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-        clear: bool,
-        response: oneshot::Sender<Vec<u32>>,
-    ) {
+    pub fn depth_copy(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<u32>>) {
+        let CopyArgs {
+            src,
+            dims,
+            half,
+            clear,
+        } = args;
+
         self.debug(format!(
-            "depth copy requested: ({x}, {y}) [{width}x{height}] (mip: {half})"
+            "depth copy requested: ({}, {}) [{}x{}] (mip: {})",
+            src.x().value(),
+            src.y().value(),
+            dims.width(),
+            dims.height(),
+            half
         ));
 
         self.next_pass(clear, false);
-        let data = self.get_depth_data(x, y, width, height, half);
+        let data = self.get_depth_data(
+            src.x().value(),
+            src.y().value(),
+            dims.width(),
+            dims.height(),
+            half,
+        );
         response.send(data).unwrap();
     }
 }

@@ -71,14 +71,14 @@ pub struct CopySrc {
 
 #[bitos(32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct CopyDimensions {
+pub struct CopyDims {
     #[bits(0..10)]
     pub width_minus_one: u10,
     #[bits(10..20)]
     pub height_minus_one: u10,
 }
 
-impl CopyDimensions {
+impl CopyDims {
     pub fn width(&self) -> u16 {
         self.width_minus_one().value() + 1
     }
@@ -385,7 +385,7 @@ pub struct Interface {
     pub constant_alpha: ConstantAlpha,
     pub copy_src: CopySrc,
     pub copy_dst: Address,
-    pub copy_dimensions: CopyDimensions,
+    pub copy_dims: CopyDims,
     pub copy_stride: u32,
     pub clear_color: Abgr8,
     pub clear_depth: u32,

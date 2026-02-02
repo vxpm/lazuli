@@ -6,7 +6,9 @@ use oneshot::Sender;
 use ordered_float::OrderedFloat;
 use static_assertions::const_assert;
 
-use crate::system::gx::pix::{BlendMode, BufferFormat, ConstantAlpha, DepthMode, Scissor};
+use crate::system::gx::pix::{
+    BlendMode, BufferFormat, ConstantAlpha, CopyDims, CopySrc, DepthMode, Scissor,
+};
 use crate::system::gx::tev::{AlphaFunction, Constant, DepthTexture, StageOps, StageRefs};
 use crate::system::gx::tex::{ClutFormat, Format, LodLimits, MipmapData, SamplerMode};
 use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
@@ -135,6 +137,14 @@ impl ClutAddress {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CopyArgs {
+    pub src: CopySrc,
+    pub dims: CopyDims,
+    pub half: bool,
+    pub clear: bool,
+}
+
 pub enum Action {
     SetFramebufferFormat(BufferFormat),
     SetViewport(Viewport),
@@ -172,21 +182,11 @@ pub enum Action {
     },
     Draw(Topology, VertexStream),
     ColorCopy {
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-        clear: bool,
+        args: CopyArgs,
         response: Sender<Vec<Rgba8>>,
     },
     DepthCopy {
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-        clear: bool,
+        args: CopyArgs,
         response: Sender<Vec<u32>>,
     },
     XfbCopy {
