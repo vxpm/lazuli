@@ -87,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ needs.generate_name.outputs.name_linux }}
-          path: ./target/release/${{ needs.generate_name.outputs.name_linux }}
+          path: ./target/release-dist/${{ needs.generate_name.outputs.name_linux }}
 
   build_windows:
     name: Build nightly (windows)
@@ -120,7 +120,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ needs.generate_name.outputs.name_windows }}
-          path: ./target/release/${{ needs.generate_name.outputs.name_windows }}
+          path: ./target/release-dist/${{ needs.generate_name.outputs.name_windows }}
 
   release:
     name: Create nightly release
