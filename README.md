@@ -72,8 +72,19 @@ For more CLI options, `--help` is your friend.
 
 ## Inputs
 
-Currently, only gamepads are supported (i.e. there's no keyboard based input). When a gamepad is detected,
-it is automatically set as the active gamepad - there's no need to do anything special.
+Both gamepads and keyboard input are supported. When a gamepad is detected, it is automatically set
+as the active input source - otherwise, the keyboard will be used. Mappings cannot be customized yet.
+
+Keyboard Mappings:
+- Left Analog: W A S D
+- Right Analog (C): H J K L
+- A B: B N
+- X Y: C V
+- Z: R
+- Start: Space
+- D-Pad: Arrows
+- Left Trigger: Q/T
+- Right Trigger: E/Y
 
 ## Debugging
 
