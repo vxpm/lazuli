@@ -625,11 +625,15 @@ impl Core {
             Err(e) => match e {
                 ppcjit::BuildError::EmptyBlock => panic!("built empty block at pc {}", sys.cpu.pc),
                 ppcjit::BuildError::Builder { source } => panic!("block builder error: {}", source),
-                ppcjit::BuildError::Codegen { source, meta } => {
+                ppcjit::BuildError::Codegen {
+                    source,
+                    sequence,
+                    clir,
+                } => {
                     panic!(
                         "block codegen error:\n{}\n{}\n{:?}",
-                        meta.seq,
-                        meta.clir.as_deref().unwrap_or("none"),
+                        sequence,
+                        clir.as_deref().unwrap_or("<missing clir>"),
                         source,
                     )
                 }

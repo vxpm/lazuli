@@ -7,6 +7,7 @@ use lazuli::modules::debug::NopDebugModule;
 use lazuli::modules::disk::NopDiskModule;
 use lazuli::modules::input::NopInputModule;
 use lazuli::modules::render::NopRenderModule;
+use lazuli::modules::vertex::NopVertexModule;
 use lazuli::system::mem::{RAM_END, RAM_LEN, RAM_START};
 use lazuli::system::{self, Modules, System};
 
@@ -75,6 +76,7 @@ fn main() {
         disk: Box::new(NopDiskModule),
         input: Box::new(NopInputModule),
         render: Box::new(NopRenderModule),
+        vertex: Box::new(NopVertexModule),
     };
 
     let mut system = System::new(

@@ -129,7 +129,7 @@ impl App {
                         ignore_unimplemented: cfg.ppcjit.ignore_unimplemented_inst,
                         round_to_single: cfg.ppcjit.round_to_single,
                     },
-                    cache_path: jit_cache_path,
+                    cache_path: Some(jit_cache_path),
                 },
             })),
         };

@@ -58,6 +58,8 @@ pub struct Meta {
     pub seq: Sequence,
     /// The Cranelift IR of this block. Only available if `cfg!(debug_assertions)` is true.
     pub clir: Option<String>,
+    /// The disassembly of this block. Only available if `cfg!(debug_assertions)` is true.
+    pub disasm: Option<String>,
     /// How many cycles this block executes at most.
     pub cycles: u32,
     /// The pattern of this block.
