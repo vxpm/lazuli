@@ -1,7 +1,7 @@
 use cranelift::codegen::ir;
 use cranelift::prelude::{InstBuilder, IntCC};
 use gekko::disasm::Ins;
-use gekko::{InsExt, Reg, SPR};
+use gekko::{InsExt, SPR};
 
 use super::{Action, BlockBuilder};
 use crate::builder::InstructionInfo;
@@ -559,10 +559,9 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
 
         let value = self.bd.ins().fadd(fpr_a, fpr_b);
-
         self.set(ins.fpr_d(), value);
-        self.update_fprf_cmpz(value);
 
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -578,12 +577,10 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fadd(fpr_a, fpr_b);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -594,15 +591,13 @@ impl BlockBuilder<'_> {
     pub fn ps_add(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
 
-        let value = self.bd.ins().fadd(ps_a, ps_b);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fadd(fpr_a, fpr_b);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -623,7 +618,6 @@ impl BlockBuilder<'_> {
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -639,12 +633,10 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fsub(fpr_a, fpr_b);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -655,15 +647,13 @@ impl BlockBuilder<'_> {
     pub fn ps_sub(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
 
-        let value = self.bd.ins().fsub(ps_a, ps_b);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fsub(fpr_a, fpr_b);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -697,12 +687,10 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fmul(fpr_a, fpr_c);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -717,12 +705,9 @@ impl BlockBuilder<'_> {
         let fpr_c = self.get(ins.fpr_c());
 
         let value = self.bd.ins().fmul(fpr_a, fpr_c);
-
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -739,12 +724,10 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -763,7 +746,6 @@ impl BlockBuilder<'_> {
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -781,12 +763,10 @@ impl BlockBuilder<'_> {
         let neg_fpr_b = self.bd.ins().fneg(fpr_b);
         let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -806,7 +786,6 @@ impl BlockBuilder<'_> {
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -826,7 +805,6 @@ impl BlockBuilder<'_> {
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -844,12 +822,10 @@ impl BlockBuilder<'_> {
         let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
         let value = self.bd.ins().fneg(value);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -870,7 +846,6 @@ impl BlockBuilder<'_> {
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -889,12 +864,10 @@ impl BlockBuilder<'_> {
         let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
         let value = self.bd.ins().fneg(value);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -910,12 +883,10 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fdiv(fpr_a, fpr_b);
         let value = self.round_to_single(value);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -930,12 +901,10 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
 
         let value = self.bd.ins().fdiv(fpr_a, fpr_b);
-
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
-        self.set(Reg::PS1(ins.fpr_d()), value);
 
         self.update_fprf_cmpz(value);
-
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -946,10 +915,10 @@ impl BlockBuilder<'_> {
     pub fn ps_neg(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_b = self.get_ps(ins.fpr_b());
+        let fpr_b = self.get(ins.fpr_b());
 
-        let value = self.bd.ins().fneg(ps_b);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fneg(fpr_b);
+        self.set(ins.fpr_d(), value);
 
         if ins.field_rc() {
             self.update_cr1_float();
@@ -961,16 +930,14 @@ impl BlockBuilder<'_> {
     pub fn ps_mul(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_c = self.get_ps(ins.fpr_c());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_c = self.get(ins.fpr_c());
 
-        let value = self.bd.ins().fmul(ps_a, ps_c);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fmul(fpr_a, fpr_c);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -981,16 +948,14 @@ impl BlockBuilder<'_> {
     pub fn ps_madd(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
-        let ps_c = self.get_ps(ins.fpr_c());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
+        let fpr_c = self.get(ins.fpr_c());
 
-        let value = self.bd.ins().fma(ps_a, ps_c, ps_b);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1001,19 +966,17 @@ impl BlockBuilder<'_> {
     pub fn ps_madds0(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
 
-        let ps0_c = self.get(ins.fpr_c());
-        let ps0_c = self.bd.ins().splat(ir::types::F64X2, ps0_c);
+        let fpr_c = self.get(ins.fpr_c());
+        let fpr_c_ps0 = self.copy_ps0_to_ps1(fpr_c);
 
-        let value = self.bd.ins().fma(ps_a, ps0_c, ps_b);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fma(fpr_a, fpr_c_ps0, fpr_b);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1024,19 +987,17 @@ impl BlockBuilder<'_> {
     pub fn ps_madds1(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
 
-        let ps1_c = self.get(Reg::PS1(ins.fpr_c()));
-        let ps1_c = self.bd.ins().splat(ir::types::F64X2, ps1_c);
+        let fpr_c = self.get(ins.fpr_c());
+        let fpr_c_ps1 = self.copy_ps1_to_ps0(fpr_c);
 
-        let value = self.bd.ins().fma(ps_a, ps1_c, ps_b);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fma(fpr_a, fpr_c_ps1, fpr_b);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1047,18 +1008,16 @@ impl BlockBuilder<'_> {
     pub fn ps_msub(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
-        let ps_c = self.get_ps(ins.fpr_c());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
+        let fpr_c = self.get(ins.fpr_c());
 
-        let neg_ps_b = self.bd.ins().fneg(ps_b);
-        let value = self.bd.ins().fma(ps_a, ps_c, neg_ps_b);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let neg_fpr_b = self.bd.ins().fneg(fpr_b);
+        let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1069,18 +1028,16 @@ impl BlockBuilder<'_> {
     pub fn ps_nmadd(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
-        let ps_c = self.get_ps(ins.fpr_c());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
+        let fpr_c = self.get(ins.fpr_c());
 
-        let value = self.bd.ins().fma(ps_a, ps_c, ps_b);
+        let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
         let value = self.bd.ins().fneg(value);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1091,19 +1048,17 @@ impl BlockBuilder<'_> {
     pub fn ps_nmsub(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
-        let ps_c = self.get_ps(ins.fpr_c());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
+        let fpr_c = self.get(ins.fpr_c());
 
-        let neg_ps_b = self.bd.ins().fneg(ps_b);
-        let value = self.bd.ins().fma(ps_a, ps_c, neg_ps_b);
+        let neg_fpr_b = self.bd.ins().fneg(fpr_b);
+        let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
         let value = self.bd.ins().fneg(value);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1114,17 +1069,15 @@ impl BlockBuilder<'_> {
     pub fn ps_muls0(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps0_c = self.get(ins.fpr_c());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_c = self.get(ins.fpr_c());
+        let fpr_c_ps0 = self.copy_ps0_to_ps1(fpr_c);
 
-        let ps0_c = self.bd.ins().splat(ir::types::F64X2, ps0_c);
-        let value = self.bd.ins().fmul(ps_a, ps0_c);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fmul(fpr_a, fpr_c_ps0);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1135,17 +1088,15 @@ impl BlockBuilder<'_> {
     pub fn ps_muls1(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps1_c = self.get(Reg::PS1(ins.fpr_c()));
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_c = self.get(ins.fpr_c());
+        let fpr_c_ps1 = self.copy_ps1_to_ps0(fpr_c);
 
-        let ps1_c = self.bd.ins().splat(ir::types::F64X2, ps1_c);
-        let value = self.bd.ins().fmul(ps_a, ps1_c);
-        let value = self.ps_round_to_single(value);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fmul(fpr_a, fpr_c_ps1);
+        let value = self.round_to_single(value);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }
@@ -1156,15 +1107,13 @@ impl BlockBuilder<'_> {
     pub fn ps_div(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
-        let ps_a = self.get_ps(ins.fpr_a());
-        let ps_b = self.get_ps(ins.fpr_b());
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
 
-        let value = self.bd.ins().fdiv(ps_a, ps_b);
-        self.set_ps(ins.fpr_d(), value);
+        let value = self.bd.ins().fdiv(fpr_a, fpr_b);
+        self.set(ins.fpr_d(), value);
 
-        let ps0 = self.get(ins.fpr_d());
-        self.update_fprf_cmpz(ps0);
-
+        self.update_fprf_cmpz(value);
         if ins.field_rc() {
             self.update_cr1_float();
         }

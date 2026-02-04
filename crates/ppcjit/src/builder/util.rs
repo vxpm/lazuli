@@ -2,6 +2,7 @@ use cranelift::codegen::ir;
 use cranelift::prelude::{FloatCC, FunctionBuilder, InstBuilder, IntCC};
 use gekko::disasm::{Ins, ParsedIns};
 use gekko::{Reg, SPR};
+use zerocopy::IntoBytes;
 
 use super::{Action, BlockBuilder};
 use crate::builder::InstructionInfo;
@@ -139,20 +140,112 @@ impl BlockBuilder<'_> {
 
     pub fn round_to_single(&mut self, value: ir::Value) -> ir::Value {
         if self.compiler.settings.round_to_single {
-            let single = self.bd.ins().fdemote(ir::types::F32, value);
-            self.bd.ins().fpromote(ir::types::F64, single)
-        } else {
-            value
-        }
-    }
-
-    pub fn ps_round_to_single(&mut self, value: ir::Value) -> ir::Value {
-        if self.compiler.settings.round_to_single {
             let single = self.bd.ins().fvdemote(value);
             self.bd.ins().fvpromote_low(single)
         } else {
             value
         }
+    }
+
+    pub fn copy_ps0_to_ps1(&mut self, value: ir::Value) -> ir::Value {
+        let bytes = self.bd.ins().bitcast(
+            ir::types::I8X16,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            value,
+        );
+
+        const SHUFFLE_CONST: [u8; 16] = [
+            0, 1, 2, 3, 4, 5, 6, 7, // ps1
+            0, 1, 2, 3, 4, 5, 6, 7, // ps0
+        ];
+
+        let shuffle_const = self
+            .bd
+            .func
+            .dfg
+            .constants
+            .insert(ir::ConstantData::from(SHUFFLE_CONST.as_bytes()));
+
+        let mask = self.bd.ins().vconst(ir::types::I8X16, shuffle_const);
+        let value = self.bd.ins().swizzle(bytes, mask);
+
+        self.bd.ins().bitcast(
+            ir::types::F64X2,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            value,
+        )
+    }
+
+    pub fn copy_ps1_to_ps0(&mut self, value: ir::Value) -> ir::Value {
+        let bytes = self.bd.ins().bitcast(
+            ir::types::I8X16,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            value,
+        );
+
+        const SHUFFLE_CONST: [u8; 16] = [
+            8, 9, 10, 11, 12, 13, 14, 15, // ps0
+            8, 9, 10, 11, 12, 13, 14, 15, // ps1
+        ];
+
+        let shuffle_const = self
+            .bd
+            .func
+            .dfg
+            .constants
+            .insert(ir::ConstantData::from(SHUFFLE_CONST.as_slice()));
+
+        let mask = self.bd.ins().vconst(ir::types::I8X16, shuffle_const);
+        let value = self.bd.ins().swizzle(bytes, mask);
+
+        self.bd.ins().bitcast(
+            ir::types::F64X2,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            value,
+        )
+    }
+
+    /// Returns [a.sel_a, b.sel_b]
+    pub fn ps_merge(&mut self, a: ir::Value, b: ir::Value, sel_a: bool, sel_b: bool) -> ir::Value {
+        let mut mask = vec![];
+        if sel_a {
+            mask.extend_from_slice(&[8, 9, 10, 11, 12, 13, 14, 15]);
+        } else {
+            mask.extend_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]);
+        }
+
+        if sel_b {
+            mask.extend_from_slice(&[24, 25, 26, 27, 28, 29, 30, 31]);
+        } else {
+            mask.extend_from_slice(&[16, 17, 18, 19, 20, 21, 22, 23]);
+        }
+
+        let bytes_a = self.bd.ins().bitcast(
+            ir::types::I8X16,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            a,
+        );
+
+        let bytes_b = self.bd.ins().bitcast(
+            ir::types::I8X16,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            b,
+        );
+
+        let mask = self
+            .bd
+            .func
+            .dfg
+            .immediates
+            .push(ir::ConstantData::from(mask.as_slice()));
+
+        let value = self.bd.ins().shuffle(bytes_a, bytes_b, mask);
+
+        self.bd.ins().bitcast(
+            ir::types::F64X2,
+            ir::MemFlags::new().with_endianness(ir::Endianness::Little),
+            value,
+        )
     }
 
     /// Updates OV and SO in XER. `overflowed` must be a boolean (I8).
@@ -225,18 +318,25 @@ impl BlockBuilder<'_> {
         self.update_cr(0, lt, gt, eq, ov);
     }
 
-    ///// Updates CR0 by signed comparison of the given value with 0 and withe the given overflow
-    ///// flag. Value must be an I32.
-    //pub fn update_cr0_cmpz_ov(&mut self, value: ir::Value, ov: ir::Value) {
-    //    let lt = self.bd.ins().icmp_imm(IntCC::SignedLessThan, value, 0);
-    //    let gt = self.bd.ins().icmp_imm(IntCC::SignedGreaterThan, value, 0);
-    //    let eq = self.bd.ins().icmp_imm(IntCC::Equal, value, 0);
-    //
-    //    self.update_cr(0, lt, gt, eq, ov);
-    //}
+    pub fn update_fprf_cmpu(&mut self, lhs: ir::Value, rhs: ir::Value) {
+        let lhs = self.bd.ins().extractlane(lhs, 0);
+        let rhs = self.bd.ins().extractlane(rhs, 0);
 
-    /// All IR values must be booleans (i.e. I8).
-    pub fn update_fprf(&mut self, lt: ir::Value, gt: ir::Value, eq: ir::Value, un: ir::Value) {
+        let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
+        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
+        let eq = self.bd.ins().fcmp(FloatCC::Equal, lhs, rhs);
+        let un = self.bd.ins().fcmp(FloatCC::Unordered, lhs, rhs);
+
+        self.flush_fprf_inner(lt, gt, eq, un);
+    }
+
+    pub fn update_fprf_cmpz(&mut self, value: ir::Value) {
+        let zero = self.ir_value(0.0f64);
+        let zero = self.bd.ins().splat(ir::types::F64X2, zero);
+        self.update_fprf_cmpu(value, zero);
+    }
+
+    fn flush_fprf_inner(&mut self, lt: ir::Value, gt: ir::Value, eq: ir::Value, un: ir::Value) {
         let fpscr = self.get(Reg::FPSCR);
 
         let lt = self.bd.ins().uextend(ir::types::I32, lt);
@@ -261,17 +361,22 @@ impl BlockBuilder<'_> {
         self.set(Reg::FPSCR, updated);
     }
 
-    pub fn update_fprf_cmpz(&mut self, value: ir::Value) {
-        let zero = self.ir_value(0.0f64);
-        let lt = self.bd.ins().fcmp(FloatCC::LessThan, value, zero);
-        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, value, zero);
-        let eq = self.bd.ins().fcmp(FloatCC::Equal, value, zero);
-        let un = self.bd.ins().fcmp(FloatCC::Unordered, value, zero);
-        self.update_fprf(lt, gt, eq, un);
-    }
+    // pub fn flush_fprf(&mut self) {
+    //     let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
+    //     let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
+    //     let eq = self.bd.ins().fcmp(FloatCC::Equal, lhs, rhs);
+    //     let un = self.bd.ins().fcmp(FloatCC::Unordered, lhs, rhs);
+    //
+    //     let lt = self.bd.ins().extractlane(lt, 0);
+    //     let gt = self.bd.ins().extractlane(gt, 0);
+    //     let eq = self.bd.ins().extractlane(eq, 0);
+    //     let un = self.bd.ins().extractlane(un, 0);
+    //
+    //     self.flush_fprf_inner(lt, gt, eq, un);
+    // }
 
     pub fn update_fpscr(&mut self) {
-        tracing::warn!("update FEX and VX")
+        // TODO: implement this
     }
 
     /// Updates CR1 by copying bits 28..32 of FPSCR.

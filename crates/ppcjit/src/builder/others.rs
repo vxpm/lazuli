@@ -155,13 +155,14 @@ impl BlockBuilder<'_> {
 
     pub fn mtfsf(&mut self, ins: Ins) -> InstructionInfo {
         let fpr_b = self.get(ins.fpr_b());
+        let fpr_b_ps0 = self.bd.ins().extractlane(fpr_b, 0);
         let mask = self.ir_value(generate_mask(ins.field_mtfsf_fm()));
 
         let fpscr = self.get(Reg::FPSCR);
         let bits = self
             .bd
             .ins()
-            .bitcast(ir::types::I64, ir::MemFlags::new(), fpr_b);
+            .bitcast(ir::types::I64, ir::MemFlags::new(), fpr_b_ps0);
         let low = self.bd.ins().ireduce(ir::types::I32, bits);
 
         let value = self.bd.ins().bitselect(mask, low, fpscr);
