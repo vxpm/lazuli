@@ -1,0 +1,610 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: disasm
+---
+  pushq %rbp
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  movq %rsp, %rbp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 48 }
+  subq $0xe0, %rsp
+  movq %rbx, 0xb0(%rsp)
+  unwind SaveReg { clobber_offset: 0, reg: p3i }
+  movq %r12, 0xb8(%rsp)
+  unwind SaveReg { clobber_offset: 8, reg: p12i }
+  movq %r13, 0xc0(%rsp)
+  unwind SaveReg { clobber_offset: 16, reg: p13i }
+  movq %r14, 0xc8(%rsp)
+  unwind SaveReg { clobber_offset: 24, reg: p14i }
+  movq %r15, 0xd0(%rsp)
+  unwind SaveReg { clobber_offset: 32, reg: p15i }
+block0:
+  movq %rdi, %r13
+  movq %rsi, <offset:1>+8(%rsp)
+  movl 0x2a8(%rdx), %r8d
+  movq %rdx, <offset:1>+0x10(%rsp)
+  shrl $0xd, %r8d
+  testb $0x1, %r8b
+  jnz     label2; j label1
+block2:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl 0x14(%rdi), %r12d
+  movl 0x368(%rdi), %edx
+  movq %rdx, <offset:1>+0x78(%rsp)
+  leaq <offset:1>+(%rsp), %rcx
+  movq %rcx, %r15
+  load_ext_name userextname11+0, %rax
+  movq %r12, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testb %al, %al
+  jnz     label4; j label3
+block4:
+  movq %r13, %rbx
+  vmovsd <offset:1>+(%rsp), %xmm6
+  movdqu %xmm6, <offset:1>+0x98(%rsp)
+  movzbl %al, %r11d
+  leal (%r12, %r11), %r14d
+  load_ext_name userextname11+0, %r11
+  movq <offset:1>+0x78(%rsp), %rdx
+  movq %r15, %rcx
+  movq %r14, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r11
+  testb %al, %al
+  jnz     label6; j label5
+block6:
+  vmovsd <offset:1>+(%rsp), %xmm3
+  movq <offset:1>+0x10(%rsp), %rdi
+  movdqu %xmm3, <offset:1>+0x88(%rsp)
+  movl (%rdi), %r8d
+  movq %r8, <offset:1>+0x78(%rsp)
+  movl 0x368(%rdi), %edx
+  leal 8(%r12), %esi
+  load_ext_name userextname11+0, %r8
+  movq %r15, %rcx
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testb %al, %al
+  jnz     label8; j label7
+block8:
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd <offset:1>+(%rsp), %xmm5
+  movq <offset:1>+0x10(%rsp), %rdi
+  movdqu %xmm5, <offset:1>+0x68(%rsp)
+  vmovsd 0x98(%rdi), %xmm5
+  movl 0x28c(%rdi), %r14d
+  movl 0x18(%rdi), %r15d
+  movl 0x368(%rdi), %edx
+  movq %rdx, %r12
+  uninit  %xmm4
+  vxorpd %xmm4, %xmm4, %xmm7
+  vmovsd %xmm6, %xmm7, %xmm7
+  vmovlhps %xmm3, %xmm7, %xmm6
+  vpshufd $0x44, %xmm5, %xmm5
+  vmulpd %xmm5, %xmm6, %xmm3
+  movdqu %xmm5, <offset:1>+0x18(%rsp)
+  movdqu %xmm3, <offset:1>+0x58(%rsp)
+  load_ext_name userextname12+0, %r8
+  movq %r15, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x58(%rsp), %xmm0
+  call    *%r8
+  testb %al, %al
+  jnz     label10; j label9
+block10:
+  movdqu <offset:1>+0x58(%rsp), %xmm5
+  movzbl %al, %r9d
+  leal (%r15, %r9), %r13d
+  vpshufd $0xee, %xmm5, %xmm0
+  movdqu %xmm0, <offset:1>+0x38(%rsp)
+  load_ext_name userextname12+0, %r9
+  movq %r12, %rdx
+  movq %r13, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r9
+  testb %al, %al
+  jnz     label12; j label11
+block12:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl 0x368(%rdi), %edx
+  movq %rdx, <offset:1>+0x48(%rsp)
+  leal 8(%r15), %r12d
+  uninit  %xmm7
+  vxorpd %xmm7, %xmm7, %xmm1
+  movdqu <offset:1>+0x68(%rsp), %xmm5
+  vmovsd %xmm5, %xmm1, %xmm3
+  movabsq $0x3ff0000000000000, %rdx
+  vmovq %rdx, %xmm2
+  vmovlhps %xmm2, %xmm3, %xmm1
+  movdqu <offset:1>+0x18(%rsp), %xmm5
+  movdqu %xmm2, <offset:1>+0x38(%rsp)
+  vmulpd %xmm5, %xmm1, %xmm1
+  movdqu %xmm1, <offset:1>+0x28(%rsp)
+  load_ext_name userextname12+0, %r8
+  movq <offset:1>+0x48(%rsp), %rdx
+  movq %r12, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x28(%rsp), %xmm0
+  call    *%r8
+  testb %al, %al
+  jnz     label14; j label13
+block14:
+  movdqu <offset:1>+0x28(%rsp), %xmm1
+  movzbl %al, %edi
+  leal 8(%r15, %rdi), %r13d
+  vpshufd $0xee, %xmm1, %xmm0
+  movdqu %xmm0, <offset:1>+0x18(%rsp)
+  load_ext_name userextname12+0, %rax
+  movq <offset:1>+0x48(%rsp), %rdx
+  movq <offset:1>+8(%rsp), %rdi
+  movq %r13, %rsi
+  call    *%rax
+  testb %al, %al
+  jnz     label16; j label15
+block16:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movdqu <offset:1>+0x18(%rsp), %xmm0
+  movdqu <offset:1>+0x28(%rsp), %xmm1
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  vmovsd %xmm3, 0xb0(%rdi)
+  movl $0x1f000, %r11d
+  uninit  %xmm5
+  vxorpd %xmm5, %xmm5, %xmm7
+  vucomisd %xmm1, %xmm7
+  seta %r9b
+  movzbl %r9b, %esi
+  shll $0xf, %esi
+  vucomisd (%rip), %xmm1
+  seta %r10b
+  movzbl %r10b, %r9d
+  shll $0xe, %r9d
+  orl %r9d, %esi
+  vucomisd (%rip), %xmm1
+  setnp %dil
+  sete %al
+  andl %eax, %edi
+  movzbl %dil, %r10d
+  shll $0xd, %r10d
+  orl %r10d, %esi
+  vucomisd (%rip), %xmm1
+  setp %dil
+  movzbl %dil, %edi
+  shll $0xc, %edi
+  orl %edi, %esi
+  movdqu <offset:1>+0x58(%rsp), %xmm5
+  vucomisd %xmm5, %xmm7
+  seta %dil
+  movzbl %dil, %edx
+  shll $0xf, %edx
+  vucomisd (%rip), %xmm5
+  seta %al
+  movzbl %al, %edi
+  shll $0xe, %edi
+  orl %edi, %edx
+  vucomisd (%rip), %xmm5
+  setnp %cl
+  sete %r8b
+  andl %r8d, %ecx
+  movzbl %cl, %eax
+  shll $0xd, %eax
+  orl %eax, %edx
+  vucomisd (%rip), %xmm5
+  setp %r8b
+  movzbl %r8b, %ecx
+  shll $0xc, %ecx
+  orl %ecx, %edx
+  movq %r11, %r8
+  andl %edx, %r8d
+  movq %r11, %rdx
+  notl %edx
+  andl %r14d, %edx
+  orl %edx, %r8d
+  movq %r11, %rdx
+  andl %esi, %edx
+  notl %r11d
+  andl %r8d, %r11d
+  orl %r11d, %edx
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %edx, 0x28c(%rdi)
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd %xmm6, 0xa8(%rdi)
+  vmovsd %xmm0, 0xd0(%rdi)
+  vmovsd %xmm1, 0xc8(%rdi)
+  vmovsd %xmm2, 0xc0(%rdi)
+  movq <offset:1>+0x78(%rsp), %r8
+  leal 0x18(%r8), %esi
+  movl %esi, (%rdi)
+  movdqu <offset:1>+0x68(%rsp), %xmm5
+  vmovsd %xmm5, 0xb8(%rdi)
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block1:
+  movl $0x800, %esi
+  load_ext_name userextname0+0, %r11
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%r11
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block3:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r12d, 0x360(%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rdx
+  call    *%rdx
+  movq %r13, %rbx
+  addl $0x1, (%rbx)
+  addl $0x2, 4(%rbx)
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block5:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r14d, 0x360(%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  call    *%rax
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block7:
+  leal 8(%r12), %r9d
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r9d, 0x360(%rdi)
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  vmovsd %xmm3, 0xb0(%rdi)
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd %xmm6, 0xa8(%rdi)
+  movq <offset:1>+0x78(%rsp), %r8
+  leal 4(%r8), %esi
+  movl %esi, (%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  call    *%rax
+  addl $0x1, (%rbx)
+  addl $0x2, 4(%rbx)
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block9:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r15d, 0x360(%rdi)
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  vmovsd %xmm3, 0xb0(%rdi)
+  movl $0x1f000, %r9d
+  uninit  %xmm0
+  vxorpd %xmm0, %xmm0, %xmm2
+  movdqu <offset:1>+0x58(%rsp), %xmm5
+  vucomisd %xmm5, %xmm2
+  seta %dil
+  movzbl %dil, %edx
+  shll $0xf, %edx
+  vucomisd (%rip), %xmm5
+  seta %al
+  movzbl %al, %edi
+  shll $0xe, %edi
+  orl %edi, %edx
+  vucomisd (%rip), %xmm5
+  setnp %cl
+  sete %r8b
+  andl %r8d, %ecx
+  movzbl %cl, %eax
+  shll $0xd, %eax
+  orl %eax, %edx
+  vucomisd (%rip), %xmm5
+  setp %r8b
+  movzbl %r8b, %ecx
+  shll $0xc, %ecx
+  orl %ecx, %edx
+  movq %r9, %r8
+  andl %edx, %r8d
+  notl %r9d
+  andl %r14d, %r9d
+  orl %r9d, %r8d
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r8d, 0x28c(%rdi)
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd %xmm6, 0xa8(%rdi)
+  vpshufd $0xee, %xmm5, %xmm7
+  vmovsd %xmm7, 0xd0(%rdi)
+  vmovsd %xmm5, 0xc8(%rdi)
+  movabsq $0x3ff0000000000000, %r10
+  vmovq %r10, %xmm2
+  vmovsd %xmm2, 0xc0(%rdi)
+  movq <offset:1>+0x78(%rsp), %r8
+  leal 0xc(%r8), %esi
+  movl %esi, (%rdi)
+  movdqu <offset:1>+0x68(%rsp), %xmm5
+  vmovsd %xmm5, 0xb8(%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  call    *%rax
+  addl $0x2, (%rbx)
+  addl $0x4, 4(%rbx)
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block11:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r13d, 0x360(%rdi)
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  vmovsd %xmm3, 0xb0(%rdi)
+  movl $0x1f000, %r10d
+  uninit  %xmm3
+  vxorpd %xmm3, %xmm3, %xmm5
+  movdqu <offset:1>+0x58(%rsp), %xmm1
+  vucomisd %xmm1, %xmm5
+  seta %al
+  movzbl %al, %r8d
+  shll $0xf, %r8d
+  movdqu <offset:1>+0x58(%rsp), %xmm5
+  vucomisd (%rip), %xmm5
+  seta %cl
+  movzbl %cl, %eax
+  shll $0xe, %eax
+  orl %eax, %r8d
+  vucomisd (%rip), %xmm5
+  setnp %dl
+  sete %r9b
+  andl %r9d, %edx
+  movzbl %dl, %ecx
+  shll $0xd, %ecx
+  orl %ecx, %r8d
+  vucomisd (%rip), %xmm5
+  setp %r9b
+  movzbl %r9b, %edx
+  shll $0xc, %edx
+  orl %edx, %r8d
+  movq %r10, %r9
+  andl %r8d, %r9d
+  notl %r10d
+  andl %r14d, %r10d
+  orl %r10d, %r9d
+  movl %r9d, 0x28c(%rdi)
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd %xmm6, 0xa8(%rdi)
+  movdqu <offset:1>+0x38(%rsp), %xmm0
+  vmovsd %xmm0, 0xd0(%rdi)
+  vmovsd %xmm5, 0xc8(%rdi)
+  movabsq $0x3ff0000000000000, %r11
+  vmovq %r11, %xmm5
+  vmovsd %xmm5, 0xc0(%rdi)
+  movq <offset:1>+0x78(%rsp), %r8
+  leal 0xc(%r8), %edi
+  movq <offset:1>+0x10(%rsp), %r8
+  movl %edi, (%r8)
+  movq <offset:1>+0x10(%rsp), %rdi
+  movdqu <offset:1>+0x68(%rsp), %xmm5
+  vmovsd %xmm5, 0xb8(%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rcx
+  call    *%rcx
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block13:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r12d, 0x360(%rdi)
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  vmovsd %xmm3, 0xb0(%rdi)
+  movl $0x1f000, %ecx
+  uninit  %xmm4
+  vxorpd %xmm4, %xmm4, %xmm6
+  movdqu <offset:1>+0x28(%rsp), %xmm1
+  vucomisd %xmm1, %xmm6
+  seta %dil
+  movzbl %dil, %edx
+  shll $0xf, %edx
+  vucomisd (%rip), %xmm1
+  seta %al
+  movzbl %al, %edi
+  shll $0xe, %edi
+  orl %edi, %edx
+  vucomisd (%rip), %xmm1
+  setnp %r8b
+  sete %r9b
+  andl %r9d, %r8d
+  movzbl %r8b, %eax
+  shll $0xd, %eax
+  orl %eax, %edx
+  vucomisd (%rip), %xmm1
+  setp %r8b
+  movzbl %r8b, %r8d
+  shll $0xc, %r8d
+  orl %r8d, %edx
+  movdqu <offset:1>+0x58(%rsp), %xmm5
+  vucomisd %xmm5, %xmm6
+  seta %r8b
+  movzbl %r8b, %r11d
+  shll $0xf, %r11d
+  vucomisd (%rip), %xmm5
+  seta %r9b
+  movzbl %r9b, %r8d
+  shll $0xe, %r8d
+  orl %r8d, %r11d
+  vucomisd (%rip), %xmm5
+  setnp %r10b
+  sete %sil
+  andl %esi, %r10d
+  movzbl %r10b, %r9d
+  shll $0xd, %r9d
+  orl %r9d, %r11d
+  vucomisd (%rip), %xmm5
+  setp %sil
+  movzbl %sil, %r10d
+  shll $0xc, %r10d
+  orl %r10d, %r11d
+  movq %rcx, %rsi
+  andl %r11d, %esi
+  movq %rcx, %r11
+  notl %r11d
+  andl %r14d, %r11d
+  orl %r11d, %esi
+  movq %rcx, %r11
+  andl %edx, %r11d
+  notl %ecx
+  andl %esi, %ecx
+  orl %ecx, %r11d
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r11d, 0x28c(%rdi)
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd %xmm6, 0xa8(%rdi)
+  vpshufd $0xee, %xmm1, %xmm7
+  vmovsd %xmm7, 0xd0(%rdi)
+  vmovsd %xmm1, 0xc8(%rdi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  vmovsd %xmm2, 0xc0(%rdi)
+  movq <offset:1>+0x78(%rsp), %r8
+  leal 0x14(%r8), %edx
+  movl %edx, (%rdi)
+  movdqu <offset:1>+0x68(%rsp), %xmm5
+  vmovsd %xmm5, 0xb8(%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %r9
+  call    *%r9
+  addl $0x2, (%rbx)
+  addl $0x4, 4(%rbx)
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block15:
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %r13d, 0x360(%rdi)
+  movdqu <offset:1>+0x88(%rsp), %xmm3
+  vmovsd %xmm3, 0xb0(%rdi)
+  movl $0x1f000, %r11d
+  uninit  %xmm3
+  vxorpd %xmm3, %xmm3, %xmm5
+  movdqu <offset:1>+0x28(%rsp), %xmm1
+  vucomisd %xmm1, %xmm5
+  seta %r9b
+  movzbl %r9b, %esi
+  shll $0xf, %esi
+  vucomisd (%rip), %xmm1
+  seta %r10b
+  movzbl %r10b, %r9d
+  shll $0xe, %r9d
+  orl %r9d, %esi
+  vucomisd (%rip), %xmm1
+  setnp %dil
+  sete %al
+  andl %eax, %edi
+  movzbl %dil, %r10d
+  shll $0xd, %r10d
+  orl %r10d, %esi
+  vucomisd (%rip), %xmm1
+  setp %dil
+  movzbl %dil, %edi
+  shll $0xc, %edi
+  orl %edi, %esi
+  movdqu <offset:1>+0x58(%rsp), %xmm6
+  vucomisd %xmm6, %xmm5
+  seta %dil
+  movzbl %dil, %edx
+  shll $0xf, %edx
+  movdqu <offset:1>+0x58(%rsp), %xmm5
+  vucomisd (%rip), %xmm5
+  seta %al
+  movzbl %al, %edi
+  shll $0xe, %edi
+  orl %edi, %edx
+  vucomisd (%rip), %xmm5
+  setnp %cl
+  sete %r8b
+  andl %r8d, %ecx
+  movzbl %cl, %eax
+  shll $0xd, %eax
+  orl %eax, %edx
+  vucomisd (%rip), %xmm5
+  setp %r8b
+  movzbl %r8b, %ecx
+  shll $0xc, %ecx
+  orl %ecx, %edx
+  movq %r11, %r8
+  andl %edx, %r8d
+  movq %r11, %rdx
+  notl %edx
+  andl %r14d, %edx
+  orl %edx, %r8d
+  movq %r11, %rdx
+  andl %esi, %edx
+  notl %r11d
+  andl %r8d, %r11d
+  orl %r11d, %edx
+  movq <offset:1>+0x10(%rsp), %rdi
+  movl %edx, 0x28c(%rdi)
+  movdqu <offset:1>+0x98(%rsp), %xmm6
+  vmovsd %xmm6, 0xa8(%rdi)
+  movdqu <offset:1>+0x18(%rsp), %xmm0
+  vmovsd %xmm0, 0xd0(%rdi)
+  vmovsd %xmm1, 0xc8(%rdi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  vmovsd %xmm2, 0xc0(%rdi)
+  movq <offset:1>+0x78(%rsp), %r8
+  leal 0x14(%r8), %esi
+  movl %esi, (%rdi)
+  movdqu <offset:1>+0x68(%rsp), %xmm5
+  vmovsd %xmm5, 0xb8(%rdi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  call    *%rax
+  movq 0xb0(%rsp), %rbx
+  movq 0xb8(%rsp), %r12
+  movq 0xc0(%rsp), %r13
+  movq 0xc8(%rsp), %r14
+  movq 0xd0(%rsp), %r15
+  addq $0xe0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq

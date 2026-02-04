@@ -98,6 +98,29 @@ fn test_sequence(name: &str, sequence: Sequence) {
 }
 
 #[test]
+fn gu_vec_scale() {
+    // ps_guVecScale:
+    // 	psq_l		fr2,0(r3),0,0
+    // 	psq_l		fr3,8(r3),1,0
+    // 	ps_muls0	fr4,fr2,fr1
+    // 	psq_st		fr4,0(r4),0,0
+    // 	ps_muls0	fr4,fr3,fr1
+    // 	psq_st		fr4,8(r4),1,0
+
+    test_sequence(
+        "gu_vec_scale",
+        ppc! {
+            psq_l fpr(2) off(0) gpr(3) u(0) u(0);
+            psq_l fpr(3) off(8) gpr(3) u(1) u(0);
+            ps_muls0 fpr(4) fpr(2) fpr(1);
+            psq_st fpr(4) off(0) gpr(4) u(0) u(0);
+            ps_muls0 fpr(4) fpr(3) fpr(1);
+            psq_st fpr(4) off(8) gpr(4) u(0) u(0);
+        },
+    );
+}
+
+#[test]
 fn gu_vec_add() {
     // #define V1_XY	fr2
     // #define V1_Z		fr3
