@@ -9,7 +9,7 @@ macro_rules! ppc {
         {
             let mut sequence = vec![];
 
-            #[allow(unused_variables, unused_mut, unused_assignments, unused_imports)]
+            #[allow(unused_variables, unused_mut, unused_assignments, unused_imports, dead_code)]
             {
                 use powerpc_asm::Argument;
 
@@ -95,6 +95,19 @@ fn test_sequence(name: &str, sequence: Sequence) {
     let disasm = artifact.disasm.unwrap();
     insta::assert_snapshot!(format!("{}_clir", name), clir);
     insta::assert_snapshot!(format!("{}_disasm", name), disasm);
+}
+
+#[test]
+fn ps_add_acc() {
+    test_sequence(
+        "ps_add_acc",
+        ppc! {
+            ps_add fpr(0) fpr(0) fpr(1);
+            ps_add fpr(0) fpr(0) fpr(2);
+            ps_add fpr(0) fpr(0) fpr(3);
+            ps_add fpr(0) fpr(0) fpr(4);
+        },
+    );
 }
 
 #[test]
