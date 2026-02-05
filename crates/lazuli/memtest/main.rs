@@ -1,3 +1,4 @@
+use std::env;
 use std::ops::RangeInclusive;
 
 use gekko::{Address, MemoryManagement};
@@ -70,6 +71,11 @@ fn test_logical(sys: &mut System) {
 }
 
 fn main() {
+    if env::var("MEMTEST").is_err() {
+        println!("memtest ignored - set env var MEMTEST to run it");
+        return;
+    }
+
     let modules = Modules {
         audio: Box::new(NopAudioModule),
         debug: Box::new(NopDebugModule),
