@@ -48,7 +48,7 @@ impl BlockBuilder<'_> {
 
     /// Checks whether floating point operations are enabled in MSR and raises an exception if not.
     pub fn check_floats(&mut self) {
-        if self.floats_checked || self.compiler.settings.force_fpu {
+        if self.floats_checked || self.codegen.settings.force_fpu {
             return;
         }
         self.floats_checked = true;
@@ -77,7 +77,7 @@ impl BlockBuilder<'_> {
     }
 
     pub fn sc(&mut self, _: Ins) -> InstructionInfo {
-        if self.compiler.settings.nop_syscalls {
+        if self.codegen.settings.nop_syscalls {
             return self.nop(Action::FlushAndPrologue);
         }
 

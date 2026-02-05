@@ -2,7 +2,7 @@ use cranelift::prelude::Configurable;
 
 use crate::block::Meta;
 use crate::hooks::Hooks;
-use crate::{Artifact, CompilerSettings, Jit, Sequence, Settings};
+use crate::{Artifact, CodegenSettings, Jit, Sequence, Settings};
 
 macro_rules! ppc {
     ($($mnemonic:ident $($arg:expr)*);* $(;)?) => {
@@ -75,7 +75,7 @@ fn compile_sequence(sequence: Sequence) -> (Artifact, Meta) {
     let mut jit = Jit::with_isa(
         isa,
         Settings {
-            compiler: CompilerSettings {
+            codegen: CodegenSettings {
                 nop_syscalls: false,
                 force_fpu: false,
                 ignore_unimplemented: false,

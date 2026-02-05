@@ -5,7 +5,7 @@ use cranelift_codegen::isa::TargetIsa;
 use fjall::{Database, KeyspaceCreateOptions};
 use zerocopy::IntoBytes;
 
-use crate::{Artifact, CompilerSettings, Sequence};
+use crate::{Artifact, CodegenSettings, Sequence};
 
 struct Hash128(twox_hash::XxHash3_128);
 
@@ -24,7 +24,7 @@ impl Hasher for Hash128 {
 pub struct ArtifactKey(u128);
 
 impl ArtifactKey {
-    pub fn new(isa: &dyn TargetIsa, settings: &CompilerSettings, seq: &Sequence) -> Self {
+    pub fn new(isa: &dyn TargetIsa, settings: &CodegenSettings, seq: &Sequence) -> Self {
         let mut hasher = Hash128(twox_hash::XxHash3_128::with_seed(0));
         isa.name().hash(&mut hasher);
         isa.triple().hash(&mut hasher);

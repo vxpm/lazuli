@@ -22,7 +22,7 @@ use crate::block::Info;
 use crate::builder::util::IntoIrValue;
 use crate::hooks::{HookKind, Hooks};
 use crate::{
-    Compiler, INTERNAL_RAISE_EXCEPTION, NAMESPACE_INTERNALS, NAMESPACE_USER_HOOKS, Sequence,
+    Codegen, INTERNAL_RAISE_EXCEPTION, NAMESPACE_INTERNALS, NAMESPACE_USER_HOOKS, Sequence,
 };
 
 const MEMFLAGS: ir::MemFlags = ir::MemFlags::trusted();
@@ -157,7 +157,7 @@ struct CachedValue {
 
 /// Structure to build JIT blocks.
 pub struct BlockBuilder<'ctx> {
-    compiler: &'ctx mut Compiler,
+    codegen: &'ctx mut Codegen,
     bd: frontend::FunctionBuilder<'ctx>,
     cache: FxHashMap<Reg, CachedValue>,
     consts: Consts,
@@ -177,7 +177,7 @@ pub struct BlockBuilder<'ctx> {
 }
 
 impl<'ctx> BlockBuilder<'ctx> {
-    pub fn new(compiler: &'ctx mut Compiler, mut builder: frontend::FunctionBuilder<'ctx>) -> Self {
+    pub fn new(codegen: &'ctx mut Codegen, mut builder: frontend::FunctionBuilder<'ctx>) -> Self {
         let entry_bb = builder.create_block();
         builder.append_block_params_for_function_params(entry_bb);
         builder.switch_to_block(entry_bb);
@@ -189,7 +189,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             align_of::<u64>().ilog2() as u8,
         ));
 
-        let ptr_type = compiler.isa.pointer_type();
+        let ptr_type = codegen.isa.pointer_type();
         let params = builder.block_params(entry_bb);
         let info_ptr = params[0];
         let ctx_ptr = params[1];
@@ -290,7 +290,7 @@ impl<'ctx> BlockBuilder<'ctx> {
         };
 
         Self {
-            compiler,
+            codegen,
             bd: builder,
             cache: FxHashMap::default(),
             consts,
@@ -382,11 +382,6 @@ impl<'ctx> BlockBuilder<'ctx> {
         }
     }
 
-    /// Calls a generic context hook.
-    fn call_generic_hook(&mut self, hook: ir::FuncRef) {
-        self.bd.ins().call(hook, &[self.consts.ctx_ptr]);
-    }
-
     /// Flushes the register cache to the registers struct. This does not invalidate the register
     /// cache.
     fn flush(&mut self) {
@@ -447,6 +442,11 @@ impl<'ctx> BlockBuilder<'ctx> {
 
         self.last_updated_cycles = self.executed_cycles;
         self.last_updated_instructions = self.executed_instructions;
+    }
+
+    /// Calls a generic context hook.
+    fn call_generic_hook(&mut self, hook: ir::FuncRef) {
+        self.bd.ins().call(hook, &[self.consts.ctx_ptr]);
     }
 
     /// Emits the prologue:
@@ -684,14 +684,14 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Xori => self.xori(ins),
             Opcode::Xoris => self.xoris(ins),
             Opcode::Illegal => {
-                if self.compiler.settings.ignore_unimplemented {
+                if self.codegen.settings.ignore_unimplemented {
                     self.stub(ins)
                 } else {
                     return Err(BuilderError::Illegal(ins));
                 }
             }
             _ => {
-                if self.compiler.settings.ignore_unimplemented {
+                if self.codegen.settings.ignore_unimplemented {
                     self.stub(ins)
                 } else {
                     todo!("unimplemented instruction {ins:?}")

@@ -138,8 +138,9 @@ impl BlockBuilder<'_> {
         self.bd.ins().bor(value, rhs)
     }
 
+    /// Rounds each lane in a F64X2 to single point precision (according to the codegen settings).
     pub fn round_to_single(&mut self, value: ir::Value) -> ir::Value {
-        if self.compiler.settings.round_to_single {
+        if self.codegen.settings.round_to_single {
             let single = self.bd.ins().fvdemote(value);
             self.bd.ins().fvpromote_low(single)
         } else {
@@ -147,6 +148,7 @@ impl BlockBuilder<'_> {
         }
     }
 
+    /// Given a F64X2, copies lane 0 to lane 1.
     pub fn copy_ps0_to_ps1(&mut self, value: ir::Value) -> ir::Value {
         let bytes = self.bd.ins().bitcast(
             ir::types::I8X16,
@@ -176,6 +178,7 @@ impl BlockBuilder<'_> {
         )
     }
 
+    /// Given a F64X2, copies lane 1 to lane 0.
     pub fn copy_ps1_to_ps0(&mut self, value: ir::Value) -> ir::Value {
         let bytes = self.bd.ins().bitcast(
             ir::types::I8X16,
@@ -205,7 +208,7 @@ impl BlockBuilder<'_> {
         )
     }
 
-    /// Returns [a.sel_a, b.sel_b]
+    /// Given two F64X2, returns a new F64X2 with lanes [a[sel_a], b[sel_b]].
     pub fn ps_merge(&mut self, a: ir::Value, b: ir::Value, sel_a: bool, sel_b: bool) -> ir::Value {
         let mut mask = vec![];
         if sel_a {
@@ -319,6 +322,7 @@ impl BlockBuilder<'_> {
         self.update_cr(0, lt, gt, eq, ov);
     }
 
+    /// Updates the FPRF field in FPSCR register with the given flags.
     pub fn update_fprf(&mut self, lt: ir::Value, gt: ir::Value, eq: ir::Value, un: ir::Value) {
         let fpscr = self.get(Reg::FPSCR);
 
@@ -343,6 +347,7 @@ impl BlockBuilder<'_> {
         self.set(Reg::FPSCR, updated);
     }
 
+    /// Updates the FPRF field in FPSCR register with flags computed from a comparison with 0.
     pub fn update_fprf_cmpz(&mut self, value: ir::Value) {
         let value = self.bd.ins().extractlane(value, 0);
         let zero = self.ir_value(0.0f64);

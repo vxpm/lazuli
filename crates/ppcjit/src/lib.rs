@@ -45,7 +45,7 @@ pub use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Default, Hash)]
-pub struct CompilerSettings {
+pub struct CodegenSettings {
     /// Whether to treat `sc` instructions as no-ops.
     pub nop_syscalls: bool,
     /// Whether to ignore the FPU enabled bit in MSR.
@@ -58,8 +58,8 @@ pub struct CompilerSettings {
 
 #[derive(Debug, Clone, Default)]
 pub struct Settings {
-    /// Compiler settings
-    pub compiler: CompilerSettings,
+    /// Codegen settings
+    pub codegen: CodegenSettings,
     /// Path to the block cache directory
     pub cache_path: Option<PathBuf>,
 }
@@ -73,15 +73,15 @@ const NAMESPACE_LINK_DATA: u32 = 2;
 
 const INTERNAL_RAISE_EXCEPTION: u32 = 0;
 
-struct Compiler {
-    settings: CompilerSettings,
+struct Codegen {
+    settings: CodegenSettings,
     hooks: Hooks,
     isa: Arc<dyn TargetIsa>,
     module: Module,
 }
 
-impl Compiler {
-    fn new(isa: codegen::isa::Builder, settings: CompilerSettings, hooks: Hooks) -> Self {
+impl Codegen {
+    fn new(isa: codegen::isa::Builder, settings: CodegenSettings, hooks: Hooks) -> Self {
         let verifier = if cfg!(debug_assertions) {
             "true"
         } else {
@@ -112,7 +112,7 @@ impl Compiler {
         let flags = codegen::settings::Flags::new(codegen);
         let isa = isa.finish(flags).unwrap();
 
-        Compiler {
+        Codegen {
             settings,
             hooks,
             isa,
@@ -294,7 +294,7 @@ impl Compiler {
 
 /// A JIT context, producing [`Block`]s.
 pub struct Jit {
-    compiler: Compiler,
+    codegen: Codegen,
     code_ctx: codegen::Context,
     func_ctx: frontend::FunctionBuilderContext,
     cache: Option<Cache>,
@@ -334,14 +334,14 @@ pub enum BuildError {
 
 impl Jit {
     pub(crate) fn with_isa(isa: codegen::isa::Builder, settings: Settings, hooks: Hooks) -> Self {
-        let mut compiler = Compiler::new(isa, settings.compiler, hooks);
+        let mut codegen = Codegen::new(isa, settings.codegen, hooks);
         let mut code_ctx = codegen::Context::new();
         let mut func_ctx = frontend::FunctionBuilderContext::new();
         let cache = settings.cache_path.map(Cache::new);
-        let trampoline = compiler.trampoline(&mut code_ctx, &mut func_ctx);
+        let trampoline = codegen.trampoline(&mut code_ctx, &mut func_ctx);
 
         Self {
-            compiler,
+            codegen,
             code_ctx,
             func_ctx,
             cache,
@@ -360,10 +360,10 @@ impl Jit {
         instructions: impl Iterator<Item = Ins>,
     ) -> Result<Translated, BuildError> {
         let mut func = ir::Function::new();
-        func.signature = self.compiler.block_signature();
+        func.signature = self.codegen.block_signature();
 
         let func_builder = frontend::FunctionBuilder::new(&mut func, &mut self.func_ctx);
-        let builder = BlockBuilder::new(&mut self.compiler, func_builder);
+        let builder = BlockBuilder::new(&mut self.codegen, func_builder);
 
         let (sequence, cycles) = builder.build(instructions).context(BuildCtx::Builder)?;
         if sequence.is_empty() {
@@ -381,13 +381,13 @@ impl Jit {
     fn compile(&mut self, disasm: bool) -> Result<Artifact, codegen::CodegenError> {
         self.code_ctx.want_disasm = disasm;
         self.code_ctx
-            .compile(&*self.compiler.isa, &mut Default::default())
+            .compile(&*self.codegen.isa, &mut Default::default())
             .map_err(|e| e.inner)?;
 
         let compiled = self.code_ctx.take_compiled_code().unwrap();
         let code = compiled.code_buffer().to_owned();
         let unwind = compiled
-            .create_unwind_info(&*self.compiler.isa)
+            .create_unwind_info(&*self.codegen.isa)
             .ok()
             .flatten();
         let disasm = compiled.vcode;
@@ -411,7 +411,7 @@ impl Jit {
         let pattern = sequence.detect_pattern();
 
         let clir = cfg!(debug_assertions).then(|| func.display().to_string());
-        let key = ArtifactKey::new(&*self.compiler.isa, &self.compiler.settings, &sequence);
+        let key = ArtifactKey::new(&*self.codegen.isa, &self.codegen.settings, &sequence);
 
         let artifact = if let Some(cache) = &mut self.cache
             && let Some(artifact) = cache.get(key)
@@ -452,12 +452,12 @@ impl Jit {
         let (artifact, meta) = self.build_artifact(instructions)?;
 
         let mut code = artifact.code;
-        self.compiler
+        self.codegen
             .apply_relocations(&mut code, &artifact.user_named_funcs, &artifact.relocs);
 
-        let alloc = self.compiler.module.allocate_code(&code);
+        let alloc = self.codegen.module.allocate_code(&code);
         let unwind_handle = if let Some(unwind) = artifact.unwind {
-            unsafe { UnwindHandle::new(&*self.compiler.isa, alloc.as_ptr().addr().get(), &unwind) }
+            unsafe { UnwindHandle::new(&*self.codegen.isa, alloc.as_ptr().addr().get(), &unwind) }
         } else {
             None
         };
