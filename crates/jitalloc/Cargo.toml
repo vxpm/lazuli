@@ -9,6 +9,7 @@ license = "MIT"
 workspace = true
 
 [dependencies]
+bytesize.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows.workspace = true

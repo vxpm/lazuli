@@ -12,7 +12,7 @@ use cranelift::codegen::{self, ir};
 use cranelift::prelude::Configurable;
 use cranelift::prelude::isa::TargetIsa;
 use cranelift::{frontend, native};
-use jitalloc::{Allocator, Exec};
+use jitalloc::{Allocator, ReadExec};
 use lazuli::modules::vertex::{Ctx, VertexModule};
 use lazuli::system::gx::cmd::attributes::VertexAttributeTable;
 use lazuli::system::gx::cmd::{VertexAttributeStream, VertexDescriptor};
@@ -41,7 +41,7 @@ impl UnpackedDefaultMatrices {
 
 struct Codegen {
     isa: Arc<dyn TargetIsa>,
-    allocator: Allocator<Exec>,
+    allocator: Allocator<ReadExec>,
 }
 
 impl Codegen {

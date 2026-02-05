@@ -1,4 +1,4 @@
-use jitalloc::{Allocation, Exec};
+use jitalloc::{Allocation, ReadExec};
 use lazuli::system::gx::cmd::attributes::VertexAttributeTable;
 use lazuli::system::gx::cmd::{Arrays, VertexDescriptor};
 use lazuli::system::gx::{MatrixSet, Vertex};
@@ -31,11 +31,11 @@ pub type ParserFn = extern "sysv64" fn(
 );
 
 pub struct VertexParser {
-    code: Allocation<Exec>,
+    code: Allocation<ReadExec>,
 }
 
 impl VertexParser {
-    pub(crate) fn new(code: Allocation<Exec>) -> Self {
+    pub(crate) fn new(code: Allocation<ReadExec>) -> Self {
         Self { code }
     }
 

@@ -1,7 +1,7 @@
 use std::ffi::c_void;
 use std::ptr::NonNull;
 
-use jitalloc::{Allocation, Exec};
+use jitalloc::{Allocation, ReadExec};
 
 use crate::Sequence;
 use crate::hooks::Context;
@@ -71,7 +71,7 @@ pub struct Meta {
 ///
 /// In order to call the block, use [`Jit::call`](super::Jit::call).
 pub struct Block {
-    code: Allocation<Exec>,
+    code: Allocation<ReadExec>,
     meta: Meta,
 }
 
@@ -81,7 +81,7 @@ pub struct Block {
 pub struct BlockFn(NonNull<c_void>);
 
 impl Block {
-    pub(crate) fn new(code: Allocation<Exec>, meta: Meta) -> Self {
+    pub(crate) fn new(code: Allocation<ReadExec>, meta: Meta) -> Self {
         Self { code, meta }
     }
 
@@ -98,7 +98,7 @@ impl Block {
 }
 
 /// A trampoline that allows calling blocks produced by a [`Jit`](super::Jit) compiler.
-pub(super) struct Trampoline(pub(super) Allocation<Exec>);
+pub(super) struct Trampoline(pub(super) Allocation<ReadExec>);
 
 type TrampolineFn = extern "sysv64-unwind" fn(*mut Info, *mut Context, BlockFn);
 

@@ -257,7 +257,7 @@ impl Codegen {
     }
 }
 
-/// A JIT context, producing [`Block`]s.
+/// A JIT compiler, producing [`Block`]s.
 pub struct Jit {
     codegen: Codegen,
     func_ctx: frontend::FunctionBuilderContext,

@@ -1,9 +1,10 @@
 use std::alloc::Layout;
 
-use jitalloc::{Allocation, Allocator, Exec, ReadWrite};
+use jitalloc::{Allocation, Allocator, ReadExec, ReadWrite};
 
+/// A module that contains code and data allocations.
 pub struct Module {
-    code_allocator: Allocator<Exec>,
+    code_allocator: Allocator<ReadExec>,
     data_allocator: Allocator<ReadWrite>,
 }
 
@@ -15,7 +16,7 @@ impl Module {
         }
     }
 
-    pub fn allocate_code(&mut self, code: &[u8]) -> Allocation<Exec> {
+    pub fn allocate_code(&mut self, code: &[u8]) -> Allocation<ReadExec> {
         self.code_allocator.allocate(64, code)
     }
 
