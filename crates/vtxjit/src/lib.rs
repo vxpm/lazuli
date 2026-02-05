@@ -22,7 +22,7 @@ use parser::VertexParser;
 use rustc_hash::FxHashMap;
 
 use crate::builder::ParserBuilder;
-use crate::parser::Config;
+use crate::parser::{Config, Meta};
 
 #[repr(C)]
 struct UnpackedDefaultMatrices {
@@ -119,8 +119,10 @@ impl Codegen {
         let builder = ParserBuilder::new(self, func_builder, config);
         builder.build();
 
+        let clir = cfg!(test).then(|| func.display().to_string());
+
         code_ctx.clear();
-        code_ctx.want_disasm = true;
+        code_ctx.want_disasm = cfg!(test);
         code_ctx.func = func;
         code_ctx
             .compile(&*self.isa, &mut Default::default())
@@ -128,7 +130,11 @@ impl Codegen {
 
         let compiled = code_ctx.take_compiled_code().unwrap();
         let alloc = self.allocator.allocate(64, compiled.code_buffer());
-        VertexParser::new(alloc)
+
+        let disasm = compiled.vcode;
+        let meta = Meta { clir, disasm };
+
+        VertexParser::new(alloc, meta)
     }
 }
 
