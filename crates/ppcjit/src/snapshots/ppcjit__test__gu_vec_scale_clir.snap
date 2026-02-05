@@ -132,153 +132,149 @@ function u0:0(i64, i64, i64, i64) tail {
 @0002                               v50 = swizzle v48, v49  ; v49 = const0
 @0002                               v51 = bitcast.f64x2 little v50
 @0002                               v52 = fmul.f64x2 v29, v51
-@0002                               v53 = f64const 0.0
-@0002                               v54 = splat.f64x2 v53  ; v53 = 0.0
-@0002                               v55 = extractlane v52, 0
-@0002                               v56 = extractlane v54, 0
-@0002                               v57 = fcmp lt v55, v56
-@0002                               v58 = fcmp gt v55, v56
-@0002                               v59 = fcmp eq v55, v56
-@0002                               v60 = fcmp uno v55, v56
-@0002                               v61 = load.i32 notrap aligned v2+652
+@0002                               v53 = extractlane v52, 0
+@0002                               v54 = f64const 0.0
+@0002                               v55 = fcmp lt v53, v54  ; v54 = 0.0
+@0002                               v56 = fcmp gt v53, v54  ; v54 = 0.0
+@0002                               v57 = fcmp eq v53, v54  ; v54 = 0.0
+@0002                               v58 = fcmp uno v53, v54  ; v54 = 0.0
+@0002                               v59 = load.i32 notrap aligned v2+652
+@0002                               v60 = uextend.i32 v55
+@0002                               v61 = uextend.i32 v56
 @0002                               v62 = uextend.i32 v57
 @0002                               v63 = uextend.i32 v58
-@0002                               v64 = uextend.i32 v59
-@0002                               v65 = uextend.i32 v60
-@0002                               v66 = iconst.i32 0
-@0002                               v67 = ishl_imm v62, 15
-@0002                               v68 = ishl_imm v63, 14
-@0002                               v69 = ishl_imm v64, 13
-@0002                               v70 = ishl_imm v65, 12
-@0002                               v71 = bor v67, v68
-@0002                               v72 = bor v71, v69
-@0002                               v73 = bor v72, v70
-@0002                               v74 = bor v73, v66  ; v66 = 0
-@0002                               v75 = iconst.i32 0x0001_f000
-@0002                               v76 = bitselect v75, v74, v61  ; v75 = 0x0001_f000
-@0002                               v77 = iadd_imm v46, 4
-@0003                               v78 = load.i32 notrap aligned v2+24
-@0003                               v79 = iadd_imm v78, 0
-@0003                               v80 = extractlane v52, 0
-@0003                               v81 = load.i32 notrap aligned v2+872
-@0003                               v82 = call fn12(v1, v79, v81, v80)
-@0003                               brif v82, block10, block9
+@0002                               v64 = iconst.i32 0
+@0002                               v65 = ishl_imm v60, 15
+@0002                               v66 = ishl_imm v61, 14
+@0002                               v67 = ishl_imm v62, 13
+@0002                               v68 = ishl_imm v63, 12
+@0002                               v69 = bor v65, v66
+@0002                               v70 = bor v69, v67
+@0002                               v71 = bor v70, v68
+@0002                               v72 = bor v71, v64  ; v64 = 0
+@0002                               v73 = iconst.i32 0x0001_f000
+@0002                               v74 = bitselect v73, v72, v59  ; v73 = 0x0001_f000
+@0002                               v75 = iadd_imm v46, 4
+@0003                               v76 = load.i32 notrap aligned v2+24
+@0003                               v77 = iadd_imm v76, 0
+@0003                               v78 = extractlane v52, 0
+@0003                               v79 = load.i32 notrap aligned v2+872
+@0003                               v80 = call fn12(v1, v77, v79, v78)
+@0003                               brif v80, block10, block9
 
                                 block9 cold:
-@0003                               store.i32 notrap aligned v79, v2+864
-@0003                               v83 = iconst.i16 768
-@0003                               store.i32 notrap aligned v77, v2
+@0003                               store.i32 notrap aligned v77, v2+864
+@0003                               v81 = iconst.i16 768
+@0003                               store.i32 notrap aligned v75, v2
 @0003                               store.f64x2 notrap aligned v29, v2+168
-@0003                               store.i32 notrap aligned v76, v2+652
+@0003                               store.i32 notrap aligned v74, v2+652
 @0003                               store.f64x2 notrap aligned v52, v2+200
 @0003                               store.f64x2 notrap aligned v45, v2+184
-@0003                               call fn0(v2, v83)  ; v83 = 768
-@0003                               v84 = load.i32 notrap aligned v0
-@0003                               v85 = iadd_imm v84, 2
-@0003                               store notrap aligned v85, v0
-@0003                               v86 = load.i32 notrap aligned v0+4
-@0003                               v87 = iadd_imm v86, 4
-@0003                               store notrap aligned v87, v0+4
+@0003                               call fn0(v2, v81)  ; v81 = 768
+@0003                               v82 = load.i32 notrap aligned v0
+@0003                               v83 = iadd_imm v82, 2
+@0003                               store notrap aligned v83, v0
+@0003                               v84 = load.i32 notrap aligned v0+4
+@0003                               v85 = iadd_imm v84, 4
+@0003                               store notrap aligned v85, v0+4
 @0003                               return
 
                                 block10:
-@0003                               v88 = uextend.i32 v82
-@0003                               v89 = extractlane.f64x2 v52, 1
-@0003                               v90 = iadd.i32 v79, v88
-@0003                               v91 = call fn12(v1, v90, v81, v89)
-@0003                               brif v91, block12, block11
+@0003                               v86 = uextend.i32 v80
+@0003                               v87 = extractlane.f64x2 v52, 1
+@0003                               v88 = iadd.i32 v77, v86
+@0003                               v89 = call fn12(v1, v88, v79, v87)
+@0003                               brif v89, block12, block11
 
                                 block11 cold:
-@0003                               store.i32 notrap aligned v90, v2+864
-@0003                               v92 = iconst.i16 768
-@0003                               store.i32 notrap aligned v77, v2
+@0003                               store.i32 notrap aligned v88, v2+864
+@0003                               v90 = iconst.i16 768
+@0003                               store.i32 notrap aligned v75, v2
 @0003                               store.f64x2 notrap aligned v29, v2+168
-@0003                               store.i32 notrap aligned v76, v2+652
+@0003                               store.i32 notrap aligned v74, v2+652
 @0003                               store.f64x2 notrap aligned v52, v2+200
 @0003                               store.f64x2 notrap aligned v45, v2+184
-@0003                               call fn0(v2, v92)  ; v92 = 768
+@0003                               call fn0(v2, v90)  ; v90 = 768
 @0003                               return
 
                                 block12:
-@0003                               v93 = uextend.i32 v91
-@0003                               v94 = iadd_imm.i32 v77, 4
-@0004                               v95 = bitcast.i8x16 little v47
-@0004                               v96 = vconst.i8x16 const0
-@0004                               v97 = swizzle v95, v96  ; v96 = const0
-@0004                               v98 = bitcast.f64x2 little v97
-@0004                               v99 = fmul.f64x2 v45, v98
-@0004                               v100 = f64const 0.0
-@0004                               v101 = splat.f64x2 v100  ; v100 = 0.0
-@0004                               v102 = extractlane v99, 0
-@0004                               v103 = extractlane v101, 0
-@0004                               v104 = fcmp lt v102, v103
-@0004                               v105 = fcmp gt v102, v103
-@0004                               v106 = fcmp eq v102, v103
-@0004                               v107 = fcmp uno v102, v103
-@0004                               v108 = uextend.i32 v104
-@0004                               v109 = uextend.i32 v105
-@0004                               v110 = uextend.i32 v106
-@0004                               v111 = uextend.i32 v107
-@0004                               v112 = iconst.i32 0
-@0004                               v113 = ishl_imm v108, 15
-@0004                               v114 = ishl_imm v109, 14
-@0004                               v115 = ishl_imm v110, 13
-@0004                               v116 = ishl_imm v111, 12
-@0004                               v117 = bor v113, v114
-@0004                               v118 = bor v117, v115
-@0004                               v119 = bor v118, v116
-@0004                               v120 = bor v119, v112  ; v112 = 0
-@0004                               v121 = iconst.i32 0x0001_f000
-@0004                               v122 = bitselect v121, v120, v76  ; v121 = 0x0001_f000
-@0004                               v123 = iadd_imm v94, 4
-@0005                               v124 = iadd_imm.i32 v78, 8
-@0005                               v125 = extractlane v99, 0
-@0005                               v126 = load.i32 notrap aligned v2+872
-@0005                               v127 = call fn12(v1, v124, v126, v125)
-@0005                               brif v127, block14, block13
+@0003                               v91 = uextend.i32 v89
+@0003                               v92 = iadd_imm.i32 v75, 4
+@0004                               v93 = bitcast.i8x16 little v47
+@0004                               v94 = vconst.i8x16 const0
+@0004                               v95 = swizzle v93, v94  ; v94 = const0
+@0004                               v96 = bitcast.f64x2 little v95
+@0004                               v97 = fmul.f64x2 v45, v96
+@0004                               v98 = extractlane v97, 0
+@0004                               v99 = f64const 0.0
+@0004                               v100 = fcmp lt v98, v99  ; v99 = 0.0
+@0004                               v101 = fcmp gt v98, v99  ; v99 = 0.0
+@0004                               v102 = fcmp eq v98, v99  ; v99 = 0.0
+@0004                               v103 = fcmp uno v98, v99  ; v99 = 0.0
+@0004                               v104 = uextend.i32 v100
+@0004                               v105 = uextend.i32 v101
+@0004                               v106 = uextend.i32 v102
+@0004                               v107 = uextend.i32 v103
+@0004                               v108 = iconst.i32 0
+@0004                               v109 = ishl_imm v104, 15
+@0004                               v110 = ishl_imm v105, 14
+@0004                               v111 = ishl_imm v106, 13
+@0004                               v112 = ishl_imm v107, 12
+@0004                               v113 = bor v109, v110
+@0004                               v114 = bor v113, v111
+@0004                               v115 = bor v114, v112
+@0004                               v116 = bor v115, v108  ; v108 = 0
+@0004                               v117 = iconst.i32 0x0001_f000
+@0004                               v118 = bitselect v117, v116, v74  ; v117 = 0x0001_f000
+@0004                               v119 = iadd_imm v92, 4
+@0005                               v120 = iadd_imm.i32 v76, 8
+@0005                               v121 = extractlane v97, 0
+@0005                               v122 = load.i32 notrap aligned v2+872
+@0005                               v123 = call fn12(v1, v120, v122, v121)
+@0005                               brif v123, block14, block13
 
                                 block13 cold:
-@0005                               store.i32 notrap aligned v124, v2+864
-@0005                               v128 = iconst.i16 768
-@0005                               store.i32 notrap aligned v123, v2
+@0005                               store.i32 notrap aligned v120, v2+864
+@0005                               v124 = iconst.i16 768
+@0005                               store.i32 notrap aligned v119, v2
 @0005                               store.f64x2 notrap aligned v29, v2+168
-@0005                               store.i32 notrap aligned v122, v2+652
-@0005                               store.f64x2 notrap aligned v99, v2+200
+@0005                               store.i32 notrap aligned v118, v2+652
+@0005                               store.f64x2 notrap aligned v97, v2+200
 @0005                               store.f64x2 notrap aligned v45, v2+184
-@0005                               call fn0(v2, v128)  ; v128 = 768
-@0005                               v129 = load.i32 notrap aligned v0
-@0005                               v130 = iadd_imm v129, 2
-@0005                               store notrap aligned v130, v0
-@0005                               v131 = load.i32 notrap aligned v0+4
-@0005                               v132 = iadd_imm v131, 4
-@0005                               store notrap aligned v132, v0+4
+@0005                               call fn0(v2, v124)  ; v124 = 768
+@0005                               v125 = load.i32 notrap aligned v0
+@0005                               v126 = iadd_imm v125, 2
+@0005                               store notrap aligned v126, v0
+@0005                               v127 = load.i32 notrap aligned v0+4
+@0005                               v128 = iadd_imm v127, 4
+@0005                               store notrap aligned v128, v0+4
 @0005                               return
 
                                 block14:
-@0005                               v133 = uextend.i32 v127
-@0005                               v134 = extractlane.f64x2 v99, 1
-@0005                               v135 = iadd.i32 v124, v133
-@0005                               v136 = call fn12(v1, v135, v126, v134)
-@0005                               brif v136, block16, block15
+@0005                               v129 = uextend.i32 v123
+@0005                               v130 = extractlane.f64x2 v97, 1
+@0005                               v131 = iadd.i32 v120, v129
+@0005                               v132 = call fn12(v1, v131, v122, v130)
+@0005                               brif v132, block16, block15
 
                                 block15 cold:
-@0005                               store.i32 notrap aligned v135, v2+864
-@0005                               v137 = iconst.i16 768
-@0005                               store.i32 notrap aligned v123, v2
+@0005                               store.i32 notrap aligned v131, v2+864
+@0005                               v133 = iconst.i16 768
+@0005                               store.i32 notrap aligned v119, v2
 @0005                               store.f64x2 notrap aligned v29, v2+168
-@0005                               store.i32 notrap aligned v122, v2+652
-@0005                               store.f64x2 notrap aligned v99, v2+200
+@0005                               store.i32 notrap aligned v118, v2+652
+@0005                               store.f64x2 notrap aligned v97, v2+200
 @0005                               store.f64x2 notrap aligned v45, v2+184
-@0005                               call fn0(v2, v137)  ; v137 = 768
+@0005                               call fn0(v2, v133)  ; v133 = 768
 @0005                               return
 
                                 block16:
-@0005                               v138 = uextend.i32 v136
-@0005                               v139 = iadd_imm.i32 v123, 4
-                                    store notrap aligned v139, v2
+@0005                               v134 = uextend.i32 v132
+@0005                               v135 = iadd_imm.i32 v119, 4
+                                    store notrap aligned v135, v2
                                     store.f64x2 notrap aligned v29, v2+168
-                                    store.i32 notrap aligned v122, v2+652
-                                    store.f64x2 notrap aligned v99, v2+200
+                                    store.i32 notrap aligned v118, v2+652
+                                    store.f64x2 notrap aligned v97, v2+200
                                     store.f64x2 notrap aligned v45, v2+184
                                     return
 }

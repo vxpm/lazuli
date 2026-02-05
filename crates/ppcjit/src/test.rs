@@ -98,6 +98,16 @@ fn test_sequence(name: &str, sequence: Sequence) {
 }
 
 #[test]
+fn fcmpu() {
+    test_sequence(
+        "fcmpu",
+        ppc! {
+            fcmpu u(0) fpr(1) fpr(2)
+        },
+    );
+}
+
+#[test]
 fn ps_add_acc() {
     test_sequence(
         "ps_add_acc",

@@ -1,0 +1,102 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: disasm
+---
+  pushq %rbp
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  movq %rsp, %rbp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 32 }
+  subq $0x30, %rsp
+  movq %rbx, 0x10(%rsp)
+  unwind SaveReg { clobber_offset: 0, reg: p3i }
+  movq %r12, 0x18(%rsp)
+  unwind SaveReg { clobber_offset: 8, reg: p12i }
+  movq %r14, 0x20(%rsp)
+  unwind SaveReg { clobber_offset: 16, reg: p14i }
+  movq %r15, 0x28(%rsp)
+  unwind SaveReg { clobber_offset: 24, reg: p15i }
+block0:
+  movq %rdi, %r12
+  movl 0x2a8(%rdx), %esi
+  shrl $0xd, %esi
+  testb $0x1, %sil
+  jnz     label2; j label1
+block2:
+  movq %rdx, %rdi
+  vmovupd 0x98(%rdi), %xmm2
+  vmovupd 0xa8(%rdi), %xmm3
+  movl 0x28c(%rdi), %r8d
+  movl 0x288(%rdi), %r11d
+  movl (%rdi), %r10d
+  movl $0xf0000000, %edx
+  vucomisd %xmm2, %xmm3
+  seta %r9b
+  movzbl %r9b, %r9d
+  movq %r9, %rcx
+  shll $0x1f, %ecx
+  vucomisd %xmm3, %xmm2
+  seta %sil
+  movzbl %sil, %esi
+  movq %rsi, %rax
+  shll $0x1e, %eax
+  orl %eax, %ecx
+  vucomisd %xmm3, %xmm2
+  setnp %al
+  sete %r14b
+  andl %r14d, %eax
+  movzbl %al, %eax
+  movq %rax, %r14
+  shll $0x1d, %r14d
+  orl %r14d, %ecx
+  vucomisd %xmm3, %xmm2
+  setp %r15b
+  movzbl %r15b, %ebx
+  movq %rbx, %r15
+  shll $0x1c, %r15d
+  orl %r15d, %ecx
+  movq %rdx, %r15
+  andl %ecx, %r15d
+  notl %edx
+  andl %r11d, %edx
+  orl %edx, %r15d
+  movl %r15d, 0x288(%rdi)
+  leal 4(%r10), %ecx
+  movl %ecx, (%rdi)
+  movl $0x1f000, %ecx
+  shll $0xf, %r9d
+  shll $0xe, %esi
+  orl %esi, %r9d
+  shll $0xd, %eax
+  orl %eax, %r9d
+  shll $0xc, %ebx
+  orl %ebx, %r9d
+  movq %rcx, %rax
+  andl %r9d, %eax
+  notl %ecx
+  andl %r8d, %ecx
+  orl %ecx, %eax
+  movl %eax, 0x28c(%rdi)
+  movq %r12, %rdi
+  addl $0x1, (%rdi)
+  addl $0x2, 4(%rdi)
+  movq 0x10(%rsp), %rbx
+  movq 0x18(%rsp), %r12
+  movq 0x20(%rsp), %r14
+  movq 0x28(%rsp), %r15
+  addq $0x30, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block1:
+  movl $0x800, %esi
+  load_ext_name userextname0+0, %rcx
+  movq %rdx, %rdi
+  call    *%rcx
+  movq 0x10(%rsp), %rbx
+  movq 0x18(%rsp), %r12
+  movq 0x20(%rsp), %r14
+  movq 0x28(%rsp), %r15
+  addq $0x30, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq

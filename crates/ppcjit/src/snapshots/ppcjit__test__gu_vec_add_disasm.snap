@@ -189,19 +189,19 @@ block20:
   seta %r11b
   movzbl %r11b, %ecx
   shll $0xf, %ecx
-  vucomisd %xmm6, %xmm5
+  vucomisd (%rip), %xmm5
   seta %sil
   movzbl %sil, %r11d
   shll $0xe, %r11d
   orl %r11d, %ecx
-  vucomisd %xmm6, %xmm5
+  vucomisd (%rip), %xmm5
   setnp %dl
   sete %r8b
   andl %r8d, %edx
   movzbl %dl, %esi
   shll $0xd, %esi
   orl %esi, %ecx
-  vucomisd %xmm6, %xmm5
+  vucomisd (%rip), %xmm5
   setp %al
   movzbl %al, %edx
   shll $0xc, %edx
@@ -212,20 +212,20 @@ block20:
   movzbl %dl, %r9d
   shll $0xf, %r9d
   movdqu <offset:1>+0x58(%rsp), %xmm2
-  vucomisd %xmm6, %xmm2
+  vucomisd (%rip), %xmm2
   seta %dl
   movzbl %dl, %edx
   shll $0xe, %edx
   orl %edx, %r9d
   movdqu <offset:1>+0x58(%rsp), %xmm0
-  vucomisd %xmm6, %xmm0
+  vucomisd (%rip), %xmm0
   setnp %r8b
   sete %r10b
   andl %r10d, %r8d
   movzbl %r8b, %edx
   shll $0xd, %edx
   orl %edx, %r9d
-  vucomisd %xmm6, %xmm0
+  vucomisd (%rip), %xmm0
   setp %r10b
   movzbl %r10b, %r8d
   shll $0xc, %r8d
@@ -371,19 +371,19 @@ block11:
   seta %r8b
   movzbl %r8b, %r11d
   shll $0xf, %r11d
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   seta %r9b
   movzbl %r9b, %r8d
   shll $0xe, %r8d
   orl %r8d, %r11d
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   setnp %r10b
   sete %sil
   andl %esi, %r10d
   movzbl %r10b, %r9d
   shll $0xd, %r9d
   orl %r9d, %r11d
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   setp %sil
   movzbl %sil, %r10d
   shll $0xc, %r10d
@@ -429,19 +429,19 @@ block13:
   seta %cl
   movzbl %cl, %r9d
   shll $0xf, %r9d
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   seta %dl
   movzbl %dl, %ecx
   shll $0xe, %ecx
   orl %ecx, %r9d
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   setnp %r8b
   sete %r10b
   andl %r10d, %r8d
   movzbl %r8b, %edx
   shll $0xd, %edx
   orl %edx, %r9d
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   setp %r10b
   movzbl %r10b, %r8d
   shll $0xc, %r8d
@@ -484,19 +484,19 @@ block15:
   seta %r11b
   movzbl %r11b, %ecx
   shll $0xf, %ecx
-  vucomisd %xmm0, %xmm4
+  vucomisd (%rip), %xmm4
   seta %sil
   movzbl %sil, %r11d
   shll $0xe, %r11d
   orl %r11d, %ecx
-  vucomisd %xmm0, %xmm4
+  vucomisd (%rip), %xmm4
   setnp %dil
   sete %r8b
   andl %r8d, %edi
   movzbl %dil, %esi
   shll $0xd, %esi
   orl %esi, %ecx
-  vucomisd %xmm0, %xmm4
+  vucomisd (%rip), %xmm4
   setp %al
   movzbl %al, %edi
   shll $0xc, %edi
@@ -541,19 +541,19 @@ block17:
   seta %r9b
   movzbl %r9b, %esi
   shll $0xf, %esi
-  vucomisd %xmm0, %xmm4
+  vucomisd (%rip), %xmm4
   seta %r10b
   movzbl %r10b, %r9d
   shll $0xe, %r9d
   orl %r9d, %esi
-  vucomisd %xmm0, %xmm4
+  vucomisd (%rip), %xmm4
   setnp %r11b
   sete %dil
   andl %edi, %r11d
   movzbl %r11b, %r10d
   shll $0xd, %r10d
   orl %r10d, %esi
-  vucomisd %xmm0, %xmm4
+  vucomisd (%rip), %xmm4
   setp %dil
   movzbl %dil, %r11d
   shll $0xc, %r11d
@@ -608,19 +608,19 @@ block19:
   seta %r9b
   movzbl %r9b, %esi
   shll $0xf, %esi
-  vucomisd %xmm2, %xmm5
+  vucomisd (%rip), %xmm5
   seta %r10b
   movzbl %r10b, %r9d
   shll $0xe, %r9d
   orl %r9d, %esi
-  vucomisd %xmm2, %xmm5
+  vucomisd (%rip), %xmm5
   setnp %dil
   sete %cl
   andl %ecx, %edi
   movzbl %dil, %r10d
   shll $0xd, %r10d
   orl %r10d, %esi
-  vucomisd %xmm2, %xmm5
+  vucomisd (%rip), %xmm5
   setp %dil
   movzbl %dil, %edi
   shll $0xc, %edi
@@ -630,19 +630,19 @@ block19:
   seta %dil
   movzbl %dil, %edx
   shll $0xf, %edx
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   seta %al
   movzbl %al, %edi
   shll $0xe, %edi
   orl %edi, %edx
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   setnp %cl
   sete %r8b
   andl %r8d, %ecx
   movzbl %cl, %ecx
   shll $0xd, %ecx
   orl %ecx, %edx
-  vucomisd %xmm2, %xmm4
+  vucomisd (%rip), %xmm4
   setp %r8b
   movzbl %r8b, %ecx
   shll $0xc, %ecx

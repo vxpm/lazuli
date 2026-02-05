@@ -318,7 +318,7 @@ impl BlockBuilder<'_> {
         self.update_cr(0, lt, gt, eq, ov);
     }
 
-    fn update_fprf_inner(&mut self, lt: ir::Value, gt: ir::Value, eq: ir::Value, un: ir::Value) {
+    pub fn update_fprf(&mut self, lt: ir::Value, gt: ir::Value, eq: ir::Value, un: ir::Value) {
         let fpscr = self.get(Reg::FPSCR);
 
         let lt = self.bd.ins().uextend(ir::types::I32, lt);
@@ -343,22 +343,16 @@ impl BlockBuilder<'_> {
         self.set(Reg::FPSCR, updated);
     }
 
-    pub fn update_fprf_cmpu(&mut self, lhs: ir::Value, rhs: ir::Value) {
-        let lhs = self.bd.ins().extractlane(lhs, 0);
-        let rhs = self.bd.ins().extractlane(rhs, 0);
-
-        let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
-        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
-        let eq = self.bd.ins().fcmp(FloatCC::Equal, lhs, rhs);
-        let un = self.bd.ins().fcmp(FloatCC::Unordered, lhs, rhs);
-
-        self.update_fprf_inner(lt, gt, eq, un);
-    }
-
     pub fn update_fprf_cmpz(&mut self, value: ir::Value) {
+        let value = self.bd.ins().extractlane(value, 0);
         let zero = self.ir_value(0.0f64);
-        let zero = self.bd.ins().splat(ir::types::F64X2, zero);
-        self.update_fprf_cmpu(value, zero);
+
+        let lt = self.bd.ins().fcmp(FloatCC::LessThan, value, zero);
+        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, value, zero);
+        let eq = self.bd.ins().fcmp(FloatCC::Equal, value, zero);
+        let un = self.bd.ins().fcmp(FloatCC::Unordered, value, zero);
+
+        self.update_fprf(lt, gt, eq, un);
     }
 
     pub fn update_fpscr(&mut self) {
