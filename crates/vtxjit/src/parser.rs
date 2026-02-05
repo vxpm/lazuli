@@ -1,4 +1,6 @@
-use jitalloc::{Allocation, Exec};
+#![cfg_attr(not(test), expect(unused, reason = "meta is only used in tests"))]
+
+use jitalloc::{Allocation, ReadExec};
 use lazuli::system::gx::cmd::attributes::VertexAttributeTable;
 use lazuli::system::gx::cmd::{Arrays, VertexDescriptor};
 use lazuli::system::gx::{MatrixSet, Vertex};
@@ -30,16 +32,31 @@ pub type ParserFn = extern "sysv64" fn(
     u32,
 );
 
+/// Meta information regarding a parser.
+#[derive(Debug, Clone)]
+pub struct Meta {
+    /// The Cranelift IR of this block. Only available if `cfg!(debug_assertions)` is true.
+    pub clir: Option<String>,
+    /// The disassembly of this block. Only available if `cfg!(debug_assertions)` is true.
+    pub disasm: Option<String>,
+}
+
+/// A vertex stream parser.
 pub struct VertexParser {
-    code: Allocation<Exec>,
+    code: Allocation<ReadExec>,
+    meta: Meta,
 }
 
 impl VertexParser {
-    pub(crate) fn new(code: Allocation<Exec>) -> Self {
-        Self { code }
+    pub fn new(code: Allocation<ReadExec>, meta: Meta) -> Self {
+        Self { code, meta }
     }
 
-    pub(crate) fn as_ptr(&self) -> ParserFn {
+    pub fn as_ptr(&self) -> ParserFn {
         unsafe { std::mem::transmute(self.code.as_ptr().cast::<u8>()) }
+    }
+
+    pub fn meta(&self) -> &Meta {
+        &self.meta
     }
 }

@@ -1434,7 +1434,6 @@ impl SPR {
 pub enum Reg {
     GPR(GPR),
     FPR(FPR),
-    PS1(FPR),
     SPR(SPR),
     PC,
     MSR,
@@ -1486,7 +1485,6 @@ impl Reg {
         match self {
             Self::GPR(gpr) => gpr.offset(),
             Self::FPR(fpr) => fpr.offset(),
-            Self::PS1(fpr) => fpr.offset() + size_of::<f64>(),
             Self::SPR(spr) => spr.offset(),
             Self::PC => offset_of!(Cpu, pc),
             Self::MSR => offset_of!(Cpu, supervisor.config.msr),

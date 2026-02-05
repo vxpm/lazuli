@@ -1,6 +1,9 @@
 mod builder;
 mod parser;
 
+#[cfg(test)]
+mod test;
+
 use std::collections::hash_map::Entry;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
@@ -9,7 +12,7 @@ use cranelift::codegen::{self, ir};
 use cranelift::prelude::Configurable;
 use cranelift::prelude::isa::TargetIsa;
 use cranelift::{frontend, native};
-use jitalloc::{Allocator, Exec};
+use jitalloc::{Allocator, ReadExec};
 use lazuli::modules::vertex::{Ctx, VertexModule};
 use lazuli::system::gx::cmd::attributes::VertexAttributeTable;
 use lazuli::system::gx::cmd::{VertexAttributeStream, VertexDescriptor};
@@ -19,7 +22,7 @@ use parser::VertexParser;
 use rustc_hash::FxHashMap;
 
 use crate::builder::ParserBuilder;
-use crate::parser::Config;
+use crate::parser::{Config, Meta};
 
 #[repr(C)]
 struct UnpackedDefaultMatrices {
@@ -36,12 +39,12 @@ impl UnpackedDefaultMatrices {
     }
 }
 
-struct Compiler {
+struct Jit {
     isa: Arc<dyn TargetIsa>,
-    allocator: Allocator<Exec>,
+    allocator: Allocator<ReadExec>,
 }
 
-impl Compiler {
+impl Jit {
     fn new() -> Self {
         let verifier = if cfg!(debug_assertions) {
             "true"
@@ -78,7 +81,7 @@ impl Compiler {
             .finish(codegen::settings::Flags::new(codegen))
             .unwrap();
 
-        Compiler {
+        Jit {
             isa,
             allocator: Allocator::new(),
         }
@@ -116,27 +119,26 @@ impl Compiler {
         let builder = ParserBuilder::new(self, func_builder, config);
         builder.build();
 
-        // println!("{:?}", config);
-        // println!("{}", func.display());
-
+        let clir = cfg!(test).then(|| func.display().to_string());
         code_ctx.clear();
-        code_ctx.want_disasm = true;
+        code_ctx.want_disasm = cfg!(test);
         code_ctx.func = func;
         code_ctx
             .compile(&*self.isa, &mut Default::default())
             .unwrap();
 
         let compiled = code_ctx.take_compiled_code().unwrap();
-        // println!("{}", code_ctx.func.display());
-        // println!("{}", compiled.vcode.as_ref().unwrap());
-
         let alloc = self.allocator.allocate(64, compiled.code_buffer());
-        VertexParser::new(alloc)
+
+        let disasm = compiled.vcode;
+        let meta = Meta { clir, disasm };
+
+        VertexParser::new(alloc, meta)
     }
 }
 
 pub struct JitVertexModule {
-    compiler: Compiler,
+    compiler: Jit,
     code_ctx: codegen::Context,
     func_ctx: frontend::FunctionBuilderContext,
     parsers: FxHashMap<Config, VertexParser>,
@@ -147,7 +149,7 @@ unsafe impl Send for JitVertexModule {}
 impl JitVertexModule {
     pub fn new() -> Self {
         Self {
-            compiler: Compiler::new(),
+            compiler: Jit::new(),
             code_ctx: codegen::Context::new(),
             func_ctx: frontend::FunctionBuilderContext::new(),
             parsers: FxHashMap::default(),

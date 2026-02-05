@@ -1,0 +1,82 @@
+---
+source: crates/vtxjit/src/test.rs
+expression: disasm
+---
+  pushq %rbp
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  movq %rsp, %rbp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
+block0:
+  movq <offset:0>+-0x10(%rbp), %r10
+  uninit  %rsi
+  xorl %esi, %esi
+  jmp     label1
+block1:
+  cmpl %r10d, %esi
+  jb      label3; j label2
+block3:
+  movzbq (%rdx), %r11
+  movb %r11b, 0x80(%r8)
+  movq 1(%rdx), %r11
+  movq %r11, 0x60(%r8)
+  vmovdqu (%rcx), %xmm7
+  vmovdqu (%rip), %xmm0
+  vpshufb %xmm0, %xmm7, %xmm7
+  vpsrad $0x10, %xmm7, %xmm7
+  vcvtdq2ps %xmm7, %xmm7
+  vmovups (%rip), %xmm0
+  vmulps %xmm0, %xmm7, %xmm7
+  vmovss %xmm7, 0x68(%r8)
+  vpshufd $0x1, %xmm7, %xmm0
+  vmovss %xmm0, 0x6c(%r8)
+  vpshufd $0x2, %xmm7, %xmm1
+  vmovss %xmm1, 0x70(%r8)
+  vmovdqu 6(%rcx), %xmm2
+  vmovdqu (%rip), %xmm3
+  vpshufb %xmm3, %xmm2, %xmm2
+  vmovdqu (%rip), %xmm3
+  vpmulld %xmm3, %xmm2, %xmm2
+  vpsrld $0xb, %xmm2, %xmm2
+  vmovdqu (%rip), %xmm3
+  vpand %xmm3, %xmm2, %xmm2
+  vpslld $0x10, %xmm2, %xmm3
+  vpsrld $0x10, %xmm3, %xmm5
+  vpsubd %xmm5, %xmm2, %xmm7
+  vcvtdq2ps %xmm5, %xmm1
+  vpsrld $0x1, %xmm7, %xmm3
+  vcvtdq2ps %xmm3, %xmm5
+  vaddps %xmm5, %xmm5, %xmm7
+  vaddps %xmm1, %xmm7, %xmm1
+  vmovups (%rip), %xmm2
+  vmulps %xmm2, %xmm1, %xmm2
+  movl $0x3f800000, %edi
+  vmovd %edi, %xmm3
+  vinsertps $0x30, %xmm3, %xmm2, %xmm2
+  vmovups %xmm2, 0x40(%r8)
+  leaq 8(%rcx), %rcx
+  leaq 0x84(%r8), %r8
+  leal 1(%rsi), %esi
+  jmp     label1
+block2:
+  vmovdqu (%r9), %xmm3
+  uninit  %r8
+  xorq %r8, %r8
+  vmovq %r8, %xmm4
+  movl $0x1, %r8d
+  movzbq (%rdx), %rdx
+  shlxq %rdx, %r8, %r10
+  vmovq %r10, %xmm5
+  vpor %xmm5, %xmm4, %xmm4
+  uninit  %xmm2
+  vpxor %xmm2, %xmm2, %xmm5
+  movzbq %dl, %rcx
+  andq $0x1f, %rcx
+  leaq 0x40(%rcx), %rdx
+  shlxq %rdx, %r8, %rdx
+  vpinsrq $0x1, %rdx, %xmm5, %xmm5
+  vpor %xmm5, %xmm4, %xmm4
+  vpor %xmm4, %xmm3, %xmm3
+  vmovdqu %xmm3, (%r9)
+  movq %rbp, %rsp
+  popq %rbp
+  retq

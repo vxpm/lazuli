@@ -15,14 +15,14 @@ use cranelift::frontend;
 use cranelift::prelude::InstBuilder;
 use easyerr::Error;
 use gekko::disasm::{Ins, Opcode};
-use gekko::{FPR, Reg, SPR};
+use gekko::{Reg, SPR};
 use rustc_hash::FxHashMap;
 
 use crate::block::Info;
 use crate::builder::util::IntoIrValue;
 use crate::hooks::{HookKind, Hooks};
 use crate::{
-    Compiler, INTERNAL_RAISE_EXCEPTION, NAMESPACE_INTERNALS, NAMESPACE_USER_HOOKS, Sequence,
+    Codegen, INTERNAL_RAISE_EXCEPTION, NAMESPACE_INTERNALS, NAMESPACE_USER_HOOKS, Sequence,
 };
 
 const MEMFLAGS: ir::MemFlags = ir::MemFlags::trusted();
@@ -31,7 +31,7 @@ const MEMFLAGS_READONLY: ir::MemFlags = MEMFLAGS.with_can_move().with_readonly()
 // NOTE: make sure to keep this up to date if anything else is not just 32 bits
 fn reg_ir_ty(reg: Reg) -> ir::Type {
     match reg {
-        Reg::FPR(_) | Reg::PS1(_) => ir::types::F64,
+        Reg::FPR(_) => ir::types::F64X2,
         _ => ir::types::I32,
     }
 }
@@ -157,10 +157,9 @@ struct CachedValue {
 
 /// Structure to build JIT blocks.
 pub struct BlockBuilder<'ctx> {
-    compiler: &'ctx mut Compiler,
+    codegen: &'ctx mut Codegen,
     bd: frontend::FunctionBuilder<'ctx>,
     cache: FxHashMap<Reg, CachedValue>,
-    ps_cache: FxHashMap<FPR, CachedValue>,
     consts: Consts,
     hooks: HookFuncs,
     current_bb: ir::Block,
@@ -178,7 +177,7 @@ pub struct BlockBuilder<'ctx> {
 }
 
 impl<'ctx> BlockBuilder<'ctx> {
-    pub fn new(compiler: &'ctx mut Compiler, mut builder: frontend::FunctionBuilder<'ctx>) -> Self {
+    pub fn new(codegen: &'ctx mut Codegen, mut builder: frontend::FunctionBuilder<'ctx>) -> Self {
         let entry_bb = builder.create_block();
         builder.append_block_params_for_function_params(entry_bb);
         builder.switch_to_block(entry_bb);
@@ -190,7 +189,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             align_of::<u64>().ilog2() as u8,
         ));
 
-        let ptr_type = compiler.isa.pointer_type();
+        let ptr_type = codegen.isa.pointer_type();
         let params = builder.block_params(entry_bb);
         let info_ptr = params[0];
         let ctx_ptr = params[1];
@@ -291,10 +290,9 @@ impl<'ctx> BlockBuilder<'ctx> {
         };
 
         Self {
-            compiler,
+            codegen,
             bd: builder,
             cache: FxHashMap::default(),
-            ps_cache: FxHashMap::default(),
             consts,
             hooks,
             current_bb: entry_bb,
@@ -336,10 +334,6 @@ impl<'ctx> BlockBuilder<'ctx> {
     fn get(&mut self, reg: impl Into<Reg>) -> ir::Value {
         let reg = reg.into();
 
-        if let Reg::FPR(fpr) | Reg::PS1(fpr) = reg {
-            self.flush_ps(fpr);
-        }
-
         if let Some(reg) = self.cache.get(&reg) {
             return reg.value;
         }
@@ -363,8 +357,10 @@ impl<'ctx> BlockBuilder<'ctx> {
         let reg = reg.into();
         let value = self.ir_value(value);
 
-        if let Reg::FPR(fpr) | Reg::PS1(fpr) = reg {
-            self.invalidate_ps(fpr);
+        let value_ty = self.bd.func.dfg.value_type(value);
+        match reg {
+            Reg::FPR(_) => assert_eq!(value_ty, ir::types::F64X2),
+            _ => assert_eq!(value_ty, ir::types::I32),
         }
 
         if let Some(reg) = self.cache.get_mut(&reg) {
@@ -386,113 +382,11 @@ impl<'ctx> BlockBuilder<'ctx> {
         }
     }
 
-    fn get_ps(&mut self, fpr: FPR) -> ir::Value {
-        if let Some(val) = self.ps_cache.get(&fpr) {
-            return val.value;
-        }
-
-        let ps0 = self.get(fpr);
-        let ps1 = self.get(Reg::PS1(fpr));
-
-        let paired = self.bd.ins().scalar_to_vector(ir::types::F64X2, ps0);
-        let paired = self.bd.ins().insertlane(paired, ps1, 1);
-
-        self.ps_cache.insert(
-            fpr,
-            CachedValue {
-                value: paired,
-                modified: false,
-            },
-        );
-
-        paired
-    }
-
-    fn set_ps(&mut self, fpr: FPR, value: ir::Value) {
-        if let Some(val) = self.ps_cache.get_mut(&fpr) {
-            val.modified = true;
-            val.value = value;
-            return;
-        }
-
-        self.ps_cache.insert(
-            fpr,
-            CachedValue {
-                value,
-                modified: true,
-            },
-        );
-    }
-
-    /// Flushes a cached paired single (splits it into PS0 and PS1 and writes it to the normal
-    /// register cache).
-    fn flush_ps(&mut self, fpr: FPR) {
-        let Some(val) = self.ps_cache.get_mut(&fpr) else {
-            return;
-        };
-
-        if !val.modified {
-            return;
-        }
-
-        val.modified = false;
-
-        let ps0 = self.bd.ins().extractlane(val.value, 0);
-        let ps1 = self.bd.ins().extractlane(val.value, 1);
-
-        self.cache.insert(
-            Reg::FPR(fpr),
-            CachedValue {
-                value: ps0,
-                modified: true,
-            },
-        );
-        self.cache.insert(
-            Reg::PS1(fpr),
-            CachedValue {
-                value: ps1,
-                modified: true,
-            },
-        );
-    }
-
-    /// Invalidates a specific paired single.
-    fn invalidate_ps(&mut self, fpr: FPR) {
-        self.flush_ps(fpr);
-        self.ps_cache.remove(&fpr);
-    }
-
-    /// Calls a generic context hook.
-    fn call_generic_hook(&mut self, hook: ir::FuncRef) {
-        self.bd.ins().call(hook, &[self.consts.ctx_ptr]);
-    }
-
     /// Flushes the register cache to the registers struct. This does not invalidate the register
     /// cache.
     fn flush(&mut self) {
-        for (&fpr, val) in &self.ps_cache {
-            if !val.modified {
-                continue;
-            }
-
-            self.bd.ins().store(
-                MEMFLAGS,
-                val.value,
-                self.consts.regs_ptr,
-                fpr.offset() as i32,
-            );
-        }
-
         for (reg, val) in &self.cache {
             if !val.modified {
-                continue;
-            }
-
-            // check whether this reg is a FPR/PS1 that has already been flushed
-            if let Reg::FPR(fpr) | Reg::PS1(fpr) = reg
-                && let Some(val) = self.ps_cache.get(fpr)
-                && val.modified
-            {
                 continue;
             }
 
@@ -548,6 +442,11 @@ impl<'ctx> BlockBuilder<'ctx> {
 
         self.last_updated_cycles = self.executed_cycles;
         self.last_updated_instructions = self.executed_instructions;
+    }
+
+    /// Calls a generic context hook.
+    fn call_generic_hook(&mut self, hook: ir::FuncRef) {
+        self.bd.ins().call(hook, &[self.consts.ctx_ptr]);
     }
 
     /// Emits the prologue:
@@ -785,14 +684,14 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Xori => self.xori(ins),
             Opcode::Xoris => self.xoris(ins),
             Opcode::Illegal => {
-                if self.compiler.settings.ignore_unimplemented {
+                if self.codegen.settings.ignore_unimplemented {
                     self.stub(ins)
                 } else {
                     return Err(BuilderError::Illegal(ins));
                 }
             }
             _ => {
-                if self.compiler.settings.ignore_unimplemented {
+                if self.codegen.settings.ignore_unimplemented {
                     self.stub(ins)
                 } else {
                     todo!("unimplemented instruction {ins:?}")

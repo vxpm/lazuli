@@ -101,6 +101,46 @@ pub struct Hooks {
 }
 
 impl Hooks {
+    #[allow(unused_assignments)]
+    #[cfg(test)]
+    pub(crate) unsafe fn stub() -> Self {
+        let mut count = usize::MAX;
+        macro_rules! stub {
+            () => {{
+                let ptr = unsafe { std::mem::transmute(count) };
+                count -= 1;
+                ptr
+            }};
+        }
+
+        Self {
+            get_registers: stub!(),
+            get_fastmem: stub!(),
+            follow_link: stub!(),
+            try_link: stub!(),
+            read_i8: stub!(),
+            write_i8: stub!(),
+            read_i16: stub!(),
+            write_i16: stub!(),
+            read_i32: stub!(),
+            write_i32: stub!(),
+            read_i64: stub!(),
+            write_i64: stub!(),
+            read_quantized: stub!(),
+            write_quantized: stub!(),
+            invalidate_icache: stub!(),
+            clear_icache: stub!(),
+            dcache_dma: stub!(),
+            msr_changed: stub!(),
+            ibat_changed: stub!(),
+            dbat_changed: stub!(),
+            tb_read: stub!(),
+            tb_changed: stub!(),
+            dec_read: stub!(),
+            dec_changed: stub!(),
+        }
+    }
+
     /// Returns the function signature for the `get_registers` hook.
     pub(crate) fn get_registers_sig(ptr_type: ir::Type) -> ir::Signature {
         ir::Signature {

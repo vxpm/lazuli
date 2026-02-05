@@ -8,6 +8,10 @@ license = "GPL-3.0-only"
 [lints]
 workspace = true
 
+[dev-dependencies]
+insta.workspace = true
+powerpc-asm = "0.4"
+
 [dependencies]
 gekko.workspace = true
 jitalloc.workspace = true

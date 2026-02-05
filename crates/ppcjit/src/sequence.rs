@@ -109,7 +109,7 @@ impl Sequence {
         })
     }
 
-    pub fn detect_idle_loop(&self) -> Pattern {
+    pub fn detect_pattern(&self) -> Pattern {
         if self.is_simple_idle_loop() {
             return Pattern::IdleBasic;
         }

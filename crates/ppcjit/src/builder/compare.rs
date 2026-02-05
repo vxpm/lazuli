@@ -85,10 +85,13 @@ impl BlockBuilder<'_> {
         let fpr_a = self.get(ins.fpr_a());
         let fpr_b = self.get(ins.fpr_b());
 
-        let lt = self.bd.ins().fcmp(FloatCC::LessThan, fpr_a, fpr_b);
-        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, fpr_a, fpr_b);
-        let eq = self.bd.ins().fcmp(FloatCC::Equal, fpr_a, fpr_b);
-        let un = self.bd.ins().fcmp(FloatCC::Unordered, fpr_a, fpr_b);
+        let lhs = self.bd.ins().extractlane(fpr_a, 0);
+        let rhs = self.bd.ins().extractlane(fpr_b, 0);
+
+        let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
+        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
+        let eq = self.bd.ins().fcmp(FloatCC::Equal, lhs, rhs);
+        let un = self.bd.ins().fcmp(FloatCC::Unordered, lhs, rhs);
 
         self.update_fprf(lt, gt, eq, un);
         self.update_cr(ins.field_crfd(), lt, gt, eq, un);
@@ -102,10 +105,13 @@ impl BlockBuilder<'_> {
         let fpr_a = self.get(ins.fpr_a());
         let fpr_b = self.get(ins.fpr_b());
 
-        let lt = self.bd.ins().fcmp(FloatCC::LessThan, fpr_a, fpr_b);
-        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, fpr_a, fpr_b);
-        let eq = self.bd.ins().fcmp(FloatCC::Equal, fpr_a, fpr_b);
-        let un = self.bd.ins().fcmp(FloatCC::Unordered, fpr_a, fpr_b);
+        let lhs = self.bd.ins().extractlane(fpr_a, 0);
+        let rhs = self.bd.ins().extractlane(fpr_b, 0);
+
+        let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
+        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
+        let eq = self.bd.ins().fcmp(FloatCC::Equal, lhs, rhs);
+        let un = self.bd.ins().fcmp(FloatCC::Unordered, lhs, rhs);
 
         self.update_fprf(lt, gt, eq, un);
         self.update_cr(ins.field_crfd(), lt, gt, eq, un);
@@ -119,10 +125,13 @@ impl BlockBuilder<'_> {
         let fpr_a = self.get(ins.fpr_a());
         let fpr_b = self.get(ins.fpr_b());
 
-        let lt = self.bd.ins().fcmp(FloatCC::LessThan, fpr_a, fpr_b);
-        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, fpr_a, fpr_b);
-        let eq = self.bd.ins().fcmp(FloatCC::Equal, fpr_a, fpr_b);
-        let un = self.bd.ins().fcmp(FloatCC::Unordered, fpr_a, fpr_b);
+        let lhs = self.bd.ins().extractlane(fpr_a, 0);
+        let rhs = self.bd.ins().extractlane(fpr_b, 0);
+
+        let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
+        let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
+        let eq = self.bd.ins().fcmp(FloatCC::Equal, lhs, rhs);
+        let un = self.bd.ins().fcmp(FloatCC::Unordered, lhs, rhs);
 
         self.update_fprf(lt, gt, eq, un);
         self.update_cr(ins.field_crfd(), lt, gt, eq, un);

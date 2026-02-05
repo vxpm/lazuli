@@ -6,6 +6,9 @@ mod module;
 mod sequence;
 mod unwind;
 
+#[cfg(test)]
+mod test;
+
 pub mod block;
 pub mod hooks;
 
@@ -30,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::{BlockFn, Info, LinkData, Meta, Trampoline};
 use crate::builder::BlockBuilder;
-use crate::cache::{Cache, CompiledKey};
+use crate::cache::{ArtifactKey, Cache};
 use crate::hooks::{Context, HookKind, Hooks};
 use crate::module::Module;
 use crate::unwind::UnwindHandle;
@@ -42,7 +45,7 @@ pub use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Default, Hash)]
-pub struct CompilerSettings {
+pub struct CodegenSettings {
     /// Whether to treat `sc` instructions as no-ops.
     pub nop_syscalls: bool,
     /// Whether to ignore the FPU enabled bit in MSR.
@@ -55,10 +58,10 @@ pub struct CompilerSettings {
 
 #[derive(Debug, Clone, Default)]
 pub struct Settings {
-    /// Compiler settings
-    pub compiler: CompilerSettings,
+    /// Codegen settings
+    pub codegen: CodegenSettings,
     /// Path to the block cache directory
-    pub cache_path: PathBuf,
+    pub cache_path: Option<PathBuf>,
 }
 
 pub const FASTMEM_LUT_COUNT: usize = 1 << 15;
@@ -70,15 +73,16 @@ const NAMESPACE_LINK_DATA: u32 = 2;
 
 const INTERNAL_RAISE_EXCEPTION: u32 = 0;
 
-struct Compiler {
-    settings: CompilerSettings,
+struct Codegen {
+    settings: CodegenSettings,
     hooks: Hooks,
     isa: Arc<dyn TargetIsa>,
     module: Module,
+    code_ctx: codegen::Context,
 }
 
-impl Compiler {
-    fn new(settings: CompilerSettings, hooks: Hooks) -> Self {
+impl Codegen {
+    fn new(isa: codegen::isa::Builder, settings: CodegenSettings, hooks: Hooks) -> Self {
         let verifier = if cfg!(debug_assertions) {
             "true"
         } else {
@@ -106,18 +110,15 @@ impl Compiler {
             .set("enable_table_access_spectre_mitigation", "false")
             .unwrap();
 
-        let isa_builder = native::builder().unwrap_or_else(|msg| {
-            panic!("host machine is not supported: {}", msg);
-        });
-
         let flags = codegen::settings::Flags::new(codegen);
-        let isa = isa_builder.finish(flags).unwrap();
+        let isa = isa.finish(flags).unwrap();
 
-        Compiler {
+        Codegen {
             settings,
             hooks,
             isa,
             module: Module::new(),
+            code_ctx: codegen::Context::new(),
         }
     }
 
@@ -140,72 +141,34 @@ impl Compiler {
         }
     }
 
-    /// Compiles and returns a trampoline to call blocks.
-    fn trampoline(
+    /// Compiles a cranelift function in the code context into an artifact.
+    fn compile(
         &mut self,
-        code_ctx: &mut codegen::Context,
-        func_ctx: &mut frontend::FunctionBuilderContext,
-    ) -> Trampoline {
-        let block_sig = self.block_signature();
-
-        let mut func = ir::Function::new();
-        func.signature = self.trampoline_signature();
-
-        let mut builder = frontend::FunctionBuilder::new(&mut func, func_ctx);
-        let entry_bb = builder.create_block();
-        builder.append_block_params_for_function_params(entry_bb);
-        builder.switch_to_block(entry_bb);
-        builder.seal_block(entry_bb);
-
-        let params = builder.block_params(entry_bb);
-        let info_ptr = params[0];
-        let ctx_ptr = params[1];
-        let block_ptr = params[2];
-        let ptr_type = self.isa.pointer_type();
-
-        // extract regs ptr
-        let get_regs_sig = builder.import_signature(Hooks::get_registers_sig(ptr_type));
-        let get_registers = builder
-            .ins()
-            .iconst(ptr_type, self.hooks.get_registers as usize as i64);
-        let inst = builder
-            .ins()
-            .call_indirect(get_regs_sig, get_registers, &[ctx_ptr]);
-        let regs_ptr = builder.inst_results(inst)[0];
-
-        // extract fastmem ptr
-        let get_fmem_sig = builder.import_signature(Hooks::get_fastmem_sig(ptr_type));
-        let get_fmem = builder
-            .ins()
-            .iconst(ptr_type, self.hooks.get_fastmem as usize as i64);
-        let inst = builder
-            .ins()
-            .call_indirect(get_fmem_sig, get_fmem, &[ctx_ptr]);
-        let fmem_ptr = builder.inst_results(inst)[0];
-
-        // call the block
-        let block_sig = builder.import_signature(block_sig);
-        builder.ins().call_indirect(
-            block_sig,
-            block_ptr,
-            &[info_ptr, ctx_ptr, regs_ptr, fmem_ptr],
-        );
-
-        builder.ins().return_(&[]);
-        builder.finalize();
-
-        code_ctx.clear();
-        code_ctx.func = func;
-        code_ctx
+        func: ir::Function,
+        disasm: bool,
+    ) -> Result<Artifact, codegen::CodegenError> {
+        self.code_ctx.clear();
+        self.code_ctx.func = func;
+        self.code_ctx.want_disasm = disasm;
+        self.code_ctx
             .compile(&*self.isa, &mut Default::default())
-            .unwrap();
+            .map_err(|e| e.inner)?;
 
-        let compiled = code_ctx.take_compiled_code().unwrap();
-        let alloc = self.module.allocate_code(compiled.code_buffer());
+        let compiled = self.code_ctx.take_compiled_code().unwrap();
+        let code = compiled.code_buffer().to_owned();
+        let unwind = compiled.create_unwind_info(&*self.isa).ok().flatten();
+        let disasm = compiled.vcode;
 
-        Trampoline(alloc)
+        Ok(Artifact {
+            code,
+            user_named_funcs: self.code_ctx.func.params.user_named_funcs().clone(),
+            relocs: compiled.buffer.relocs().to_owned(),
+            unwind,
+            disasm,
+        })
     }
 
+    /// Writes a relocation in the given buffer.
     fn write_relocation(code: &mut [u8], reloc: &FinalizedMachReloc, addr: usize) {
         match reloc.kind {
             Reloc::Abs8 => {
@@ -216,6 +179,7 @@ impl Compiler {
         }
     }
 
+    /// Applies all relocations to the given buffer.
     fn apply_relocations(
         &mut self,
         code: &mut [u8],
@@ -293,12 +257,11 @@ impl Compiler {
     }
 }
 
-/// A JIT context, producing [`Block`]s.
+/// A JIT compiler, producing [`Block`]s.
 pub struct Jit {
-    compiler: Compiler,
-    code_ctx: codegen::Context,
+    codegen: Codegen,
     func_ctx: frontend::FunctionBuilderContext,
-    cache: Cache,
+    cache: Option<Cache>,
     compiled_count: u64,
     trampoline: Trampoline,
 }
@@ -310,10 +273,11 @@ struct Translated {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct Compiled {
+struct Artifact {
     user_named_funcs: PrimaryMap<UserExternalNameRef, UserExternalName>,
     relocs: Vec<FinalizedMachReloc>,
     unwind: Option<UnwindInfo>,
+    disasm: Option<String>,
     #[serde(with = "serde_bytes")]
     code: Vec<u8>,
 }
@@ -327,26 +291,90 @@ pub enum BuildError {
     #[error(transparent)]
     Codegen {
         source: codegen::CodegenError,
-        meta: Meta,
+        sequence: Sequence,
+        clir: Option<String>,
     },
 }
 
 impl Jit {
-    pub fn new(settings: Settings, hooks: Hooks) -> Self {
-        let mut compiler = Compiler::new(settings.compiler, hooks);
-        let mut code_ctx = codegen::Context::new();
+    /// Compiles and returns a trampoline to call blocks.
+    fn trampoline(
+        codegen: &mut Codegen,
+        func_ctx: &mut frontend::FunctionBuilderContext,
+    ) -> Trampoline {
+        let block_sig = codegen.block_signature();
+
+        let mut func = ir::Function::new();
+        func.signature = codegen.trampoline_signature();
+
+        let mut builder = frontend::FunctionBuilder::new(&mut func, func_ctx);
+        let entry_bb = builder.create_block();
+        builder.append_block_params_for_function_params(entry_bb);
+        builder.switch_to_block(entry_bb);
+        builder.seal_block(entry_bb);
+
+        let params = builder.block_params(entry_bb);
+        let info_ptr = params[0];
+        let ctx_ptr = params[1];
+        let block_ptr = params[2];
+        let ptr_type = codegen.isa.pointer_type();
+
+        // extract regs ptr
+        let get_regs_sig = builder.import_signature(Hooks::get_registers_sig(ptr_type));
+        let get_registers = builder
+            .ins()
+            .iconst(ptr_type, codegen.hooks.get_registers as usize as i64);
+        let inst = builder
+            .ins()
+            .call_indirect(get_regs_sig, get_registers, &[ctx_ptr]);
+        let regs_ptr = builder.inst_results(inst)[0];
+
+        // extract fastmem ptr
+        let get_fmem_sig = builder.import_signature(Hooks::get_fastmem_sig(ptr_type));
+        let get_fmem = builder
+            .ins()
+            .iconst(ptr_type, codegen.hooks.get_fastmem as usize as i64);
+        let inst = builder
+            .ins()
+            .call_indirect(get_fmem_sig, get_fmem, &[ctx_ptr]);
+        let fmem_ptr = builder.inst_results(inst)[0];
+
+        // call the block
+        let block_sig = builder.import_signature(block_sig);
+        builder.ins().call_indirect(
+            block_sig,
+            block_ptr,
+            &[info_ptr, ctx_ptr, regs_ptr, fmem_ptr],
+        );
+
+        builder.ins().return_(&[]);
+        builder.finalize();
+
+        let artifact = codegen.compile(func, false).unwrap();
+        let alloc = codegen.module.allocate_code(&artifact.code);
+
+        Trampoline(alloc)
+    }
+
+    /// Creates a new [`Jit`] instance with the given ISA.
+    pub(crate) fn with_isa(isa: codegen::isa::Builder, settings: Settings, hooks: Hooks) -> Self {
+        let mut codegen = Codegen::new(isa, settings.codegen, hooks);
         let mut func_ctx = frontend::FunctionBuilderContext::new();
-        let cache = Cache::new(settings.cache_path);
-        let trampoline = compiler.trampoline(&mut code_ctx, &mut func_ctx);
+        let cache = settings.cache_path.map(Cache::new);
+        let trampoline = Self::trampoline(&mut codegen, &mut func_ctx);
 
         Self {
-            compiler,
-            code_ctx,
+            codegen,
             func_ctx,
             cache,
             compiled_count: 0,
             trampoline,
         }
+    }
+
+    /// Creates a new [`Jit`] instance with the host's ISA.
+    pub fn new(settings: Settings, hooks: Hooks) -> Self {
+        Self::with_isa(native::builder().unwrap(), settings, hooks)
     }
 
     /// Translates a sequence of instructions into a cranelift function.
@@ -355,10 +383,10 @@ impl Jit {
         instructions: impl Iterator<Item = Ins>,
     ) -> Result<Translated, BuildError> {
         let mut func = ir::Function::new();
-        func.signature = self.compiler.block_signature();
+        func.signature = self.codegen.block_signature();
 
         let func_builder = frontend::FunctionBuilder::new(&mut func, &mut self.func_ctx);
-        let builder = BlockBuilder::new(&mut self.compiler, func_builder);
+        let builder = BlockBuilder::new(&mut self.codegen, func_builder);
 
         let (sequence, cycles) = builder.build(instructions).context(BuildCtx::Builder)?;
         if sequence.is_empty() {
@@ -372,63 +400,63 @@ impl Jit {
         })
     }
 
-    /// Compiles a cranelift function in the code context.
-    fn compile(&mut self) -> Result<Compiled, codegen::CodegenError> {
-        self.code_ctx
-            .compile(&*self.compiler.isa, &mut Default::default())
-            .map_err(|e| e.inner)?;
+    /// Builds an artifact from the given instructions (up until a terminal instruction or the end of
+    /// the iterator).
+    pub(crate) fn build_artifact(
+        &mut self,
+        instructions: impl Iterator<Item = Ins>,
+    ) -> Result<(Artifact, Meta), BuildError> {
+        let translated = self.translate(instructions)?;
+        let func = translated.func;
+        let sequence = translated.sequence;
+        let pattern = sequence.detect_pattern();
 
-        let code = self.code_ctx.take_compiled_code().unwrap();
-        let unwind = code.create_unwind_info(&*self.compiler.isa).ok().flatten();
+        let clir = cfg!(debug_assertions).then(|| func.display().to_string());
+        let key = ArtifactKey::new(&*self.codegen.isa, &self.codegen.settings, &sequence);
 
-        Ok(Compiled {
-            code: code.code_buffer().to_owned(),
-            user_named_funcs: self.code_ctx.func.params.user_named_funcs().clone(),
-            relocs: code.buffer.relocs().to_owned(),
-            unwind,
-        })
+        let artifact = if let Some(cache) = &mut self.cache
+            && let Some(artifact) = cache.get(key)
+        {
+            artifact
+        } else {
+            let artifact = self
+                .codegen
+                .compile(func, cfg!(debug_assertions))
+                .with_context(|_| BuildCtx::Codegen {
+                    sequence: sequence.clone(),
+                    clir: clir.clone(),
+                })?;
+
+            if let Some(cache) = &mut self.cache {
+                cache.insert(key, &artifact);
+            }
+
+            artifact
+        };
+
+        let meta = Meta {
+            seq: sequence,
+            clir,
+            disasm: artifact.disasm.clone(),
+            cycles: translated.cycles,
+            pattern,
+        };
+
+        Ok((artifact, meta))
     }
 
     /// Builds a block with the given instructions (up until a terminal instruction or the end of
     /// the iterator).
     pub fn build(&mut self, instructions: impl Iterator<Item = Ins>) -> Result<Block, BuildError> {
-        let translated = self.translate(instructions)?;
+        let (artifact, meta) = self.build_artifact(instructions)?;
 
-        let ir = cfg!(debug_assertions).then(|| translated.func.display().to_string());
-        let meta = Meta {
-            pattern: translated.sequence.detect_idle_loop(),
-            clir: ir,
-            cycles: translated.cycles,
-            seq: translated.sequence.clone(),
-        };
+        let mut code = artifact.code;
+        self.codegen
+            .apply_relocations(&mut code, &artifact.user_named_funcs, &artifact.relocs);
 
-        let key = CompiledKey::new(
-            &*self.compiler.isa,
-            &self.compiler.settings,
-            &translated.sequence,
-        );
-        let compiled = if let Some(compiled) = self.cache.get(key) {
-            compiled
-        } else {
-            self.code_ctx.clear();
-            self.code_ctx.func = translated.func;
-
-            let compiled = self
-                .compile()
-                .with_context(|_| BuildCtx::Codegen { meta: meta.clone() })?;
-
-            self.cache.insert(key, &compiled);
-
-            compiled
-        };
-
-        let mut code = compiled.code;
-        self.compiler
-            .apply_relocations(&mut code, &compiled.user_named_funcs, &compiled.relocs);
-
-        let alloc = self.compiler.module.allocate_code(&code);
-        let unwind_handle = if let Some(unwind) = compiled.unwind {
-            unsafe { UnwindHandle::new(&*self.compiler.isa, alloc.as_ptr().addr().get(), &unwind) }
+        let alloc = self.codegen.module.allocate_code(&code);
+        let unwind_handle = if let Some(unwind) = artifact.unwind {
+            unsafe { UnwindHandle::new(&*self.codegen.isa, alloc.as_ptr().addr().get(), &unwind) }
         } else {
             None
         };

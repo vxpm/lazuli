@@ -1,7 +1,7 @@
 use cranelift::codegen::ir;
 use cranelift::prelude::InstBuilder;
 use gekko::disasm::Ins;
-use gekko::{Exception, GPR, InsExt, Reg, SPR};
+use gekko::{Exception, GPR, InsExt, SPR};
 
 use super::BlockBuilder;
 use crate::builder::{Action, InstructionInfo, MEMFLAGS, MEMFLAGS_READONLY};
@@ -116,10 +116,9 @@ impl BlockBuilder<'_> {
         self.bd.seal_block(exit_block);
 
         self.switch_to_bb(exit_block);
-        self.bd.ins().jump(continue_block, &[]);
-        // self.set(SPR::DAR, addr);
-        // self.raise_exception(Exception::DSI);
-        // self.prologue_with(STORE_INFO);
+        self.set(SPR::DAR, addr);
+        self.raise_exception(Exception::DSI);
+        self.prologue_with(STORE_INFO);
 
         self.bd.seal_block(continue_block);
         self.switch_to_bb(continue_block);
@@ -634,7 +633,7 @@ impl BlockBuilder<'_> {
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
         let paired = self.bd.ins().splat(ir::types::F64X2, value);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
 
         LOAD_INFO
     }
@@ -656,7 +655,7 @@ impl BlockBuilder<'_> {
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
         let paired = self.bd.ins().splat(ir::types::F64X2, value);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
         self.set(ins.gpr_a(), addr);
 
         LOAD_INFO
@@ -680,7 +679,7 @@ impl BlockBuilder<'_> {
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
         let paired = self.bd.ins().splat(ir::types::F64X2, value);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
 
         LOAD_INFO
     }
@@ -699,7 +698,7 @@ impl BlockBuilder<'_> {
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
         let paired = self.bd.ins().splat(ir::types::F64X2, value);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
         self.set(ins.gpr_a(), addr);
 
         LOAD_INFO
@@ -723,7 +722,7 @@ impl BlockBuilder<'_> {
 
         let double = self.bd.ins().fpromote(ir::types::F64, value);
         let paired = self.bd.ins().splat(ir::types::F64X2, double);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
 
         LOAD_INFO
     }
@@ -746,7 +745,7 @@ impl BlockBuilder<'_> {
 
         let double = self.bd.ins().fpromote(ir::types::F64, value);
         let paired = self.bd.ins().splat(ir::types::F64X2, double);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
         self.set(ins.gpr_a(), addr);
 
         LOAD_INFO
@@ -771,7 +770,7 @@ impl BlockBuilder<'_> {
 
         let double = self.bd.ins().fpromote(ir::types::F64, value);
         let paired = self.bd.ins().splat(ir::types::F64X2, double);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
 
         LOAD_INFO
     }
@@ -791,7 +790,7 @@ impl BlockBuilder<'_> {
 
         let double = self.bd.ins().fpromote(ir::types::F64, value);
         let paired = self.bd.ins().splat(ir::types::F64X2, double);
-        self.set_ps(ins.fpr_d(), paired);
+        self.set(ins.fpr_d(), paired);
         self.set(ins.gpr_a(), addr);
 
         LOAD_INFO
@@ -980,6 +979,7 @@ impl BlockBuilder<'_> {
         };
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self
             .bd
             .ins()
@@ -1001,6 +1001,7 @@ impl BlockBuilder<'_> {
         };
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self
             .bd
             .ins()
@@ -1024,6 +1025,7 @@ impl BlockBuilder<'_> {
         };
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self
             .bd
             .ins()
@@ -1042,6 +1044,7 @@ impl BlockBuilder<'_> {
         let addr = self.bd.ins().iadd(ra, rb);
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self
             .bd
             .ins()
@@ -1064,6 +1067,7 @@ impl BlockBuilder<'_> {
         };
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self.bd.ins().fdemote(ir::types::F32, value);
         let value = self
             .bd
@@ -1086,6 +1090,7 @@ impl BlockBuilder<'_> {
         };
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self.bd.ins().fdemote(ir::types::F32, value);
         let value = self
             .bd
@@ -1110,6 +1115,7 @@ impl BlockBuilder<'_> {
         };
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self.bd.ins().fdemote(ir::types::F32, value);
         let value = self
             .bd
@@ -1129,6 +1135,7 @@ impl BlockBuilder<'_> {
         let addr = self.bd.ins().iadd(ra, rb);
 
         let value = self.get(ins.fpr_s());
+        let value = self.bd.ins().extractlane(value, 0);
         let value = self.bd.ins().fdemote(ir::types::F32, value);
         let value = self
             .bd
@@ -1153,10 +1160,11 @@ impl BlockBuilder<'_> {
         };
 
         let fpr_s = self.get(ins.fpr_s());
+        let fpr_s_ps0 = self.bd.ins().extractlane(fpr_s, 0);
         let int64 = self
             .bd
             .ins()
-            .bitcast(ir::types::I64, ir::MemFlags::new(), fpr_s);
+            .bitcast(ir::types::I64, ir::MemFlags::new(), fpr_s_ps0);
         let int32 = self.bd.ins().ireduce(ir::types::I32, int64);
 
         self.mem_store::<i32>(addr, int32);
@@ -1183,9 +1191,9 @@ impl BlockBuilder<'_> {
             self.ir_value(1.0f64)
         };
 
-        let fpr_d = ins.fpr_d();
-        self.set(fpr_d, ps0);
-        self.set(Reg::PS1(fpr_d), ps1);
+        let value = self.bd.ins().scalar_to_vector(ir::types::F64X2, ps0);
+        let value = self.bd.ins().insertlane(value, ps1, 1);
+        self.set(ins.fpr_d(), value);
 
         LOAD_INFO
     }
@@ -1209,10 +1217,9 @@ impl BlockBuilder<'_> {
             self.ir_value(1.0f64)
         };
 
-        let fpr_d = ins.fpr_d();
-        self.set(fpr_d, ps0);
-        self.set(Reg::PS1(fpr_d), ps1);
-
+        let value = self.bd.ins().scalar_to_vector(ir::types::F64X2, ps0);
+        let value = self.bd.ins().insertlane(value, ps1, 1);
+        self.set(ins.fpr_d(), value);
         self.set(ins.gpr_a(), addr);
 
         LOAD_INFO
@@ -1238,9 +1245,9 @@ impl BlockBuilder<'_> {
             self.ir_value(1.0f64)
         };
 
-        let fpr_d = ins.fpr_d();
-        self.set(fpr_d, ps0);
-        self.set(Reg::PS1(fpr_d), ps1);
+        let value = self.bd.ins().scalar_to_vector(ir::types::F64X2, ps0);
+        let value = self.bd.ins().insertlane(value, ps1, 1);
+        self.set(ins.fpr_d(), value);
 
         LOAD_INFO
     }
@@ -1255,12 +1262,13 @@ impl BlockBuilder<'_> {
             self.bd.ins().iadd_imm(ra, ins.field_ps_offset() as i64)
         };
 
-        let ps0 = self.get(ins.fpr_s());
+        let fpr_s = self.get(ins.fpr_s());
+        let ps0 = self.bd.ins().extractlane(fpr_s, 0);
         let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
 
         let size = self.mem_store_quant(addr, gqr, ps0);
         if ins.field_ps_w() == 0 {
-            let ps1 = self.get(Reg::PS1(ins.fpr_s()));
+            let ps1 = self.bd.ins().extractlane(fpr_s, 1);
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_store_quant(addr, gqr, ps1);
         }
@@ -1278,12 +1286,13 @@ impl BlockBuilder<'_> {
             self.bd.ins().iadd_imm(ra, ins.field_ps_offset() as i64)
         };
 
-        let ps0 = self.get(ins.fpr_s());
+        let fpr_s = self.get(ins.fpr_s());
+        let ps0 = self.bd.ins().extractlane(fpr_s, 0);
         let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
 
         let size = self.mem_store_quant(addr, gqr, ps0);
         if ins.field_ps_w() == 0 {
-            let ps1 = self.get(Reg::PS1(ins.fpr_s()));
+            let ps1 = self.bd.ins().extractlane(fpr_s, 1);
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_store_quant(addr, gqr, ps1);
         }
@@ -1304,12 +1313,13 @@ impl BlockBuilder<'_> {
             self.bd.ins().iadd(ra, rb)
         };
 
-        let ps0 = self.get(ins.fpr_s());
+        let fpr_s = self.get(ins.fpr_s());
+        let ps0 = self.bd.ins().extractlane(fpr_s, 0);
         let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
 
         let size = self.mem_store_quant(addr, gqr, ps0);
         if ins.field_ps_w() == 0 {
-            let ps1 = self.get(Reg::PS1(ins.fpr_s()));
+            let ps1 = self.bd.ins().extractlane(fpr_s, 1);
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_store_quant(addr, gqr, ps1);
         }

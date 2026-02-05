@@ -5,7 +5,7 @@ use cranelift_codegen::isa::TargetIsa;
 use fjall::{Database, KeyspaceCreateOptions};
 use zerocopy::IntoBytes;
 
-use crate::{Compiled, CompilerSettings, Sequence};
+use crate::{Artifact, CodegenSettings, Sequence};
 
 struct Hash128(twox_hash::XxHash3_128);
 
@@ -21,10 +21,10 @@ impl Hasher for Hash128 {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct CompiledKey(u128);
+pub struct ArtifactKey(u128);
 
-impl CompiledKey {
-    pub fn new(isa: &dyn TargetIsa, settings: &CompilerSettings, seq: &Sequence) -> Self {
+impl ArtifactKey {
+    pub fn new(isa: &dyn TargetIsa, settings: &CodegenSettings, seq: &Sequence) -> Self {
         let mut hasher = Hash128(twox_hash::XxHash3_128::with_seed(0));
         isa.name().hash(&mut hasher);
         isa.triple().hash(&mut hasher);
@@ -63,7 +63,7 @@ impl Cache {
         }
     }
 
-    pub fn get(&mut self, key: CompiledKey) -> Option<Compiled> {
+    pub fn get(&mut self, key: ArtifactKey) -> Option<Artifact> {
         let artifacts = self
             .db
             .keyspace("artifacts", KeyspaceCreateOptions::default)
@@ -82,7 +82,7 @@ impl Cache {
         Some(deserialized)
     }
 
-    pub fn insert(&mut self, key: CompiledKey, compiled: &Compiled) {
+    pub fn insert(&mut self, key: ArtifactKey, compiled: &Artifact) {
         let artifacts = self
             .db
             .keyspace("artifacts", KeyspaceCreateOptions::default)

@@ -123,13 +123,13 @@ impl App {
             cpu: Box::new(cores::cpu::jit::Core::new(cores::cpu::jit::Config {
                 instr_per_block: cfg.ppcjit.instr_per_block,
                 jit_settings: cores::cpu::jit::ppcjit::Settings {
-                    compiler: cores::cpu::jit::ppcjit::CompilerSettings {
+                    codegen: cores::cpu::jit::ppcjit::CodegenSettings {
                         nop_syscalls: cfg.ppcjit.nop_syscalls,
                         force_fpu: cfg.ppcjit.force_fpu,
                         ignore_unimplemented: cfg.ppcjit.ignore_unimplemented_inst,
                         round_to_single: cfg.ppcjit.round_to_single,
                     },
-                    cache_path: jit_cache_path,
+                    cache_path: Some(jit_cache_path),
                 },
             })),
         };
