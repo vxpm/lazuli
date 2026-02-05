@@ -1,6 +1,9 @@
 mod builder;
 mod parser;
 
+#[cfg(test)]
+mod test;
+
 use std::collections::hash_map::Entry;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
@@ -116,9 +119,6 @@ impl Codegen {
         let builder = ParserBuilder::new(self, func_builder, config);
         builder.build();
 
-        // println!("{:?}", config);
-        // println!("{}", func.display());
-
         code_ctx.clear();
         code_ctx.want_disasm = true;
         code_ctx.func = func;
@@ -127,9 +127,6 @@ impl Codegen {
             .unwrap();
 
         let compiled = code_ctx.take_compiled_code().unwrap();
-        // println!("{}", code_ctx.func.display());
-        // println!("{}", compiled.vcode.as_ref().unwrap());
-
         let alloc = self.allocator.allocate(64, compiled.code_buffer());
         VertexParser::new(alloc)
     }

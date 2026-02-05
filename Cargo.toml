@@ -155,6 +155,7 @@ easyerr = "0.1"
 eyre-pretty = { git = "https://github.com/vxpm/eyre-pretty.git" }
 glam = { version = "0.31", features = ["zerocopy"] }
 indexmap = "2"
+insta = "1.46"
 nanorand = { version = "0.8", features = ["tls"], default-features = false }
 oneshot = { version = "0.1", default-features = false, features = ["std"] }
 ordered-float = "5"

@@ -5071,6 +5071,7 @@ name = "vtxjit"
 version = "0.1.0"
 dependencies = [
  "cranelift",
+ "insta",
  "jitalloc",
  "lazuli",
  "rustc-hash 2.1.1",
