@@ -7,145 +7,129 @@ expression: disasm
   movq %rsp, %rbp
   unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 16 }
   subq $0x20, %rsp
-  movq %r14, 0x10(%rsp)
-  unwind SaveReg { clobber_offset: 0, reg: p14i }
+  movq %r15, 0x10(%rsp)
+  unwind SaveReg { clobber_offset: 0, reg: p15i }
 block0:
-  movq %rdi, %r14
+  movq %rdi, %r15
   movl 0x2a8(%rdx), %r8d
   shrl $0xd, %r8d
   testb $0x1, %r8b
   jnz     label2; j label1
 block2:
   movq %rdx, %rdi
-  vmovupd 0x88(%rdi), %xmm5
-  vmovupd 0x98(%rdi), %xmm6
-  movl 0x28c(%rdi), %eax
-  movl (%rdi), %ecx
-  vmovupd 0xa8(%rdi), %xmm7
-  vmovupd 0xb8(%rdi), %xmm0
+  vmovupd 0x88(%rdi), %xmm4
+  vmovupd 0x98(%rdi), %xmm5
+  movl 0x28c(%rdi), %edx
+  movl (%rdi), %eax
+  vmovupd 0xa8(%rdi), %xmm6
+  vmovupd 0xb8(%rdi), %xmm7
   vmovupd 0xc8(%rdi), %xmm2
-  leal 0x10(%rcx), %ecx
-  movl %ecx, (%rdi)
-  vaddpd %xmm6, %xmm5, %xmm6
-  vaddpd %xmm7, %xmm6, %xmm7
-  vaddpd %xmm0, %xmm7, %xmm1
-  vaddpd %xmm2, %xmm1, %xmm2
-  vmovupd %xmm2, 0x88(%rdi)
-  movl $0x1f000, %esi
-  uninit  %xmm0
-  vxorpd %xmm0, %xmm0, %xmm0
-  vucomisd %xmm2, %xmm0
-  seta %dl
-  movzbl %dl, %r10d
-  shll $0xf, %r10d
-  vucomisd (%rip), %xmm2
+  leal 0x10(%rax), %eax
+  movl %eax, (%rdi)
+  vaddpd %xmm5, %xmm4, %xmm1
+  vaddpd %xmm6, %xmm1, %xmm0
+  vaddpd %xmm7, %xmm0, %xmm6
+  vaddpd %xmm2, %xmm6, %xmm5
+  vmovupd %xmm5, 0x88(%rdi)
+  andl $0xfffe0fff, %edx
+  uninit  %xmm7
+  vxorpd %xmm7, %xmm7, %xmm7
+  vucomisd %xmm1, %xmm7
   seta %r8b
-  movzbl %r8b, %edx
-  shll $0xe, %edx
-  orl %edx, %r10d
-  vucomisd (%rip), %xmm2
+  movzbl %r8b, %r10d
+  shll $0xf, %r10d
+  vucomisd (%rip), %xmm1
+  seta %r8b
+  movzbl %r8b, %r8d
+  shll $0xe, %r8d
+  orl %r8d, %r10d
+  vucomisd (%rip), %xmm1
   setnp %r9b
   sete %r11b
   andl %r11d, %r9d
   movzbl %r9b, %r8d
   shll $0xd, %r8d
   orl %r8d, %r10d
-  vucomisd (%rip), %xmm2
+  vucomisd (%rip), %xmm1
   setp %r11b
   movzbl %r11b, %r9d
   shll $0xc, %r9d
   orl %r9d, %r10d
-  vucomisd %xmm1, %xmm0
+  orl %r10d, %edx
+  andl $0xfffe0fff, %edx
+  vucomisd %xmm0, %xmm7
   seta %r11b
-  movzbl %r11b, %ecx
-  shll $0xf, %ecx
-  vucomisd (%rip), %xmm1
-  seta %dl
-  movzbl %dl, %r11d
+  movzbl %r11b, %eax
+  shll $0xf, %eax
+  vucomisd (%rip), %xmm0
+  seta %sil
+  movzbl %sil, %r11d
   shll $0xe, %r11d
-  orl %r11d, %ecx
-  vucomisd (%rip), %xmm1
-  setnp %dl
+  orl %r11d, %eax
+  vucomisd (%rip), %xmm0
+  setnp %cl
   sete %r8b
-  andl %r8d, %edx
-  movzbl %dl, %edx
-  shll $0xd, %edx
-  orl %edx, %ecx
-  vucomisd (%rip), %xmm1
-  setp %dl
-  movzbl %dl, %edx
-  shll $0xc, %edx
-  orl %edx, %ecx
-  vucomisd %xmm7, %xmm0
-  seta %dl
-  movzbl %dl, %r9d
+  andl %r8d, %ecx
+  movzbl %cl, %esi
+  shll $0xd, %esi
+  orl %esi, %eax
+  vucomisd (%rip), %xmm0
+  setp %cl
+  movzbl %cl, %ecx
+  shll $0xc, %ecx
+  orl %ecx, %eax
+  orl %eax, %edx
+  andl $0xfffe0fff, %edx
+  vucomisd %xmm6, %xmm7
+  seta %cl
+  movzbl %cl, %r9d
   shll $0xf, %r9d
-  vucomisd (%rip), %xmm7
-  seta %dl
-  movzbl %dl, %edx
-  shll $0xe, %edx
-  orl %edx, %r9d
-  vucomisd (%rip), %xmm7
+  vucomisd (%rip), %xmm6
+  seta %r8b
+  movzbl %r8b, %ecx
+  shll $0xe, %ecx
+  orl %ecx, %r9d
+  vucomisd (%rip), %xmm6
   setnp %r8b
-  sete %r11b
-  andl %r11d, %r8d
-  movzbl %r8b, %edx
-  shll $0xd, %edx
-  orl %edx, %r9d
-  vucomisd (%rip), %xmm7
-  setp %r11b
-  movzbl %r11b, %r8d
+  sete %r10b
+  andl %r10d, %r8d
+  movzbl %r8b, %r8d
+  shll $0xd, %r8d
+  orl %r8d, %r9d
+  vucomisd (%rip), %xmm6
+  setp %r10b
+  movzbl %r10b, %r8d
   shll $0xc, %r8d
   orl %r8d, %r9d
-  vucomisd %xmm6, %xmm0
+  orl %r9d, %edx
+  andl $0xfffe0fff, %edx
+  vucomisd %xmm5, %xmm7
+  seta %r10b
+  movzbl %r10b, %eax
+  shll $0xf, %eax
+  vucomisd (%rip), %xmm5
   seta %r11b
-  movzbl %r11b, %edx
-  shll $0xf, %edx
-  vucomisd (%rip), %xmm6
-  seta %r11b
-  movzbl %r11b, %r11d
-  shll $0xe, %r11d
-  orl %r11d, %edx
-  vucomisd (%rip), %xmm6
-  setnp %r8b
-  sete %r11b
-  andl %r11d, %r8d
-  movzbl %r8b, %r11d
+  movzbl %r11b, %r10d
+  shll $0xe, %r10d
+  orl %r10d, %eax
+  vucomisd (%rip), %xmm5
+  setnp %sil
+  sete %cl
+  andl %ecx, %esi
+  movzbl %sil, %r11d
   shll $0xd, %r11d
-  orl %r11d, %edx
-  vucomisd (%rip), %xmm6
-  setp %r8b
-  movzbl %r8b, %r8d
-  shll $0xc, %r8d
-  orl %r8d, %edx
-  movq %rsi, %r8
-  andl %edx, %r8d
-  movq %rsi, %rdx
-  notl %edx
-  andl %eax, %edx
-  orl %edx, %r8d
-  movq %rsi, %rax
-  andl %r9d, %eax
-  movq %rsi, %rdx
-  notl %edx
-  andl %r8d, %edx
-  orl %edx, %eax
-  movq %rsi, %rdx
-  andl %ecx, %edx
-  movq %rsi, %rcx
-  notl %ecx
-  andl %eax, %ecx
-  orl %ecx, %edx
-  movq %rsi, %rax
-  andl %r10d, %eax
-  notl %esi
-  andl %edx, %esi
+  orl %r11d, %eax
+  vucomisd (%rip), %xmm5
+  setp %cl
+  movzbl %cl, %esi
+  shll $0xc, %esi
   orl %esi, %eax
-  movl %eax, 0x28c(%rdi)
-  movq %r14, %rdi
+  orl %eax, %edx
+  movl %edx, 0x28c(%rdi)
+  movq %r15, %rdi
   addl $0x4, (%rdi)
   addl $0x8, 4(%rdi)
-  movq 0x10(%rsp), %r14
+  movq 0x10(%rsp), %r15
   addq $0x20, %rsp
   movq %rbp, %rsp
   popq %rbp
@@ -155,7 +139,7 @@ block1:
   load_ext_name userextname0+0, %r11
   movq %rdx, %rdi
   call    *%r11
-  movq 0x10(%rsp), %r14
+  movq 0x10(%rsp), %r15
   addq $0x20, %rsp
   movq %rbp, %rsp
   popq %rbp

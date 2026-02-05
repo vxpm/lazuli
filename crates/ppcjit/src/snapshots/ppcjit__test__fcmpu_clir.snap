@@ -71,36 +71,36 @@ function u0:0(i64, i64, i64, i64) tail {
 @0000                               v20 = uextend.i32 v15
 @0000                               v21 = uextend.i32 v16
 @0000                               v22 = uextend.i32 v17
-@0000                               v23 = iconst.i32 0
-@0000                               v24 = ishl_imm v19, 15
-@0000                               v25 = ishl_imm v20, 14
-@0000                               v26 = ishl_imm v21, 13
-@0000                               v27 = ishl_imm v22, 12
-@0000                               v28 = bor v24, v25
+@0000                               v23 = ishl_imm v19, 15
+@0000                               v24 = ishl_imm v20, 14
+@0000                               v25 = ishl_imm v21, 13
+@0000                               v26 = ishl_imm v22, 12
+@0000                               v27 = bor v23, v24
+@0000                               v28 = bor v27, v25
 @0000                               v29 = bor v28, v26
-@0000                               v30 = bor v29, v27
-@0000                               v31 = bor v30, v23  ; v23 = 0
-@0000                               v32 = iconst.i32 0x0001_f000
-@0000                               v33 = bitselect v32, v31, v18  ; v32 = 0x0001_f000
-@0000                               v34 = load.i32 notrap aligned v2+648
-@0000                               v35 = uextend.i32 v14
-@0000                               v36 = uextend.i32 v15
-@0000                               v37 = uextend.i32 v16
-@0000                               v38 = uextend.i32 v17
-@0000                               v39 = ishl_imm v35, 31
-@0000                               v40 = ishl_imm v36, 30
-@0000                               v41 = ishl_imm v37, 29
-@0000                               v42 = ishl_imm v38, 28
-@0000                               v43 = bor v39, v40
+@0000                               v30 = iconst.i32 0x0001_f000
+@0000                               v31 = band_not v18, v30  ; v30 = 0x0001_f000
+@0000                               v32 = bor v31, v29
+@0000                               v33 = load.i32 notrap aligned v2+648
+@0000                               v34 = uextend.i32 v14
+@0000                               v35 = uextend.i32 v15
+@0000                               v36 = uextend.i32 v16
+@0000                               v37 = uextend.i32 v17
+@0000                               v38 = ishl_imm v34, 31
+@0000                               v39 = ishl_imm v35, 30
+@0000                               v40 = ishl_imm v36, 29
+@0000                               v41 = ishl_imm v37, 28
+@0000                               v42 = bor v38, v39
+@0000                               v43 = bor v42, v40
 @0000                               v44 = bor v43, v41
-@0000                               v45 = bor v44, v42
-@0000                               v46 = iconst.i32 -268435456
-@0000                               v47 = bitselect v46, v45, v34  ; v46 = -268435456
+@0000                               v45 = iconst.i32 -268435456
+@0000                               v46 = band_not v33, v45  ; v45 = -268435456
+@0000                               v47 = bor v46, v44
 @0000                               v48 = load.i32 notrap aligned v2
 @0000                               v49 = iadd_imm v48, 4
                                     store notrap aligned v47, v2+648
                                     store notrap aligned v49, v2
-                                    store notrap aligned v33, v2+652
+                                    store notrap aligned v32, v2+652
                                     v50 = load.i32 notrap aligned v0
                                     v51 = iadd_imm v50, 1
                                     store notrap aligned v51, v0

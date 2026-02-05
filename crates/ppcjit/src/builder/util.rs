@@ -258,8 +258,8 @@ impl BlockBuilder<'_> {
         let so = self.bd.ins().ishl_imm(overflowed, 31);
         let value = self.bd.ins().bor(ov, so);
 
-        let mask = self.ir_value(!(0b1 << 30));
-        let masked = self.bd.ins().band(xer, mask);
+        let mask = self.ir_value(0b1 << 30);
+        let masked = self.bd.ins().band_not(xer, mask);
         let updated = self.bd.ins().bor(masked, value);
 
         self.set(SPR::XER, updated);
@@ -300,7 +300,8 @@ impl BlockBuilder<'_> {
         let value = self.bd.ins().bor(value, ov);
 
         let mask = self.ir_value(0b1111u32 << base);
-        let updated = self.bd.ins().bitselect(mask, value, cr);
+        let updated = self.bd.ins().band_not(cr, mask);
+        let updated = self.bd.ins().bor(updated, value);
 
         self.set(Reg::CR, updated);
     }
@@ -326,7 +327,6 @@ impl BlockBuilder<'_> {
         let eq = self.bd.ins().uextend(ir::types::I32, eq);
         let un = self.bd.ins().uextend(ir::types::I32, un);
 
-        let cc = self.ir_value(0);
         let lt = self.bd.ins().ishl_imm(lt, 15);
         let gt = self.bd.ins().ishl_imm(gt, 14);
         let eq = self.bd.ins().ishl_imm(eq, 13);
@@ -335,10 +335,10 @@ impl BlockBuilder<'_> {
         let value = self.bd.ins().bor(lt, gt);
         let value = self.bd.ins().bor(value, eq);
         let value = self.bd.ins().bor(value, un);
-        let value = self.bd.ins().bor(value, cc);
 
         let mask = self.ir_value(0b11111u32 << 12);
-        let updated = self.bd.ins().bitselect(mask, value, fpscr);
+        let updated = self.bd.ins().band_not(fpscr, mask);
+        let updated = self.bd.ins().bor(updated, value);
 
         self.set(Reg::FPSCR, updated);
     }
