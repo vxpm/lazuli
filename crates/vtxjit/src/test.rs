@@ -10,7 +10,7 @@ use crate::parser::Config;
 fn test_config(name: &str, config: Config) {
     let mut jit = JitVertexModule::new();
     let parser = jit
-        .codegen
+        .compiler
         .compile(&mut jit.code_ctx, &mut jit.func_ctx, config);
 
     let clir = parser.meta().clir.clone().unwrap();

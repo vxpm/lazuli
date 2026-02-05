@@ -39,12 +39,12 @@ impl UnpackedDefaultMatrices {
     }
 }
 
-struct Codegen {
+struct Jit {
     isa: Arc<dyn TargetIsa>,
     allocator: Allocator<ReadExec>,
 }
 
-impl Codegen {
+impl Jit {
     fn new() -> Self {
         let verifier = if cfg!(debug_assertions) {
             "true"
@@ -81,7 +81,7 @@ impl Codegen {
             .finish(codegen::settings::Flags::new(codegen))
             .unwrap();
 
-        Codegen {
+        Jit {
             isa,
             allocator: Allocator::new(),
         }
@@ -120,7 +120,6 @@ impl Codegen {
         builder.build();
 
         let clir = cfg!(test).then(|| func.display().to_string());
-
         code_ctx.clear();
         code_ctx.want_disasm = cfg!(test);
         code_ctx.func = func;
@@ -139,7 +138,7 @@ impl Codegen {
 }
 
 pub struct JitVertexModule {
-    codegen: Codegen,
+    compiler: Jit,
     code_ctx: codegen::Context,
     func_ctx: frontend::FunctionBuilderContext,
     parsers: FxHashMap<Config, VertexParser>,
@@ -150,7 +149,7 @@ unsafe impl Send for JitVertexModule {}
 impl JitVertexModule {
     pub fn new() -> Self {
         Self {
-            codegen: Codegen::new(),
+            compiler: Jit::new(),
             code_ctx: codegen::Context::new(),
             func_ctx: frontend::FunctionBuilderContext::new(),
             parsers: FxHashMap::default(),
@@ -178,7 +177,7 @@ impl VertexModule for JitVertexModule {
             Entry::Occupied(o) => o.into_mut(),
             Entry::Vacant(v) => {
                 let parser = self
-                    .codegen
+                    .compiler
                     .compile(&mut self.code_ctx, &mut self.func_ctx, config);
 
                 v.insert(parser)

@@ -12,7 +12,7 @@ use util::offset_of;
 
 use crate::builder::attr::AttributeExt;
 use crate::parser::Config;
-use crate::{Codegen, UnpackedDefaultMatrices};
+use crate::{Jit, UnpackedDefaultMatrices};
 
 const MEMFLAGS: ir::MemFlags = ir::MemFlags::new().with_notrap().with_can_move();
 const MEMFLAGS_READONLY: ir::MemFlags = ir::MemFlags::new()
@@ -55,7 +55,7 @@ pub struct ParserBuilder<'ctx> {
 
 impl<'ctx> ParserBuilder<'ctx> {
     pub fn new(
-        codegen: &'ctx Codegen,
+        codegen: &'ctx Jit,
         mut bd: frontend::FunctionBuilder<'ctx>,
         config: Config,
     ) -> Self {

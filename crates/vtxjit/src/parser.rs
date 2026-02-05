@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), expect(unused, reason = "meta is only used in tests"))]
+
 use jitalloc::{Allocation, ReadExec};
 use lazuli::system::gx::cmd::attributes::VertexAttributeTable;
 use lazuli::system::gx::cmd::{Arrays, VertexDescriptor};
