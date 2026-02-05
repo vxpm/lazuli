@@ -304,8 +304,9 @@ impl BlockBuilder<'_> {
             .bd
             .ins()
             .bitcast(ir::types::F64, ir::MemFlags::new(), extended);
+        let paired = self.bd.ins().splat(ir::types::F64X2, float);
 
-        self.set(ins.fpr_d(), float);
+        self.set(ins.fpr_d(), paired);
 
         if ins.field_rc() {
             self.update_cr1_float();
@@ -322,7 +323,11 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
         let fpr_c = self.get(ins.fpr_c());
 
-        let cond = self.bd.ins().fcmp(FloatCC::GreaterThanOrEqual, fpr_a, zero);
+        let fpr_a_ps0 = self.bd.ins().extractlane(fpr_a, 0);
+        let cond = self
+            .bd
+            .ins()
+            .fcmp(FloatCC::GreaterThanOrEqual, fpr_a_ps0, zero);
         let value = self.bd.ins().select(cond, fpr_c, fpr_b);
 
         self.set(ins.fpr_d(), value);

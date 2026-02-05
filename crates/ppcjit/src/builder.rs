@@ -357,6 +357,12 @@ impl<'ctx> BlockBuilder<'ctx> {
         let reg = reg.into();
         let value = self.ir_value(value);
 
+        let value_ty = self.bd.func.dfg.value_type(value);
+        match reg {
+            Reg::FPR(_) => assert_eq!(value_ty, ir::types::F64X2),
+            _ => assert_eq!(value_ty, ir::types::I32),
+        }
+
         if let Some(reg) = self.cache.get_mut(&reg) {
             reg.value = value;
             reg.modified = true;
