@@ -353,24 +353,25 @@ impl Renderer {
     }
 
     pub fn apply_scissor_and_viewport(&mut self) {
-        let (x, y) = self.scissor.top_left();
-        let (width, height) = self.scissor.dimensions();
+        let (scissor_x, scissor_y) = self.scissor.top_left();
+        let (scissor_width, scissor_height) = self.scissor.dimensions();
+        let (scissor_offset_x, scissor_offset_y) = self.scissor.offset();
 
-        // HACK: ignore broken scissors for now - requires handling scissor offset...
-        if x + width <= 640 && y + height <= 528 {
-            self.current_pass.set_scissor_rect(
-                self.scissor.top_left().0,
-                self.scissor.top_left().1,
-                self.scissor.dimensions().0,
-                self.scissor.dimensions().1,
-            );
-        } else {
-            tracing::warn!("out of bounds scissor: {:?}", self.scissor);
-        }
+        let (scissor_effective_x, scissor_effective_y) = (
+            scissor_x.saturating_sub(scissor_offset_x),
+            scissor_y.saturating_sub(scissor_offset_y),
+        );
+
+        self.current_pass.set_scissor_rect(
+            scissor_effective_x,
+            scissor_effective_y,
+            scissor_width,
+            scissor_height,
+        );
 
         self.current_pass.set_viewport(
-            self.viewport.top_left_x,
-            self.viewport.top_left_y,
+            self.viewport.top_left_x - scissor_offset_x as f32,
+            self.viewport.top_left_y - scissor_offset_y as f32,
             self.viewport.width,
             self.viewport.height,
             self.viewport.near_depth.clamp(0.0, 1.0),
