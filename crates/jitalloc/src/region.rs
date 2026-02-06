@@ -1,9 +1,7 @@
 #[cfg(target_family = "unix")]
 use rustix::mm::{self as mman, MapFlags, ProtFlags};
 #[cfg(target_family = "windows")]
-use windows::Win32::System::{
-    Diagnostics::Debug::FlushInstructionCache, Memory, Threading::GetCurrentProcess,
-};
+use windows::Win32::System::Memory;
 
 // TODO: don't assume 4 KiB pages
 const PAGE_SIZE: usize = 4 * bytesize::KIB as usize;

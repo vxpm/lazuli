@@ -4,7 +4,12 @@ mod region;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
-use region::Region;
+#[cfg(target_family = "windows")]
+use windows::Win32::System::{
+    Diagnostics::Debug::FlushInstructionCache, Threading::GetCurrentProcess,
+};
+
+use crate::region::Region;
 
 #[rustfmt::skip]
 pub use crate::region::Protection;
