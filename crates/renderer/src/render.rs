@@ -846,7 +846,7 @@ impl Renderer {
     }
 
     // Finishes the current render pass and starts the next one.
-    pub fn next_pass(&mut self, copy_to_xfb: bool) {
+    pub fn next_pass(&mut self, copy_to_xfb: Option<CopyArgs>) {
         self.flush(format_args!("finishing pass"));
 
         let color = self.framebuffer.color();
@@ -887,22 +887,41 @@ impl Renderer {
         let previous_pass = std::mem::replace(&mut self.current_pass, pass);
 
         std::mem::drop(previous_pass);
-        if copy_to_xfb {
+        if let Some(args) = copy_to_xfb {
+            let (offset_x, offset_y) = self.scissor.offset();
+            let origin_efb = wgpu::Origin3d {
+                x: args.src.x().value() as u32,
+                y: args.src.y().value() as u32,
+                z: 0,
+            };
+
+            let origin_xfb = wgpu::Origin3d {
+                x: args.src.x().value() as u32 + offset_x,
+                y: args.src.y().value() as u32 + offset_y,
+                z: 0,
+            };
+
+            let dimensions = wgpu::Extent3d {
+                width: args.dims.width() as u32,
+                height: args.dims.height() as u32,
+                depth_or_array_layers: 1,
+            };
+
             let external = self.framebuffer.external();
             prev_render_encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfoBase {
                     texture: color.texture(),
                     mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
+                    origin: origin_efb,
                     aspect: wgpu::TextureAspect::All,
                 },
                 wgpu::TexelCopyTextureInfoBase {
                     texture: external.texture(),
                     mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
+                    origin: origin_xfb,
                     aspect: wgpu::TextureAspect::All,
                 },
-                external.texture().size(),
+                dimensions,
             );
         }
 
@@ -1196,7 +1215,7 @@ impl Renderer {
             half
         ));
 
-        self.next_pass(false);
+        self.next_pass(None);
         let data = self.get_color_data(
             src.x().value(),
             src.y().value(),
@@ -1233,7 +1252,7 @@ impl Renderer {
             half
         ));
 
-        self.next_pass(false);
+        self.next_pass(None);
         let data = self.get_depth_data(
             src.x().value(),
             src.y().value(),
@@ -1262,7 +1281,7 @@ impl Renderer {
         } = args;
 
         self.debug("XFB copy requested");
-        self.next_pass(true);
+        self.next_pass(Some(args));
 
         if clear {
             self.clear(
