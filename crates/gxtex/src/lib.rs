@@ -436,49 +436,6 @@ impl Format for FastRgb565 {
 
     #[inline(always)]
     fn decode_tile(data: &[u8], mut set: impl FnMut(usize, usize, Pixel)) {
-        let pixels: [u16; 16] =
-            std::array::from_fn(|i| u16::from_be_bytes([data[2 * i], data[2 * i + 1]]));
-        let conv = pixels.map(Pixel::from_rgb565_fast);
-        seq! {
-            Y in 0..4 {
-                seq! {
-                    X in 0..4 {
-                        set(X, Y, conv[X + 4 * Y]);
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub struct SimdRgb565;
-
-impl Format for SimdRgb565 {
-    const TILE_WIDTH: usize = 4;
-    const TILE_HEIGHT: usize = 4;
-
-    type Texel = Pixel;
-
-    #[inline(always)]
-    fn encode_tile(data: &mut [u8], get: impl Fn(usize, usize) -> Pixel) {
-        let pixels: [Pixel; 16] = std::array::from_fn(|i| get(i % 4, i / 4));
-        let conv = pixels.map(|p| p.to_rgb565_fast());
-        seq! {
-            Y in 0..4 {
-                seq! {
-                    X in 0..4 {
-                        let index = X + 4 * Y;
-                        let value = conv[index].to_be_bytes();
-                        data[2 * index] = value[0];
-                        data[2 * index + 1] = value[1];
-                    }
-                }
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn decode_tile(data: &[u8], mut set: impl FnMut(usize, usize, Pixel)) {
         // 01. convert endianness
         let bytes = u8x32::from_slice(data);
         let values = u16x16::from_be_bytes(bytes);
@@ -496,18 +453,17 @@ impl Format for SimdRgb565 {
         let green = (green << 2) | (green >> 4);
         let red = (red << 3) | (red >> 2);
 
-        // 04. channels as bytes
-        let blue: u8x32 = blue.to_le_bytes();
-        let green: u8x32 = green.to_le_bytes();
-        let red: u8x32 = red.to_le_bytes();
-
-        // 05. swizzle channels into pairs
+        // 04. swizzle channels into pairs
         const SWIZZLE_CHANNELS: [usize; 32] = [
             0, 32, 2, 34, 4, 36, 6, 38, 8, 40, 10, 42, 12, 44, 14, 46, //
             16, 48, 18, 50, 20, 52, 22, 54, 24, 56, 26, 58, 28, 60, 30, 62,
         ];
 
         let alpha = u8x32::splat(255);
+        let blue: u8x32 = blue.to_le_bytes();
+        let green: u8x32 = green.to_le_bytes();
+        let red: u8x32 = red.to_le_bytes();
+
         let red_green = simd_swizzle!(red, green, SWIZZLE_CHANNELS);
         let blue_alpha = simd_swizzle!(blue, alpha, SWIZZLE_CHANNELS);
         let red_green = u16x16::from_le_bytes(red_green);
@@ -841,11 +797,6 @@ mod test {
     fn test_fast() {
         test_format::<FastRgb565>("resources/waterfall.webp", "FAST_RGB565");
         test_format::<IA8<FastLuma, AlphaChannel>>("resources/waterfall.webp", "FAST_IA8");
-    }
-
-    #[test]
-    fn test_simd() {
-        test_format::<SimdRgb565>("resources/waterfall.webp", "SIMD_RGB565");
     }
 
     #[test]
