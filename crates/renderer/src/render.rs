@@ -339,15 +339,21 @@ impl Renderer {
         let (scissor_offset_x, scissor_offset_y) = self.scissor.offset();
 
         let (scissor_effective_x, scissor_effective_y) = (
-            scissor_x.saturating_sub(scissor_offset_x),
-            scissor_y.saturating_sub(scissor_offset_y),
+            scissor_x
+                .saturating_sub(scissor_offset_x)
+                .min(EFB_WIDTH as u32),
+            scissor_y
+                .saturating_sub(scissor_offset_y)
+                .min(EFB_HEIGHT as u32),
         );
 
+        let scissor_max_width = EFB_WIDTH as u32 - scissor_effective_x;
+        let scissor_max_height = EFB_HEIGHT as u32 - scissor_effective_y;
         self.current_pass.set_scissor_rect(
             scissor_effective_x,
             scissor_effective_y,
-            scissor_width,
-            scissor_height,
+            scissor_width.min(scissor_max_width),
+            scissor_height.min(scissor_max_height),
         );
 
         self.current_pass.set_viewport(
