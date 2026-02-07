@@ -1,7 +1,11 @@
 use std::hint::black_box;
+use std::time::Duration;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use gxtex::{FastLuma, FastRgb565, Format, IA8, Luma, Pixel, Rgb565, compute_size};
+use gxtex::{
+    AlphaChannel, FastLuma, FastRgb565, Format, I4, I8, IA4, IA8, Luma, Pixel, Rgb5A3, Rgb565,
+    Rgba8, compute_size,
+};
 
 fn bench<F: Format<Texel = Pixel>>(c: &mut Criterion, name: &str) {
     let img = image::open("resources/waterfall.webp").unwrap();
@@ -43,6 +47,7 @@ fn bench<F: Format<Texel = Pixel>>(c: &mut Criterion, name: &str) {
 
     let mut group = c.benchmark_group(format!("{name} Encoding"));
     group.throughput(criterion::Throughput::Bytes(encoded.len() as u64));
+    group.measurement_time(Duration::from_secs(10));
 
     group.bench_function("Accurate", |b| {
         b.iter_with_large_drop(|| {
@@ -77,8 +82,10 @@ fn bench_with_fast<Accurate: Format<Texel = Pixel>, Fast: Format<Texel = Pixel>>
     let required_width = (img.width() as usize).next_multiple_of(Accurate::TILE_WIDTH);
     let required_height = (img.height() as usize).next_multiple_of(Accurate::TILE_HEIGHT);
     let mut encoded = vec![0; compute_size::<Rgb565>(required_width, required_height)];
+
+    let stride = Accurate::BYTES_PER_TILE / 32 * required_width / Accurate::TILE_WIDTH;
     gxtex::encode::<Accurate>(
-        required_width / Rgb565::TILE_WIDTH,
+        stride,
         img.width() as usize,
         img.height() as usize,
         black_box(&pixels),
@@ -87,6 +94,7 @@ fn bench_with_fast<Accurate: Format<Texel = Pixel>, Fast: Format<Texel = Pixel>>
 
     let mut group = c.benchmark_group(format!("{name} Decoding"));
     group.throughput(criterion::Throughput::Bytes(encoded.len() as u64));
+    group.measurement_time(Duration::from_secs(10));
 
     group.bench_function("Accurate", |b| {
         b.iter_with_large_drop(|| {
@@ -140,9 +148,15 @@ fn bench_with_fast<Accurate: Format<Texel = Pixel>, Fast: Format<Texel = Pixel>>
 }
 
 fn formats(c: &mut Criterion) {
-    bench_with_fast::<Rgb565, FastRgb565>(c, "RGB565");
+    bench_with_fast::<I4<Luma>, I4<FastLuma>>(c, "I4");
+    bench_with_fast::<IA4<Luma, AlphaChannel>, IA4<FastLuma, AlphaChannel>>(c, "IA4");
+
+    bench_with_fast::<I8<Luma>, I8<FastLuma>>(c, "I8");
     bench_with_fast::<IA8<Luma, Luma>, IA8<FastLuma, FastLuma>>(c, "IA8");
-    bench_with_fast::<Rgb565, FastRgb565>(c, "SIMD");
+
+    bench_with_fast::<Rgb565, FastRgb565>(c, "RGB565");
+    bench::<Rgb5A3>(c, "RGB5A3");
+    bench::<Rgba8>(c, "RGBA8");
 }
 
 criterion_group!(benches, formats);

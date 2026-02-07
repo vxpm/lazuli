@@ -88,9 +88,9 @@ pub enum Format {
     I8        = 0x1,
     IA4       = 0x2,
     IA8       = 0x3,
-    Rgb565    = 0x4,
-    Rgb5A3    = 0x5,
-    Rgba8     = 0x6,
+    RGB565    = 0x4,
+    RGB5A3    = 0x5,
+    RGBA8     = 0x6,
     Reserved0 = 0x7,
     CI4       = 0x8,
     CI8       = 0x9,
@@ -98,7 +98,7 @@ pub enum Format {
     Reserved1 = 0xB,
     Reserved2 = 0xC,
     Reserved3 = 0xD,
-    Cmp       = 0xE,
+    Cmpr      = 0xE,
     Reserved4 = 0xF,
 }
 
@@ -175,10 +175,10 @@ impl Encoding {
             Format::I8 => gxtex::compute_size::<I8>(width, height),
             Format::IA4 => gxtex::compute_size::<IA4>(width, height),
             Format::IA8 => gxtex::compute_size::<IA8>(width, height),
-            Format::Rgb565 => gxtex::compute_size::<Rgb565>(width, height),
-            Format::Rgb5A3 => gxtex::compute_size::<Rgb5A3>(width, height),
-            Format::Rgba8 => gxtex::compute_size::<Rgba8>(width, height),
-            Format::Cmp => gxtex::compute_size::<Cmpr>(width, height),
+            Format::RGB565 => gxtex::compute_size::<Rgb565>(width, height),
+            Format::RGB5A3 => gxtex::compute_size::<Rgb5A3>(width, height),
+            Format::RGBA8 => gxtex::compute_size::<Rgba8>(width, height),
+            Format::Cmpr => gxtex::compute_size::<Cmpr>(width, height),
             Format::CI4 => gxtex::compute_size::<CI4>(width, height),
             Format::CI8 => gxtex::compute_size::<CI8>(width, height),
             Format::CI14X2 => gxtex::compute_size::<CI14X2>(width, height),
@@ -390,6 +390,7 @@ fn decode_planar(data: &[u8], width: u32, height: u32, format: Format) -> Planar
     let width = width as usize;
     let height = height as usize;
 
+    println!("D: {format:?}");
     match format {
         Format::I4 => PlanarData::Direct(decode::<I4<FastLuma>>(width, height, data)),
         Format::IA4 => {
@@ -399,10 +400,10 @@ fn decode_planar(data: &[u8], width: u32, height: u32, format: Format) -> Planar
         Format::IA8 => {
             PlanarData::Direct(decode::<IA8<FastLuma, AlphaChannel>>(width, height, data))
         }
-        Format::Rgb565 => PlanarData::Direct(decode::<FastRgb565>(width, height, data)),
-        Format::Rgb5A3 => PlanarData::Direct(decode::<Rgb5A3>(width, height, data)),
-        Format::Rgba8 => PlanarData::Direct(decode::<Rgba8>(width, height, data)),
-        Format::Cmp => PlanarData::Direct(decode::<Cmpr>(width, height, data)),
+        Format::RGB565 => PlanarData::Direct(decode::<FastRgb565>(width, height, data)),
+        Format::RGB5A3 => PlanarData::Direct(decode::<Rgb5A3>(width, height, data)),
+        Format::RGBA8 => PlanarData::Direct(decode::<Rgba8>(width, height, data)),
+        Format::Cmpr => PlanarData::Direct(decode::<Cmpr>(width, height, data)),
         Format::CI4 => PlanarData::Indirect(decode::<CI4>(width, height, data)),
         Format::CI8 => PlanarData::Indirect(decode::<CI8>(width, height, data)),
         Format::CI14X2 => PlanarData::Indirect(decode::<CI14X2>(width, height, data)),
@@ -473,6 +474,7 @@ pub fn encode_color_texture(
         };
     }
 
+    println!("E: {format:?}");
     match format {
         ColorCopyFormat::R4 => encode!(I4<RedChannel>),
         ColorCopyFormat::Y8 => encode!(I8<FastLuma>),
@@ -524,6 +526,7 @@ pub fn encode_depth_texture(
         };
     }
 
+    println!("E: {format:?}");
     match format {
         DepthCopyFormat::Z4 => todo!(),
         DepthCopyFormat::Z8 => encode!(I8<RedChannel>), // not sure...
