@@ -86,7 +86,10 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
         for tile_x in 0..width_in_tiles {
             let tile_index = tile_y * width_in_tiles + tile_x;
             let tile_offset = tile_index * F::BYTES_PER_TILE;
-            let tile_data = &data[tile_offset..][..F::BYTES_PER_TILE];
+
+            // SAFETY: data size was checked to be big enough by the assert before the loop
+            let tile_data =
+                unsafe { data.get_unchecked(tile_offset..tile_offset + F::BYTES_PER_TILE) };
 
             let base_x = tile_x * F::TILE_WIDTH;
             let base_y = tile_y * F::TILE_HEIGHT;
