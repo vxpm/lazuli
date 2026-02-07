@@ -97,15 +97,14 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
                 assert!(x <= F::TILE_WIDTH);
                 assert!(y <= F::TILE_HEIGHT);
 
-                // since we're decoding from top to bottom, even if the index is in bounds but not
-                // assigned to this coordinate, it will be overwritten later by the correct texel
                 let x = base_x + x;
                 let y = base_y + y;
-                let image_index = y * width + x;
-
-                // SAFETY: x and y are within tile width/height, and the texels buffer is big
-                // enough to fit (height_in_tiles * width_in_tiles) tiles
-                unsafe { *texels.get_unchecked_mut(image_index) = value };
+                if x < width && y < height {
+                    let image_index = y * width + x;
+                    // SAFETY: x and y are within tile width/height, and the texels buffer is big
+                    // enough to fit (height_in_tiles * width_in_tiles) tiles
+                    unsafe { *texels.get_unchecked_mut(image_index) = value };
+                }
             });
         }
     }
