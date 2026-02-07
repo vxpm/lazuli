@@ -1,9 +1,9 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use gxtex::{FastLuma, FastRgb565, Format, IA8, Luma, Pixel, Rgb565, compute_size};
+use gxtex::{FastLuma, FastRgb565, Format, IA8, Luma, Pixel, Rgb565, SimdRgb565, compute_size};
 
-fn bench<F: Format>(c: &mut Criterion, name: &str) {
+fn bench<F: Format<Texel = Pixel>>(c: &mut Criterion, name: &str) {
     let img = image::open("resources/waterfall.webp").unwrap();
     let pixels = img
         .to_rgba8()
@@ -58,7 +58,10 @@ fn bench<F: Format>(c: &mut Criterion, name: &str) {
     group.finish();
 }
 
-fn bench_with_fast<Accurate: Format, Fast: Format>(c: &mut Criterion, name: &str) {
+fn bench_with_fast<Accurate: Format<Texel = Pixel>, Fast: Format<Texel = Pixel>>(
+    c: &mut Criterion,
+    name: &str,
+) {
     let img = image::open("resources/waterfall.webp").unwrap();
     let pixels = img
         .to_rgba8()
@@ -139,6 +142,7 @@ fn bench_with_fast<Accurate: Format, Fast: Format>(c: &mut Criterion, name: &str
 fn formats(c: &mut Criterion) {
     bench_with_fast::<Rgb565, FastRgb565>(c, "RGB565");
     bench_with_fast::<IA8<Luma, Luma>, IA8<FastLuma, FastLuma>>(c, "IA8");
+    bench_with_fast::<FastRgb565, SimdRgb565>(c, "SIMD");
 }
 
 criterion_group!(benches, formats);
