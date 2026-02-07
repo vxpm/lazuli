@@ -33,7 +33,7 @@ pub fn compute_size<F: Format>(width: usize, height: usize) -> usize {
     width * height * F::BYTES_PER_TILE
 }
 
-/// Stride is in cache lines.
+/// Stride is in cache lines (32 bytes).
 #[multiversion(targets = "simd")]
 pub fn encode<F: Format>(
     stride: usize,
@@ -62,10 +62,10 @@ pub fn encode<F: Format>(
             F::encode_tile(out, |x, y| {
                 assert!(x <= F::TILE_WIDTH);
                 assert!(y <= F::TILE_HEIGHT);
+
                 let x = base_x + x;
                 let y = base_y + y;
                 let image_index = y * width + x;
-
                 data.get(image_index).copied().unwrap_or_default()
             });
         }
@@ -74,8 +74,6 @@ pub fn encode<F: Format>(
 
 #[multiversion(targets = "simd")]
 pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Texel> {
-    let mut texels = vec![F::Texel::default(); width * height];
-
     let width_in_tiles = width.div_ceil(F::TILE_WIDTH);
     let height_in_tiles = height.div_ceil(F::TILE_HEIGHT);
 
@@ -83,6 +81,7 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
     let full_height = height_in_tiles * F::TILE_HEIGHT;
     assert!(data.len() >= compute_size::<F>(full_width, full_height));
 
+    let mut texels = vec![F::Texel::default(); full_width * full_height];
     for tile_y in 0..height_in_tiles {
         for tile_x in 0..width_in_tiles {
             let tile_index = tile_y * width_in_tiles + tile_x;
@@ -92,19 +91,23 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
             let base_x = tile_x * F::TILE_WIDTH;
             let base_y = tile_y * F::TILE_HEIGHT;
             F::decode_tile(tile_data, |x, y, value| {
-                debug_assert!(x <= F::TILE_WIDTH);
-                debug_assert!(y <= F::TILE_HEIGHT);
+                assert!(x <= F::TILE_WIDTH);
+                assert!(y <= F::TILE_HEIGHT);
 
+                // since we're decoding from top to bottom, even if the index is in bounds but not
+                // assigned to this coordinate, it will be overwritten later by the correct texel
                 let x = base_x + x;
                 let y = base_y + y;
-                if x < width && y < height {
-                    let image_index = y * width + x;
-                    texels[image_index] = value;
-                }
+                let image_index = y * width + x;
+
+                // SAFETY: x and y are within tile width/height, and the texels buffer is big
+                // enough to fit (height_in_tiles * width_in_tiles) tiles
+                unsafe { *texels.get_unchecked_mut(image_index) = value };
             });
         }
     }
 
+    texels.truncate(width * height);
     texels
 }
 
@@ -796,8 +799,9 @@ mod test {
         let required_height = (img.height() as usize).next_multiple_of(F::TILE_HEIGHT);
         let mut encoded = vec![0; compute_size::<F>(required_width, required_height)];
 
+        let stride = F::BYTES_PER_TILE / 32 * required_width / F::TILE_WIDTH;
         encode::<F>(
-            required_width / F::TILE_WIDTH,
+            stride,
             img.width() as usize,
             img.height() as usize,
             &texels,
