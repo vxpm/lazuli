@@ -3,7 +3,7 @@
 #![feature(portable_simd)]
 
 use std::marker::PhantomData;
-use std::simd::{ToBytes, simd_swizzle, u8x32, u16x16};
+use std::simd::{ToBytes, simd_swizzle, u8x32, u16x16, u16x32};
 
 use bitut::BitUtils;
 use color::convert_range;
@@ -495,42 +495,35 @@ impl Format for SimdRgb565 {
         let green: u8x32 = green.to_le_bytes();
         let red: u8x32 = red.to_le_bytes();
 
-        // 05. swizzle into place
-        const SWIZZLE_AB: [usize; 32] = [
+        // 05. swizzle channels into pairs
+        const SWIZZLE_CHANNELS: [usize; 32] = [
             0, 32, 2, 34, 4, 36, 6, 38, 8, 40, 10, 42, 12, 44, 14, 46, //
             16, 48, 18, 50, 20, 52, 22, 54, 24, 56, 26, 58, 28, 60, 30, 62,
         ];
 
         let alpha = u8x32::splat(255);
-        let red_green = simd_swizzle!(red, green, SWIZZLE_AB);
-        let blue_alpha = simd_swizzle!(blue, alpha, SWIZZLE_AB);
-
-        // 06. interleave
+        let red_green = simd_swizzle!(red, green, SWIZZLE_CHANNELS);
+        let blue_alpha = simd_swizzle!(blue, alpha, SWIZZLE_CHANNELS);
         let red_green = u16x16::from_le_bytes(red_green);
         let blue_alpha = u16x16::from_le_bytes(blue_alpha);
-        let (rgba_low, rgba_high) = red_green.interleave(blue_alpha);
+
+        // 06. swizzle pairs into texels
+        const SWIZZLE_PAIRS: [usize; 32] = [
+            0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23, //
+            8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31,
+        ];
+
+        let rgba: u16x32 = simd_swizzle!(red_green, blue_alpha, SWIZZLE_PAIRS);
 
         // 07. store
-        let rgba_low = rgba_low.to_le_bytes().to_array();
-        let rgba_high = rgba_high.to_le_bytes().to_array();
-        let rgba_low: &[Pixel; 8] = zerocopy::transmute_ref!(&rgba_low);
-        let rgba_high: &[Pixel; 8] = zerocopy::transmute_ref!(&rgba_high);
+        let rgba = rgba.to_le_bytes().to_array();
+        let rgba: &[Pixel; 16] = zerocopy::transmute_ref!(&rgba);
 
         seq! {
-            Y in 0..2 {
+            Y in 0..4 {
                 seq! {
                     X in 0..4 {
-                        set(X, Y, rgba_low[X + 4 * Y]);
-                    }
-                }
-            }
-        }
-
-        seq! {
-            Y in 0..2 {
-                seq! {
-                    X in 0..4 {
-                        set(X, 2 + Y, rgba_high[X + 4 * Y]);
+                        set(X, Y, rgba[X + 4 * Y]);
                     }
                 }
             }
