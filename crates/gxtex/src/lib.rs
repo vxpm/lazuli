@@ -99,7 +99,9 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
 
                 let x = base_x + x;
                 let y = base_y + y;
-                if x < width && y < height {
+
+                // checking x is enough as y being out of bounds will be truncated
+                if x < width {
                     let image_index = y * width + x;
                     // SAFETY: x and y are within tile width/height, and the texels buffer is big
                     // enough to fit (height_in_tiles * width_in_tiles) tiles
