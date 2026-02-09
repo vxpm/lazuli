@@ -1,7 +1,7 @@
-<h1>
-  <img align="left" width="32" height="32" alt="lazuli" src="./resources/logo_256.png" />
-  lazuli
-</h1>
+<img align="left" width="32" height="32" alt="lazuli" src="./resources/logo_256.png" />
+
+# lazuli
+
 
 A work-in-progress GameCube emulator :)
 
