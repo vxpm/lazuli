@@ -470,7 +470,7 @@ impl Format for FastRgb565 {
         let red_green = u16x16::from_le_bytes(red_green);
         let blue_alpha = u16x16::from_le_bytes(blue_alpha);
 
-        // 06. swizzle pairs into texels
+        // 05. swizzle pairs into texels
         const SWIZZLE_PAIRS: [usize; 32] = [
             0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23, //
             8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31,
@@ -478,7 +478,7 @@ impl Format for FastRgb565 {
 
         let rgba: u16x32 = simd_swizzle!(red_green, blue_alpha, SWIZZLE_PAIRS);
 
-        // 07. store
+        // 06. store
         let rgba = rgba.to_le_bytes().to_array();
         let rgba: &[Pixel; 16] = zerocopy::transmute_ref!(&rgba);
 

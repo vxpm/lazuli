@@ -28,7 +28,7 @@ impl TextureData {
         match (self, lod) {
             (Self::Direct(lods), LodData::Direct(lod)) => lods.push(lod),
             (Self::Indirect(lods), LodData::Indirect(lod)) => lods.push(lod),
-            _ => panic!("mismatched texture and planar formats - this is definitely a bug"),
+            _ => panic!("mismatched texture and lod formats - this is definitely a bug"),
         }
     }
 
