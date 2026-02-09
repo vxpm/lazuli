@@ -12,22 +12,22 @@ use crate::system::System;
 use crate::system::gx::pix::{ColorCopyFormat, DepthCopyFormat};
 
 #[derive(Debug, Clone)]
-pub enum PlanarData {
+enum LodData {
     Direct(Vec<Rgba8>),
     Indirect(Vec<PaletteIndex>),
 }
 
 #[derive(Debug, Clone)]
-pub enum MipmapData {
+pub enum TextureData {
     Direct(Vec<Vec<Rgba8>>),
     Indirect(Vec<Vec<PaletteIndex>>),
 }
 
-impl MipmapData {
-    fn push(&mut self, lod: PlanarData) {
+impl TextureData {
+    fn push(&mut self, lod: LodData) {
         match (self, lod) {
-            (Self::Direct(lods), PlanarData::Direct(lod)) => lods.push(lod),
-            (Self::Indirect(lods), PlanarData::Indirect(lod)) => lods.push(lod),
+            (Self::Direct(lods), LodData::Direct(lod)) => lods.push(lod),
+            (Self::Indirect(lods), LodData::Indirect(lod)) => lods.push(lod),
             _ => panic!("mismatched texture and planar formats - this is definitely a bug"),
         }
     }
@@ -381,7 +381,7 @@ impl Interface {
 }
 
 /// Decodes a planar texture.
-fn decode_planar(data: &[u8], width: u32, height: u32, format: Format) -> PlanarData {
+fn decode_planar(data: &[u8], width: u32, height: u32, format: Format) -> LodData {
     use gxtex::{
         AlphaChannel, CI4, CI8, CI14X2, Cmpr, FastLuma, FastRgb565, I4, I8, IA4, IA8, Rgb5A3,
         Rgba8, decode,
@@ -390,33 +390,34 @@ fn decode_planar(data: &[u8], width: u32, height: u32, format: Format) -> Planar
     let width = width as usize;
     let height = height as usize;
 
-    println!("D: {format:?}");
     match format {
-        Format::I4 => PlanarData::Direct(decode::<I4<FastLuma>>(width, height, data)),
-        Format::IA4 => {
-            PlanarData::Direct(decode::<IA4<FastLuma, AlphaChannel>>(width, height, data))
-        }
-        Format::I8 => PlanarData::Direct(decode::<I8<FastLuma>>(width, height, data)),
-        Format::IA8 => {
-            PlanarData::Direct(decode::<IA8<FastLuma, AlphaChannel>>(width, height, data))
-        }
-        Format::RGB565 => PlanarData::Direct(decode::<FastRgb565>(width, height, data)),
-        Format::RGB5A3 => PlanarData::Direct(decode::<Rgb5A3>(width, height, data)),
-        Format::RGBA8 => PlanarData::Direct(decode::<Rgba8>(width, height, data)),
-        Format::Cmpr => PlanarData::Direct(decode::<Cmpr>(width, height, data)),
-        Format::CI4 => PlanarData::Indirect(decode::<CI4>(width, height, data)),
-        Format::CI8 => PlanarData::Indirect(decode::<CI8>(width, height, data)),
-        Format::CI14X2 => PlanarData::Indirect(decode::<CI14X2>(width, height, data)),
+        Format::I4 => LodData::Direct(decode::<I4<FastLuma>>(width, height, data)),
+        Format::IA4 => LodData::Direct(decode::<IA4<FastLuma, AlphaChannel>>(width, height, data)),
+        Format::I8 => LodData::Direct(decode::<I8<FastLuma>>(width, height, data)),
+        Format::IA8 => LodData::Direct(decode::<IA8<FastLuma, AlphaChannel>>(width, height, data)),
+        Format::RGB565 => LodData::Direct(decode::<FastRgb565>(width, height, data)),
+        Format::RGB5A3 => LodData::Direct(decode::<Rgb5A3>(width, height, data)),
+        Format::RGBA8 => LodData::Direct(decode::<Rgba8>(width, height, data)),
+        Format::Cmpr => LodData::Direct(decode::<Cmpr>(width, height, data)),
+        Format::CI4 => LodData::Indirect(decode::<CI4>(width, height, data)),
+        Format::CI8 => LodData::Indirect(decode::<CI8>(width, height, data)),
+        Format::CI14X2 => LodData::Indirect(decode::<CI14X2>(width, height, data)),
         _ => todo!("reserved texture format"),
     }
 }
 
 /// Decodes a mipmap texture with `count` levels.
-fn decode_mipmap(data: &[u8], width: u32, height: u32, format: Format, count: usize) -> MipmapData {
+fn decode_mipmap(
+    data: &[u8],
+    width: u32,
+    height: u32,
+    format: Format,
+    count: usize,
+) -> TextureData {
     let mut mipmap = if format.is_direct() {
-        MipmapData::Direct(Vec::with_capacity(count))
+        TextureData::Direct(Vec::with_capacity(count))
     } else {
-        MipmapData::Indirect(Vec::with_capacity(count))
+        TextureData::Indirect(Vec::with_capacity(count))
     };
 
     let mut current_data = data;
@@ -474,7 +475,6 @@ pub fn encode_color_texture(
         };
     }
 
-    println!("E: {format:?}");
     match format {
         ColorCopyFormat::R4 => encode!(I4<RedChannel>),
         ColorCopyFormat::Y8 => encode!(I8<FastLuma>),
@@ -526,7 +526,6 @@ pub fn encode_depth_texture(
         };
     }
 
-    println!("E: {format:?}");
     match format {
         DepthCopyFormat::Z4 => todo!(),
         DepthCopyFormat::Z8 => encode!(I8<RedChannel>), // not sure...

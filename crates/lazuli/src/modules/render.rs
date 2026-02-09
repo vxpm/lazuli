@@ -102,7 +102,7 @@ pub struct Texture {
     pub width: u32,
     pub height: u32,
     pub format: tex::Format,
-    pub data: tex::MipmapData,
+    pub data: tex::TextureData,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

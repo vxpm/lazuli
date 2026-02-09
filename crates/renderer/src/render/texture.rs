@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 
 use lazuli::modules::render::{Clut, ClutAddress, Texture, TextureId};
 use lazuli::system::gx::color::Rgba8;
-use lazuli::system::gx::tex::{ClutFormat, MipmapData};
+use lazuli::system::gx::tex::{ClutFormat, TextureData};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -72,11 +72,11 @@ impl Cache {
 
         let owned_data;
         let data: Vec<&[u8]> = match &raw.value.data {
-            MipmapData::Direct(data) => data
+            TextureData::Direct(data) => data
                 .iter()
                 .map(|lod| zerocopy::transmute_ref!(lod.as_slice()))
                 .collect::<Vec<_>>(),
-            MipmapData::Indirect(data) => {
+            TextureData::Indirect(data) => {
                 let clut_base = settings.clut_addr.to_tmem_addr();
                 let clut = &tmem[clut_base..];
 
