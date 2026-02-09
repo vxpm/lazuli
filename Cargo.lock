@@ -217,6 +217,7 @@ dependencies = [
  "eframe",
  "egui_extras",
  "eyre-pretty",
+ "image",
  "indexmap",
  "lazuli",
  "modules",

@@ -435,8 +435,16 @@ fn main() -> Result<()> {
         }
     });
 
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../resources/logo_256.png"
+    )))
+    .unwrap();
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_maximized(true),
+        viewport: egui::ViewportBuilder::default()
+            .with_maximized(true)
+            .with_icon(icon),
         wgpu_options: WgpuConfiguration {
             wgpu_setup: WgpuSetup::CreateNew(WgpuSetupCreateNew {
                 instance_descriptor: wgpu::InstanceDescriptor {

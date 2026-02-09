@@ -1,4 +1,13 @@
-# lazuli
+<div align="center">
+    <img width="128" height="128" alt="lazuli" src="./resources/logo_256.png" />
+    <br>
+    <h1>Lazuli</h1>
+</div>
+
+<img src="./resources/screenshots/sunshine.webp" width="23%"></img> 
+<img src="./resources/screenshots/luigi.webp" width="23%"></img> 
+<img src="./resources/screenshots/mparty.webp" width="23%"></img> 
+<img src="./resources/screenshots/wario.webp" width="23%"></img> 
 
 A work-in-progress GameCube emulator :)
 

@@ -43,3 +43,4 @@ typetag = "0.2"
 renderdoc = "0.12"
 spin_sleep = "1.3"
 directories = "6"
+image = { version = "0.25", default-features = false, features = ["png"] }
