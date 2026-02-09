@@ -4,6 +4,7 @@
     <h1>Lazuli</h1>
 </div>
 
+<img src="./resources/screenshots/sunshine.webp" width="45%"></img> <img src="./resources/screenshots/luigi.webp" width="45%"></img> <img src="./resources/screenshots/mparty.webp" width="45%"></img> <img src="./resources/screenshots/wario.webp" width="45%"></img> 
 
 A work-in-progress GameCube emulator :)
 
