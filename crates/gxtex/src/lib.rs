@@ -1,7 +1,9 @@
 #![expect(clippy::identity_op, reason = "seq expanded code")]
 #![expect(clippy::erasing_op, reason = "seq expanded code")]
+#![feature(portable_simd)]
 
 use std::marker::PhantomData;
+use std::simd::{ToBytes, simd_swizzle, u8x32, u16x16, u16x32};
 
 use bitut::BitUtils;
 use color::convert_range;
@@ -10,17 +12,6 @@ use seq_macro::seq;
 
 #[rustfmt::skip]
 pub use color;
-
-// const DITHER: [[i8; 8]; 8] = [
-//     [0, 32, 8, 40, 2, 34, 10, 42],
-//     [48, 16, 56, 24, 50, 18, 58, 26],
-//     [12, 44, 4, 36, 14, 46, 6, 38],
-//     [60, 28, 52, 20, 62, 30, 54, 22],
-//     [3, 35, 11, 43, 1, 33, 9, 41],
-//     [51, 19, 59, 27, 49, 17, 57, 25],
-//     [15, 47, 7, 39, 13, 45, 5, 37],
-//     [63, 31, 55, 23, 61, 29, 53, 21],
-// ];
 
 pub type Pixel = color::Rgba8;
 pub type PaletteIndex = u16;
@@ -42,7 +33,7 @@ pub fn compute_size<F: Format>(width: usize, height: usize) -> usize {
     width * height * F::BYTES_PER_TILE
 }
 
-/// Stride is in cache lines.
+/// Stride is in cache lines (32 bytes).
 #[multiversion(targets = "simd")]
 pub fn encode<F: Format>(
     stride: usize,
@@ -71,10 +62,10 @@ pub fn encode<F: Format>(
             F::encode_tile(out, |x, y| {
                 assert!(x <= F::TILE_WIDTH);
                 assert!(y <= F::TILE_HEIGHT);
+
                 let x = base_x + x;
                 let y = base_y + y;
                 let image_index = y * width + x;
-
                 data.get(image_index).copied().unwrap_or_default()
             });
         }
@@ -83,8 +74,6 @@ pub fn encode<F: Format>(
 
 #[multiversion(targets = "simd")]
 pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Texel> {
-    let mut texels = vec![F::Texel::default(); width * height];
-
     let width_in_tiles = width.div_ceil(F::TILE_WIDTH);
     let height_in_tiles = height.div_ceil(F::TILE_HEIGHT);
 
@@ -92,11 +81,15 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
     let full_height = height_in_tiles * F::TILE_HEIGHT;
     assert!(data.len() >= compute_size::<F>(full_width, full_height));
 
+    let mut texels = vec![F::Texel::default(); full_width * full_height];
     for tile_y in 0..height_in_tiles {
         for tile_x in 0..width_in_tiles {
             let tile_index = tile_y * width_in_tiles + tile_x;
             let tile_offset = tile_index * F::BYTES_PER_TILE;
-            let tile_data = &data[tile_offset..][..F::BYTES_PER_TILE];
+
+            // SAFETY: data size was checked to be big enough by the assert before the loop
+            let tile_data =
+                unsafe { data.get_unchecked(tile_offset..tile_offset + F::BYTES_PER_TILE) };
 
             let base_x = tile_x * F::TILE_WIDTH;
             let base_y = tile_y * F::TILE_HEIGHT;
@@ -106,14 +99,19 @@ pub fn decode<F: Format>(width: usize, height: usize, data: &[u8]) -> Vec<F::Tex
 
                 let x = base_x + x;
                 let y = base_y + y;
-                if x < width && y < height {
+
+                // checking x is enough as y being out of bounds will be truncated
+                if x < width {
                     let image_index = y * width + x;
-                    texels[image_index] = value;
+                    // SAFETY: x and y are within tile width/height, and the texels buffer is big
+                    // enough to fit (height_in_tiles * width_in_tiles) tiles
+                    unsafe { *texels.get_unchecked_mut(image_index) = value };
                 }
             });
         }
     }
 
+    texels.truncate(width * height);
     texels
 }
 
@@ -439,14 +437,56 @@ impl Format for FastRgb565 {
 
     #[inline(always)]
     fn decode_tile(data: &[u8], mut set: impl FnMut(usize, usize, Pixel)) {
-        let pixels: [u16; 16] =
-            std::array::from_fn(|i| u16::from_be_bytes([data[2 * i], data[2 * i + 1]]));
-        let conv = pixels.map(Pixel::from_rgb565_fast);
+        // 01. convert endianness
+        let bytes = u8x32::from_slice(data);
+        let values = u16x16::from_be_bytes(bytes);
+
+        // 02. extract each channel
+        let mask_5 = u16x16::splat(0x1F);
+        let mask_6 = u16x16::splat(0x3F);
+
+        let blue = values & mask_5;
+        let green = (values >> 5) & mask_6;
+        let red = values >> 11;
+
+        // 03. convert each channel to the 0..256 range
+        let blue = (blue << 3) | (blue >> 2);
+        let green = (green << 2) | (green >> 4);
+        let red = (red << 3) | (red >> 2);
+
+        // 04. swizzle channels into pairs
+        const SWIZZLE_CHANNELS: [usize; 32] = [
+            0, 32, 2, 34, 4, 36, 6, 38, 8, 40, 10, 42, 12, 44, 14, 46, //
+            16, 48, 18, 50, 20, 52, 22, 54, 24, 56, 26, 58, 28, 60, 30, 62,
+        ];
+
+        let alpha = u8x32::splat(255);
+        let blue: u8x32 = blue.to_le_bytes();
+        let green: u8x32 = green.to_le_bytes();
+        let red: u8x32 = red.to_le_bytes();
+
+        let red_green = simd_swizzle!(red, green, SWIZZLE_CHANNELS);
+        let blue_alpha = simd_swizzle!(blue, alpha, SWIZZLE_CHANNELS);
+        let red_green = u16x16::from_le_bytes(red_green);
+        let blue_alpha = u16x16::from_le_bytes(blue_alpha);
+
+        // 05. swizzle pairs into texels
+        const SWIZZLE_PAIRS: [usize; 32] = [
+            0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23, //
+            8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31,
+        ];
+
+        let rgba: u16x32 = simd_swizzle!(red_green, blue_alpha, SWIZZLE_PAIRS);
+
+        // 06. store
+        let rgba = rgba.to_le_bytes().to_array();
+        let rgba: &[Pixel; 16] = zerocopy::transmute_ref!(&rgba);
+
         seq! {
             Y in 0..4 {
                 seq! {
                     X in 0..4 {
-                        set(X, Y, conv[X + 4 * Y]);
+                        set(X, Y, rgba[X + 4 * Y]);
                     }
                 }
             }
@@ -719,8 +759,9 @@ mod test {
         let required_height = (img.height() as usize).next_multiple_of(F::TILE_HEIGHT);
         let mut encoded = vec![0; compute_size::<F>(required_width, required_height)];
 
+        let stride = F::BYTES_PER_TILE / 32 * required_width / F::TILE_WIDTH;
         encode::<F>(
-            required_width / F::TILE_WIDTH,
+            stride,
             img.width() as usize,
             img.height() as usize,
             &texels,
