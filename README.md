@@ -1,5 +1,5 @@
 <h1>
-  <img align="left" width="32" height="32" style="margin-bottom: -12px, margin-right: -8px" alt="lazuli" src="./resources/logo_256.png" />
+  <img align="left" width="32" height="32" alt="lazuli" src="./resources/logo_256.png" />
   lazuli
 </h1>
 
