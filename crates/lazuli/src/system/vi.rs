@@ -318,12 +318,16 @@ impl Interface {
         height_multiplier * active_lines
     }
 
+    fn video_width(&self) -> u16 {
+        self.horizontal_timing.halfline_width().value()
+            + self.horizontal_timing.halfline_to_blank_start().value()
+            - self.horizontal_timing.sync_start_to_blank_end().value()
+    }
+
     /// Dimensions of the video output.
     pub fn video_dimensions(&self) -> Dimensions {
+        let width = self.video_width();
         let height = self.video_height();
-        let width = self.horizontal_timing.halfline_width().value()
-            + self.horizontal_timing.halfline_to_blank_start().value()
-            - self.horizontal_timing.sync_start_to_blank_end().value();
 
         Dimensions { width, height }
     }
@@ -351,15 +355,27 @@ impl Interface {
 }
 
 pub fn update_display_interrupts(sys: &mut System) {
+    let video_width = sys.video.video_width();
+
     let mut raised = false;
-    for (index, interrupt) in sys.video.interrupts.iter_mut().enumerate() {
-        if interrupt.enable() && interrupt.vertical_count().value() == sys.video.vertical_count {
+    for interrupt in sys.video.interrupts.iter_mut() {
+        interrupt.set_status(false);
+        if !interrupt.enable() {
+            continue;
+        }
+
+        if interrupt.horizontal_count().value() > video_width {
+            continue;
+        }
+
+        sys.video.horizontal_count = sys
+            .video
+            .horizontal_count
+            .max(interrupt.horizontal_count().value());
+
+        if interrupt.vertical_count().value() == sys.video.vertical_count {
             raised = true;
             interrupt.set_status(true);
-            sys.video.horizontal_count = interrupt.horizontal_count().value();
-            tracing::debug!("raised display interrupt {index} ({interrupt:?})");
-        } else {
-            interrupt.set_status(false);
         }
     }
 
@@ -408,29 +424,4 @@ pub fn update(sys: &mut System) {
     if sys.video.display_config.enable() {
         sys.scheduler.schedule_now(self::vertical_count);
     }
-}
-
-fn xfb_inner(sys: &System, base: Address) -> Option<&[u8]> {
-    let xfb = base.value();
-    let Dimensions { width, height } = sys.video.xfb_dimensions();
-
-    let pixels = width as u32 * height as u32;
-    if pixels == 0 {
-        return None;
-    }
-
-    let length = 2 * pixels;
-    Some(&sys.mem.ram()[xfb as usize..xfb as usize + length as usize])
-}
-
-/// Returns the data of the top XFB in YCbCr format (y0, cb, y1, cr).
-pub fn top_xfb(sys: &System) -> Option<&[u8]> {
-    let base = sys.video.top_xfb_address();
-    xfb_inner(sys, base)
-}
-
-/// Returns the data of the bottom XFB in YCbCr format (y0, cb, y1, cr).
-pub fn bottom_xfb(sys: &System) -> Option<&[u8]> {
-    let base = sys.video.bottom_xfb_address();
-    xfb_inner(sys, base)
 }
