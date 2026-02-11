@@ -43,7 +43,9 @@ impl AppWindow for Window {
             return;
         }
 
-        self.xfb_resolution = emulator.sys.video.xfb_resolution();
+        let dims = emulator.sys.video.xfb_dimensions();
+        self.xfb_resolution = (dims.width, dims.height);
+
         let Some(xfb) = (if self.bottom {
             system::vi::bottom_xfb(&emulator.sys)
         } else {

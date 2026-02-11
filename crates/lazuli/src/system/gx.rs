@@ -1096,24 +1096,28 @@ fn call(sys: &mut System, address: Address, length: u32) {
 }
 
 fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
-    if cmd.to_xfb() {
-        let args = render::CopyArgs {
-            src: sys.gpu.pix.copy_src,
-            dims: sys.gpu.pix.copy_dims,
-            half: cmd.half(),
-            clear: cmd.clear(),
-        };
+    let args = render::CopyArgs {
+        src: sys.gpu.pix.copy_src,
+        dims: sys.gpu.pix.copy_dims,
+        half: cmd.half(),
+        clear: cmd.clear(),
+    };
 
+    let divisor = if args.half { 2 } else { 1 };
+    let width = args.dims.width() as u32 / divisor;
+    let height = args.dims.height() as u32 / divisor;
+    let dst = sys.gpu.pix.copy_dst;
+    let stride = sys.gpu.pix.copy_stride;
+
+    if cmd.to_xfb() {
+        dbg!(
+            dst,
+            sys.video.top_xfb_address(),
+            sys.video.bottom_xfb_address()
+        );
         sys.modules.render.exec(render::Action::XfbCopy { args });
     } else if sys.gpu.pix.control.format().is_depth() {
         let (sender, receiver) = oneshot::channel();
-        let args = render::CopyArgs {
-            src: sys.gpu.pix.copy_src,
-            dims: sys.gpu.pix.copy_dims,
-            half: cmd.half(),
-            clear: cmd.clear(),
-        };
-
         sys.modules.render.exec(render::Action::DepthCopy {
             args,
             response: sender,
@@ -1124,22 +1128,10 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
             return;
         };
 
-        let divisor = if cmd.half() { 2 } else { 1 };
-        let width = args.dims.width() as u32 / divisor;
-        let height = args.dims.height() as u32 / divisor;
-        let dst = sys.gpu.pix.copy_dst;
-        let stride = sys.gpu.pix.copy_stride;
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_depth_texture(pixels, cmd.depth_format(), stride, width, height, output);
     } else {
         let (sender, receiver) = oneshot::channel();
-        let args = render::CopyArgs {
-            src: sys.gpu.pix.copy_src,
-            dims: sys.gpu.pix.copy_dims,
-            half: cmd.half(),
-            clear: cmd.clear(),
-        };
-
         sys.modules.render.exec(render::Action::ColorCopy {
             args,
             response: sender,
@@ -1150,11 +1142,6 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
             return;
         };
 
-        let divisor = if cmd.half() { 2 } else { 1 };
-        let width = args.dims.width() as u32 / divisor;
-        let height = args.dims.height() as u32 / divisor;
-        let dst = sys.gpu.pix.copy_dst;
-        let stride = sys.gpu.pix.copy_stride;
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
     }
