@@ -542,6 +542,7 @@ pub struct Gpu {
     pub pix: pix::Interface,
     pub write_mask: u32,
     matrix_set: Box<MatrixSet>,
+    xfb_copies: Vec<(Address, render::CopyArgs)>,
 }
 
 impl Default for Gpu {
@@ -555,6 +556,7 @@ impl Default for Gpu {
             pix: Default::default(),
             write_mask: 0x00FF_FFFF,
             matrix_set: Box::default(),
+            xfb_copies: Vec::with_capacity(4),
         }
     }
 }
@@ -1110,11 +1112,13 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     let stride = sys.gpu.pix.copy_stride;
 
     if cmd.to_xfb() {
-        dbg!(
-            dst,
-            sys.video.top_xfb_address(),
-            sys.video.bottom_xfb_address()
-        );
+        // dbg!(
+        //     dst,
+        //     sys.video.top_xfb_address(),
+        //     sys.video.bottom_xfb_address()
+        // );
+
+        sys.gpu.xfb_copies.push((dst, args));
         sys.modules.render.exec(render::Action::XfbCopy { args });
     } else if sys.gpu.pix.control.format().is_depth() {
         let (sender, receiver) = oneshot::channel();
@@ -1144,5 +1148,12 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
 
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
+    }
+}
+
+pub fn flush_xfb(sys: &mut System, base: Address) {
+    println!("{}", base);
+    for copy in sys.gpu.xfb_copies.drain(..) {
+        println!("{:?}", copy);
     }
 }

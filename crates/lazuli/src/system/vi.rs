@@ -3,7 +3,7 @@ use bitos::bitos;
 use bitos::integer::{u4, u7, u9, u10, u24};
 use gekko::{Address, FREQUENCY};
 
-use crate::system::{System, pi, si};
+use crate::system::{System, gx, pi, si};
 
 #[bitos(16)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -386,6 +386,16 @@ pub fn update_display_interrupts(sys: &mut System) {
 
 pub fn vertical_count(sys: &mut System) {
     self::update_display_interrupts(sys);
+
+    if sys.video.vertical_count == 4 {
+        println!("flush top");
+        gx::flush_xfb(sys, sys.video.top_xfb_address());
+    } else if sys.video.display_config.field_mode() == FieldMode::Double
+        && sys.video.vertical_count as u32 == sys.video.lines_per_frame() / 2 + 4
+    {
+        println!("flush bottom");
+        gx::flush_xfb(sys, sys.video.top_xfb_address());
+    }
 
     sys.video.vertical_count += 1;
     sys.video.horizontal_count = 1;
