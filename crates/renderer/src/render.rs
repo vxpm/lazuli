@@ -327,6 +327,10 @@ impl Renderer {
     }
 
     pub fn set_xfb_dimensions(&mut self, dims: Dimensions) {
+        if dims == self.external_fb.dimensions() {
+            return;
+        }
+
         self.external_fb.resize(
             &self.device,
             wgpu::Extent3d {

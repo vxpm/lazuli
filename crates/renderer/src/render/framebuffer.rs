@@ -2,6 +2,7 @@
 
 use lazuli::modules::render::XfbPart;
 use lazuli::system::gx::{EFB_HEIGHT, EFB_WIDTH};
+use lazuli::system::vi::Dimensions;
 use rustc_hash::FxHashMap;
 
 pub struct Embedded {
@@ -123,6 +124,13 @@ impl External {
 
     pub fn framebuffer(&self) -> &wgpu::TextureView {
         &self.framebuffer
+    }
+
+    pub fn dimensions(&self) -> Dimensions {
+        Dimensions {
+            width: self.framebuffer.texture().width() as u16,
+            height: self.framebuffer.texture().height() as u16,
+        }
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, size: wgpu::Extent3d) {

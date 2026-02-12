@@ -190,6 +190,12 @@ pub struct Dimensions {
     pub height: u16,
 }
 
+impl Dimensions {
+    pub fn is_degenerate(self) -> bool {
+        self.width == 0 || self.height == 0
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Interface {
     pub display_config: DisplayConfig,
@@ -462,6 +468,14 @@ pub fn present(sys: &mut System) {
     let frame_dimensions = sys.video.frame_dimensions();
     let stride_in_pixels = sys.video.xfb_stride() as u32;
     let base_copy = sys.gpu.xfb_copies.iter().min_by_key(|x| x.addr).unwrap();
+
+    if frame_dimensions.is_degenerate() {
+        // TODO: black out VI
+    } else {
+        sys.modules
+            .render
+            .exec(render::Action::SetXfbDimensions(frame_dimensions));
+    }
 
     let mut parts = Vec::with_capacity(sys.gpu.xfb_copies.len());
     for (id, copy) in sys.gpu.xfb_copies.iter().enumerate() {
