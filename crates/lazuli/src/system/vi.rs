@@ -468,7 +468,6 @@ pub fn present(sys: &mut System) {
         let delta_pixels = (copy.addr.value() - base_copy.addr.value()) / 2;
         let offset_x = delta_pixels % stride_in_pixels;
         let offset_y = delta_pixels / stride_in_pixels;
-        dbg!(copy, offset_y);
 
         if offset_x >= frame_dimensions.width as u32 || offset_y >= frame_dimensions.height as u32 {
             continue;

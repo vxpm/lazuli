@@ -377,11 +377,11 @@ impl Scissor {
         (width as u32, height as u32)
     }
 
-    pub fn offset(&self) -> (u32, u32) {
+    pub fn offset(&self) -> (i32, i32) {
         let base_x = self.offset.x_plus_342_div_2().value() as u32 * 2;
         let base_y = self.offset.y_plus_342_div_2().value() as u32 * 2;
-        let x = base_x.saturating_sub(342);
-        let y = base_y.saturating_sub(342);
+        let x = base_x as i32 - 342;
+        let y = base_y as i32 - 342;
         (x, y)
     }
 }

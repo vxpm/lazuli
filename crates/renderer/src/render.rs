@@ -359,10 +359,10 @@ impl Renderer {
 
         let (scissor_effective_x, scissor_effective_y) = (
             scissor_x
-                .saturating_sub(scissor_offset_x)
+                .saturating_sub_signed(scissor_offset_x)
                 .min(EFB_WIDTH as u32),
             scissor_y
-                .saturating_sub(scissor_offset_y)
+                .saturating_sub_signed(scissor_offset_y)
                 .min(EFB_HEIGHT as u32),
         );
 
