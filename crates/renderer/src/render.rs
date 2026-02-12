@@ -1289,17 +1289,7 @@ impl Renderer {
         };
 
         let color = self.embedded_fb.color();
-        let target = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("xfb copy texture"),
-            dimension: wgpu::TextureDimension::D2,
-            size,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-            mip_level_count: 1,
-            sample_count: 1,
-        });
-        let target = target.create_view(&Default::default());
+        let target = self.external_fb.create_copy(&self.device, id, size);
 
         self.current_transfer_encoder.copy_texture_to_texture(
             wgpu::TexelCopyTextureInfo {
@@ -1316,8 +1306,6 @@ impl Renderer {
             },
             size,
         );
-
-        self.external_fb.insert_copy(id, target);
 
         if clear {
             self.clear(x, y, width, height);

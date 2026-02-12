@@ -1,5 +1,7 @@
 //! Framebuffers (EFB and XFB).
 
+use std::collections::hash_map::Entry;
+
 use lazuli::modules::render::XfbPart;
 use lazuli::system::gx::{EFB_HEIGHT, EFB_WIDTH};
 use lazuli::system::vi::Dimensions;
@@ -87,7 +89,8 @@ impl Embedded {
 
 pub struct External {
     framebuffer: wgpu::TextureView,
-    saved_copies: FxHashMap<u32, wgpu::TextureView>,
+    texture_pool: FxHashMap<wgpu::Extent3d, wgpu::TextureView>,
+    copies: FxHashMap<u32, wgpu::TextureView>,
 }
 
 impl External {
@@ -118,7 +121,8 @@ impl External {
 
         Self {
             framebuffer,
-            saved_copies: Default::default(),
+            texture_pool: FxHashMap::default(),
+            copies: Default::default(),
         }
     }
 
@@ -137,9 +141,32 @@ impl External {
         self.framebuffer = Self::create_framebuffer(device, size);
     }
 
-    /// Saves the given texture as the source for the copy with the given ID.
-    pub fn insert_copy(&mut self, id: u32, tex: wgpu::TextureView) {
-        self.saved_copies.insert(id, tex);
+    pub fn create_copy(
+        &mut self,
+        device: &wgpu::Device,
+        id: u32,
+        size: wgpu::Extent3d,
+    ) -> wgpu::TextureView {
+        let tex = match self.texture_pool.entry(size) {
+            Entry::Occupied(o) => o.remove(),
+            Entry::Vacant(_) => {
+                let tex = device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("xfb copy texture"),
+                    dimension: wgpu::TextureDimension::D2,
+                    size,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                    mip_level_count: 1,
+                    sample_count: 1,
+                });
+
+                tex.create_view(&wgpu::TextureViewDescriptor::default())
+            }
+        };
+
+        self.copies.insert(id, tex.clone());
+        tex
     }
 
     /// Builds the XFB texture from a list of parts describing where to put each copy. Copies must
@@ -158,7 +185,7 @@ impl External {
         );
 
         for part in parts {
-            let saved = self.saved_copies.get(&part.id).unwrap();
+            let saved = self.copies.get(&part.id).unwrap();
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
                     texture: saved.texture(),
@@ -180,6 +207,10 @@ impl External {
             );
         }
 
-        self.saved_copies.clear();
+        self.texture_pool
+            .extend(self.copies.drain().map(|(_, tex)| {
+                let size = tex.texture().size();
+                (size, tex)
+            }));
     }
 }
