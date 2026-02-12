@@ -354,18 +354,18 @@ impl Interface {
 
     /// Dimensions of the video output.
     pub fn video_dimensions(&self) -> Dimensions {
-        let width = self.video_width();
-        let height = self.video_height();
-
-        Dimensions { width, height }
+        Dimensions {
+            width: self.video_width(),
+            height: self.video_height(),
+        }
     }
 
     /// Dimensions of the region in the video output which contain image data.
     pub fn video_dimensions_cropped(&self) -> Dimensions {
-        let width = self.xfb_dimensions().width;
-        let height = self.video_height();
-
-        Dimensions { width, height }
+        Dimensions {
+            width: self.xfb_dimensions().width,
+            height: self.video_height(),
+        }
     }
 
     pub fn write_interrupt<const N: usize>(&mut self, new: DisplayInterrupt) {
@@ -376,7 +376,6 @@ impl Interface {
 
 pub fn update_display_interrupts(sys: &mut System) {
     let video_width = sys.video.video_width();
-
     let mut raised = false;
     for interrupt in sys.video.interrupts.iter_mut() {
         interrupt.set_status(false);
