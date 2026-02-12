@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use glam::{Mat4, Vec2};
 use lazuli::modules::render::{
     Action, Clut, ClutAddress, CopyArgs, Sampler, Scaling, TexEnvConfig, TexGenConfig, Texture,
-    TextureId, Viewport, oneshot,
+    TextureId, Viewport, XfbPart, oneshot,
 };
 use lazuli::system::gx::color::{Rgba, Rgba8};
 use lazuli::system::gx::pix::{
@@ -23,6 +23,7 @@ use lazuli::system::gx::{
     CullingMode, DEPTH_24_BIT_MAX, EFB_HEIGHT, EFB_WIDTH, MatrixId, Topology, Vertex, VertexStream,
     tev, tex,
 };
+use lazuli::system::vi::Dimensions;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use schnellru::{ByLength, LruMap};
 use seq_macro::seq;
@@ -31,12 +32,11 @@ use zerocopy::{FromBytes, IntoBytes};
 use crate::alloc::Allocator;
 use crate::blit::{ColorBlitter, DepthBlitter};
 use crate::clear::Cleaner;
-use crate::render::framebuffer::Framebuffer;
 use crate::render::pipeline::TexGenStageSettings;
 use crate::render::texture::TextureSettings;
 
 pub struct Shared {
-    pub xfb: Mutex<wgpu::TextureView>,
+    pub output: Mutex<wgpu::TextureView>,
     pub rendered_anything: AtomicBool,
 }
 
@@ -78,7 +78,8 @@ pub struct Renderer {
 
     // components
     pipeline_settings: pipeline::Settings,
-    framebuffer: Framebuffer,
+    embedded_fb: framebuffer::Embedded,
+    external_fb: framebuffer::External,
     allocators: Allocators,
     tex_slots: [TexSlotSettings; 8],
     cleaner: Cleaner,
@@ -126,7 +127,9 @@ fn set_channel(channel: &mut data::Channel, control: ChannelControl) {
 
 impl Renderer {
     pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> (Self, Arc<Shared>) {
-        let framebuffer = Framebuffer::new(&device);
+        let embedded_fb = framebuffer::Embedded::new(&device);
+        let external_fb = framebuffer::External::new(&device);
+
         let allocators = Allocators {
             index: Allocator::new(&device, wgpu::BufferUsages::INDEX),
             storage: Allocator::new(&device, wgpu::BufferUsages::STORAGE),
@@ -136,13 +139,12 @@ impl Renderer {
         let texture_cache = texture::Cache::default();
         let sampler_cache = sampler::Cache::default();
 
-        let color = framebuffer.color();
-        let multisampled_color = framebuffer.multisampled_color();
-        let depth = framebuffer.depth();
-        let external = framebuffer.external();
+        let color = embedded_fb.color();
+        let multisampled_color = embedded_fb.multisampled_color();
+        let depth = embedded_fb.depth();
 
         let shared = Arc::new(Shared {
-            xfb: Mutex::new(external.clone()),
+            output: Mutex::new(external_fb.framebuffer().clone()),
             rendered_anything: AtomicBool::new(false),
         });
 
@@ -201,7 +203,8 @@ impl Renderer {
             current_pass: pass,
 
             pipeline_settings: Default::default(),
-            framebuffer,
+            embedded_fb,
+            external_fb,
             allocators,
             tex_slots: Default::default(),
             cleaner,
@@ -238,6 +241,7 @@ impl Renderer {
 
     pub fn exec(&mut self, action: Action) {
         match action {
+            Action::SetXfbDimensions(dims) => self.set_xfb_dimensions(dims),
             Action::SetFramebufferFormat(fmt) => self.set_framebuffer_format(fmt),
             Action::SetViewport(viewport) => self.set_viewport(viewport),
             Action::SetScissor(scissor) => self.set_scissor(scissor),
@@ -275,9 +279,10 @@ impl Renderer {
             Action::SetColorChannel(idx, control) => self.set_color_channel(idx, control),
             Action::SetAlphaChannel(idx, control) => self.set_alpha_channel(idx, control),
             Action::SetLight(idx, light) => self.set_light(idx, light),
-            Action::ColorCopy { args, response } => self.color_copy(args, response),
-            Action::DepthCopy { args, response } => self.depth_copy(args, response),
-            Action::XfbCopy { args } => self.xfb_copy(args),
+            Action::CopyColor { args, response } => self.copy_color(args, response),
+            Action::CopyDepth { args, response } => self.copy_depth(args, response),
+            Action::CopyXfb { args, id } => self.copy_xfb(args, id),
+            Action::PresentXfb(parts) => self.present_xfb(parts),
         }
 
         self.actions += 1;
@@ -319,6 +324,20 @@ impl Renderer {
         self.vertices.push(vertex);
 
         idx as u32
+    }
+
+    pub fn set_xfb_dimensions(&mut self, dims: Dimensions) {
+        self.external_fb.resize(
+            &self.device,
+            wgpu::Extent3d {
+                width: dims.width as u32,
+                height: dims.height as u32,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        let mut output = self.shared.output.lock().unwrap();
+        *output = self.external_fb.framebuffer().clone();
     }
 
     pub fn set_framebuffer_format(&mut self, format: pix::BufferFormat) {
@@ -845,12 +864,12 @@ impl Renderer {
     }
 
     // Finishes the current render pass and starts the next one.
-    pub fn next_pass(&mut self, copy_to_xfb: bool) {
+    pub fn next_pass(&mut self) {
         self.flush(format_args!("finishing pass"));
 
-        let color = self.framebuffer.color();
-        let depth = self.framebuffer.depth();
-        let multisampled_color = self.framebuffer.multisampled_color();
+        let color = self.embedded_fb.color();
+        let depth = self.embedded_fb.depth();
+        let multisampled_color = self.embedded_fb.multisampled_color();
 
         let transfer_encoder = self.device.create_command_encoder(&Default::default());
         let mut render_encoder = self.device.create_command_encoder(&Default::default());
@@ -881,29 +900,11 @@ impl Renderer {
 
         let prev_transfer_encoder =
             std::mem::replace(&mut self.current_transfer_encoder, transfer_encoder);
-        let mut prev_render_encoder =
+        let prev_render_encoder =
             std::mem::replace(&mut self.current_render_encoder, render_encoder);
-        let previous_pass = std::mem::replace(&mut self.current_pass, pass);
 
+        let previous_pass = std::mem::replace(&mut self.current_pass, pass);
         std::mem::drop(previous_pass);
-        if copy_to_xfb {
-            let external = self.framebuffer.external();
-            prev_render_encoder.copy_texture_to_texture(
-                wgpu::TexelCopyTextureInfoBase {
-                    texture: color.texture(),
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                wgpu::TexelCopyTextureInfoBase {
-                    texture: external.texture(),
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                external.texture().size(),
-            );
-        }
 
         let transfer_cmds = prev_transfer_encoder.finish();
         let render_cmds = prev_render_encoder.finish();
@@ -925,7 +926,7 @@ impl Renderer {
         height: u16,
         half: bool,
     ) -> Vec<Rgba8> {
-        let color = self.framebuffer.color();
+        let color = self.embedded_fb.color();
 
         let divisor = if half { 2 } else { 1 };
         let target_width = width as u32 / divisor;
@@ -1045,7 +1046,7 @@ impl Renderer {
         height: u16,
         half: bool,
     ) -> Vec<u32> {
-        let depth = self.framebuffer.depth();
+        let depth = self.embedded_fb.depth();
 
         let divisor = if half { 2 } else { 1 };
         let target_width = width as u32 / divisor;
@@ -1178,7 +1179,7 @@ impl Renderer {
             .clear_target(color, depth, &mut self.current_pass);
     }
 
-    pub fn color_copy(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<Rgba8>>) {
+    pub fn copy_color(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<Rgba8>>) {
         let CopyArgs {
             src,
             dims,
@@ -1195,7 +1196,7 @@ impl Renderer {
             half
         ));
 
-        self.next_pass(false);
+        self.next_pass();
         let data = self.get_color_data(
             src.x().value(),
             src.y().value(),
@@ -1215,7 +1216,7 @@ impl Renderer {
         }
     }
 
-    pub fn depth_copy(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<u32>>) {
+    pub fn copy_depth(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<u32>>) {
         let CopyArgs {
             src,
             dims,
@@ -1232,7 +1233,7 @@ impl Renderer {
             half
         ));
 
-        self.next_pass(false);
+        self.next_pass();
         let data = self.get_depth_data(
             src.x().value(),
             src.y().value(),
@@ -1252,24 +1253,72 @@ impl Renderer {
         }
     }
 
-    pub fn xfb_copy(&mut self, args: CopyArgs) {
+    pub fn copy_xfb(&mut self, args: CopyArgs, id: u32) {
         let CopyArgs {
             src,
             dims,
-            half: _,
+            half,
             clear,
         } = args;
 
+        assert!(!half);
+
         self.debug("XFB copy requested");
-        self.next_pass(true);
+        self.next_pass();
+
+        let x = src.x().value() as u32;
+        let y = src.y().value() as u32;
+        let width = dims.width() as u32;
+        let height = dims.height() as u32;
+
+        let size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+
+        let color = self.embedded_fb.color();
+        let target = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("xfb copy texture"),
+            dimension: wgpu::TextureDimension::D2,
+            size,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            mip_level_count: 1,
+            sample_count: 1,
+        });
+        let target = target.create_view(&Default::default());
+
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: color.texture(),
+                mip_level: 0,
+                origin: wgpu::Origin3d { x, y, z: 0 },
+                aspect: wgpu::TextureAspect::default(),
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture: target.texture(),
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::default(),
+            },
+            size,
+        );
+
+        let cmd = encoder.finish();
+        self.queue.submit([cmd]);
+
+        self.external_fb.save_copy(id, target);
 
         if clear {
-            self.clear(
-                src.x().value() as u32,
-                src.y().value() as u32,
-                dims.width() as u32,
-                dims.height() as u32,
-            );
+            self.clear(x, y, width, height);
         }
+    }
+
+    pub fn present_xfb(&mut self, parts: Vec<XfbPart>) {
+        let cmd = self.external_fb.build(&self.device, parts);
+        self.queue.submit([cmd]);
     }
 }

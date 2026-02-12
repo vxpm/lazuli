@@ -533,6 +533,12 @@ impl MatrixSet {
     }
 }
 
+#[derive(Debug)]
+pub struct XfbCopy {
+    pub addr: Address,
+    pub args: render::CopyArgs,
+}
+
 pub struct Gpu {
     pub mode: GenMode,
     pub cmd: cmd::Interface,
@@ -541,8 +547,8 @@ pub struct Gpu {
     pub tex: tex::Interface,
     pub pix: pix::Interface,
     pub write_mask: u32,
+    pub xfb_copies: Vec<XfbCopy>,
     matrix_set: Box<MatrixSet>,
-    xfb_copies: Vec<(Address, render::CopyArgs)>,
 }
 
 impl Default for Gpu {
@@ -1112,17 +1118,15 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     let stride = sys.gpu.pix.copy_stride;
 
     if cmd.to_xfb() {
-        // dbg!(
-        //     dst,
-        //     sys.video.top_xfb_address(),
-        //     sys.video.bottom_xfb_address()
-        // );
+        let id = sys.gpu.xfb_copies.len() as u32;
+        sys.gpu.xfb_copies.push(XfbCopy { addr: dst, args });
 
-        sys.gpu.xfb_copies.push((dst, args));
-        sys.modules.render.exec(render::Action::XfbCopy { args });
+        sys.modules
+            .render
+            .exec(render::Action::CopyXfb { args, id });
     } else if sys.gpu.pix.control.format().is_depth() {
         let (sender, receiver) = oneshot::channel();
-        sys.modules.render.exec(render::Action::DepthCopy {
+        sys.modules.render.exec(render::Action::CopyDepth {
             args,
             response: sender,
         });
@@ -1136,7 +1140,7 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
         tex::encode_depth_texture(pixels, cmd.depth_format(), stride, width, height, output);
     } else {
         let (sender, receiver) = oneshot::channel();
-        sys.modules.render.exec(render::Action::ColorCopy {
+        sys.modules.render.exec(render::Action::CopyColor {
             args,
             response: sender,
         });
@@ -1149,34 +1153,4 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
     }
-}
-
-pub fn present(sys: &mut System) {
-    if sys.gpu.xfb_copies.is_empty() {
-        return;
-    }
-
-    let base = sys.gpu.xfb_copies.iter().min_by_key(|x| x.0).unwrap();
-
-    println!("======================================================== FLUSH START");
-    dbg!(sys.video.frame_dimensions());
-    dbg!(base.0);
-
-    // compute x and y from base
-    let frame_dimensions = sys.video.frame_dimensions();
-    let stride_in_pixels = sys.video.xfb_stride() as u32;
-    for copy in sys.gpu.xfb_copies.iter() {
-        let delta_pixels = (copy.0.value() - base.0.value()) / 2;
-        let offset_x = delta_pixels % stride_in_pixels;
-        let offset_y = delta_pixels / stride_in_pixels;
-
-        if offset_x >= frame_dimensions.width as u32 || offset_y >= frame_dimensions.height as u32 {
-            continue;
-        }
-
-        dbg!(offset_x, offset_y, copy);
-    }
-    println!("======================================================== FLUSH END");
-
-    sys.gpu.xfb_copies.clear();
 }

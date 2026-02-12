@@ -11,6 +11,7 @@ use crate::system::gx::pix::{
 };
 use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
+use crate::system::vi::Dimensions;
 
 #[rustfmt::skip]
 pub use oneshot;
@@ -143,7 +144,14 @@ pub struct CopyArgs {
     pub clear: bool,
 }
 
+pub struct XfbPart {
+    pub id: u32,
+    pub offset_x: u32,
+    pub offset_y: u32,
+}
+
 pub enum Action {
+    SetXfbDimensions(Dimensions),
     SetFramebufferFormat(BufferFormat),
     SetViewport(Viewport),
     SetScissor(Scissor),
@@ -179,17 +187,19 @@ pub enum Action {
         clut_fmt: tex::ClutFormat,
     },
     Draw(Topology, VertexStream),
-    ColorCopy {
+    CopyColor {
         args: CopyArgs,
         response: Sender<Vec<Rgba8>>,
     },
-    DepthCopy {
+    CopyDepth {
         args: CopyArgs,
         response: Sender<Vec<u32>>,
     },
-    XfbCopy {
+    CopyXfb {
         args: CopyArgs,
+        id: u32,
     },
+    PresentXfb(Vec<XfbPart>),
 }
 
 const_assert!(size_of::<Action>() <= 64);

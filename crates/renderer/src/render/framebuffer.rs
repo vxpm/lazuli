@@ -1,19 +1,19 @@
-//! Framebuffer (EFB color, EFB depth, XFB).
+//! Framebuffers (EFB and XFB).
 
+use lazuli::modules::render::XfbPart;
 use lazuli::system::gx::{EFB_HEIGHT, EFB_WIDTH};
+use rustc_hash::FxHashMap;
 
-pub struct Framebuffer {
+pub struct Embedded {
     /// Color component of the EFB.
     color: wgpu::TextureView,
     /// Multisampled color component of the EFB.
     multisampled_color: wgpu::TextureView,
     /// Depth component of the EFB.
     depth: wgpu::TextureView,
-    /// Represents the external framebuffer.
-    external: wgpu::TextureView,
 }
 
-impl Framebuffer {
+impl Embedded {
     pub fn new(device: &wgpu::Device) -> Self {
         let size = wgpu::Extent3d {
             width: EFB_WIDTH as u32,
@@ -60,32 +60,15 @@ impl Framebuffer {
             sample_count: 4,
         });
 
-        let external = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("xfb"),
-            dimension: wgpu::TextureDimension::D2,
-            size,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-            mip_level_count: 1,
-            sample_count: 1,
-        });
-
         let color = color.create_view(&Default::default());
         let multisampled_color = multisampled_color.create_view(&Default::default());
         let depth = depth.create_view(&Default::default());
-        let external = external.create_view(&Default::default());
 
         Self {
             color,
             multisampled_color,
             depth,
-            external,
         }
-    }
-
-    pub fn external(&self) -> &wgpu::TextureView {
-        &self.external
     }
 
     pub fn color(&self) -> &wgpu::TextureView {
@@ -98,5 +81,97 @@ impl Framebuffer {
 
     pub fn depth(&self) -> &wgpu::TextureView {
         &self.depth
+    }
+}
+
+pub struct External {
+    framebuffer: wgpu::TextureView,
+    saved_copies: FxHashMap<u32, wgpu::TextureView>,
+}
+
+impl External {
+    fn create_framebuffer(device: &wgpu::Device, size: wgpu::Extent3d) -> wgpu::TextureView {
+        device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("external framebuffer"),
+                dimension: wgpu::TextureDimension::D2,
+                size,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+                mip_level_count: 1,
+                sample_count: 1,
+            })
+            .create_view(&Default::default())
+    }
+
+    pub fn new(device: &wgpu::Device) -> Self {
+        let framebuffer = Self::create_framebuffer(
+            device,
+            wgpu::Extent3d {
+                width: 640,
+                height: 480,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        Self {
+            framebuffer,
+            saved_copies: Default::default(),
+        }
+    }
+
+    pub fn framebuffer(&self) -> &wgpu::TextureView {
+        &self.framebuffer
+    }
+
+    pub fn resize(&mut self, device: &wgpu::Device, size: wgpu::Extent3d) {
+        self.framebuffer = Self::create_framebuffer(device, size);
+    }
+
+    pub fn save_copy(&mut self, id: u32, tex: wgpu::TextureView) {
+        self.saved_copies.insert(id, tex);
+    }
+
+    pub fn build(&mut self, device: &wgpu::Device, parts: Vec<XfbPart>) -> wgpu::CommandBuffer {
+        let framebuffer = self.framebuffer.texture();
+
+        let mut encoder = device.create_command_encoder(&Default::default());
+        encoder.clear_texture(
+            framebuffer,
+            &wgpu::ImageSubresourceRange {
+                aspect: wgpu::TextureAspect::default(),
+                base_mip_level: 0,
+                mip_level_count: None,
+                base_array_layer: 0,
+                array_layer_count: None,
+            },
+        );
+
+        for part in parts {
+            let saved = self.saved_copies.get(&part.id).unwrap();
+            encoder.copy_texture_to_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: saved.texture(),
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::default(),
+                },
+                wgpu::TexelCopyTextureInfo {
+                    texture: framebuffer,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d {
+                        x: part.offset_x,
+                        y: part.offset_y,
+                        z: 0,
+                    },
+                    aspect: wgpu::TextureAspect::default(),
+                },
+                saved.texture().size(),
+            );
+        }
+
+        self.saved_copies.clear();
+        encoder.finish()
     }
 }

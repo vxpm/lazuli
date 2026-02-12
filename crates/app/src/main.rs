@@ -424,6 +424,7 @@ fn main() -> Result<()> {
         required_features |= wgpu::Features::DUAL_SOURCE_BLENDING;
         required_features |= wgpu::Features::FLOAT32_FILTERABLE;
         required_features |= wgpu::Features::PUSH_CONSTANTS;
+        required_features |= wgpu::Features::CLEAR_TEXTURE;
 
         if matches!(
             info.device_type,

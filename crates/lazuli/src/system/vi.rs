@@ -3,7 +3,8 @@ use bitos::bitos;
 use bitos::integer::{u4, u7, u9, u10, u24};
 use gekko::{Address, FREQUENCY};
 
-use crate::system::{System, gx, pi, si};
+use crate::modules::render;
+use crate::system::{System, pi, si};
 
 #[bitos(16)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -411,7 +412,7 @@ pub fn vertical_count(sys: &mut System) {
         && sys.video.vertical_count as u32 == sys.video.lines_per_frame() / 2 + 1;
 
     if start_of_top_field || start_of_bottom_field {
-        gx::present(sys);
+        self::present(sys);
     }
 
     sys.video.vertical_count += 1;
@@ -451,4 +452,34 @@ pub fn update(sys: &mut System) {
     if sys.video.display_config.enable() {
         sys.scheduler.schedule_now(self::vertical_count);
     }
+}
+
+pub fn present(sys: &mut System) {
+    if sys.gpu.xfb_copies.is_empty() {
+        return;
+    }
+
+    let frame_dimensions = sys.video.frame_dimensions();
+    let stride_in_pixels = sys.video.xfb_stride() as u32;
+    let base_copy = sys.gpu.xfb_copies.iter().min_by_key(|x| x.addr).unwrap();
+
+    let mut parts = vec![];
+    for (id, copy) in sys.gpu.xfb_copies.iter().enumerate() {
+        let delta_pixels = (copy.addr.value() - base_copy.addr.value()) / 2;
+        let offset_x = delta_pixels % stride_in_pixels;
+        let offset_y = delta_pixels / stride_in_pixels;
+
+        if offset_x >= frame_dimensions.width as u32 || offset_y >= frame_dimensions.height as u32 {
+            continue;
+        }
+
+        parts.push(render::XfbPart {
+            id: id as u32,
+            offset_x,
+            offset_y,
+        });
+    }
+
+    sys.modules.render.exec(render::Action::PresentXfb(parts));
+    sys.gpu.xfb_copies.clear();
 }
