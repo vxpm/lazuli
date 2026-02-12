@@ -326,7 +326,7 @@ impl Renderer {
         idx as u32
     }
 
-    pub fn set_xfb_dimensions(&mut self, dims: Dimensions) {
+    fn set_xfb_dimensions(&mut self, dims: Dimensions) {
         if dims == self.external_fb.dimensions() {
             return;
         }
@@ -344,7 +344,7 @@ impl Renderer {
         *output = self.external_fb.framebuffer().clone();
     }
 
-    pub fn set_framebuffer_format(&mut self, format: pix::BufferFormat) {
+    fn set_framebuffer_format(&mut self, format: pix::BufferFormat) {
         self.flush(format_args!("framebuffer format changed to {format:?}"));
 
         match format {
@@ -356,7 +356,7 @@ impl Renderer {
         }
     }
 
-    pub fn apply_scissor_and_viewport(&mut self) {
+    fn apply_scissor_and_viewport(&mut self) {
         let (scissor_x, scissor_y) = self.scissor.top_left();
         let (scissor_width, scissor_height) = self.scissor.dimensions();
         let (scissor_offset_x, scissor_offset_y) = self.scissor.offset();
@@ -389,33 +389,33 @@ impl Renderer {
         );
     }
 
-    pub fn set_viewport(&mut self, viewport: Viewport) {
+    fn set_viewport(&mut self, viewport: Viewport) {
         if self.viewport != viewport {
             self.flush(format_args!("changed viewport to {viewport:?}"));
             self.viewport = viewport;
         }
     }
 
-    pub fn set_scissor(&mut self, scissor: Scissor) {
+    fn set_scissor(&mut self, scissor: Scissor) {
         if self.scissor != scissor {
             self.flush(format_args!("changed scissor to {scissor:?}"));
             self.scissor = scissor;
         }
     }
 
-    pub fn set_culling_mode(&mut self, mode: CullingMode) {
+    fn set_culling_mode(&mut self, mode: CullingMode) {
         if self.pipeline_settings.culling != mode {
             self.flush(format_args!("changed culling mode to {mode:?}"));
             self.pipeline_settings.culling = mode;
         }
     }
 
-    pub fn set_clear_color(&mut self, rgba: Rgba) {
+    fn set_clear_color(&mut self, rgba: Rgba) {
         self.debug(format!("set clear color to {rgba:?}"));
         self.clear_color = rgba;
     }
 
-    pub fn set_blend_mode(&mut self, mode: BlendMode) {
+    fn set_blend_mode(&mut self, mode: BlendMode) {
         let src = match mode.src_factor() {
             SrcBlendFactor::Zero => wgpu::BlendFactor::Zero,
             SrcBlendFactor::One => wgpu::BlendFactor::One,
@@ -459,7 +459,7 @@ impl Renderer {
         }
     }
 
-    pub fn set_depth_mode(&mut self, mode: DepthMode) {
+    fn set_depth_mode(&mut self, mode: DepthMode) {
         let compare = match mode.compare() {
             CompareMode::Never => wgpu::CompareFunction::Never,
             CompareMode::Less => wgpu::CompareFunction::Less,
@@ -483,7 +483,7 @@ impl Renderer {
         }
     }
 
-    pub fn set_alpha_function(&mut self, func: tev::alpha::Function) {
+    fn set_alpha_function(&mut self, func: tev::alpha::Function) {
         let settings = pipeline::AlphaFuncSettings {
             comparison: func.comparison(),
             logic: func.logic(),
@@ -498,7 +498,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_constant_alpha_mode(&mut self, mode: ConstantAlpha) {
+    fn set_constant_alpha_mode(&mut self, mode: ConstantAlpha) {
         self.debug(format!("set constant alpha mode to {mode:?}"));
         self.current_config.constant_alpha = if mode.enabled() {
             mode.value() as u32
@@ -508,17 +508,17 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_ambient(&mut self, idx: u8, color: Rgba) {
+    fn set_ambient(&mut self, idx: u8, color: Rgba) {
         self.current_config.ambient[idx as usize] = color;
         self.current_config_dirty = true;
     }
 
-    pub fn set_material(&mut self, idx: u8, color: Rgba) {
+    fn set_material(&mut self, idx: u8, color: Rgba) {
         self.current_config.material[idx as usize] = color;
         self.current_config_dirty = true;
     }
 
-    pub fn set_color_channel(&mut self, idx: u8, control: ChannelControl) {
+    fn set_color_channel(&mut self, idx: u8, control: ChannelControl) {
         set_channel(
             &mut self.current_config.color_channels[idx as usize],
             control,
@@ -526,7 +526,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_alpha_channel(&mut self, idx: u8, control: ChannelControl) {
+    fn set_alpha_channel(&mut self, idx: u8, control: ChannelControl) {
         set_channel(
             &mut self.current_config.alpha_channels[idx as usize],
             control,
@@ -534,7 +534,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_light(&mut self, idx: u8, light: Light) {
+    fn set_light(&mut self, idx: u8, light: Light) {
         let data = &mut self.current_config.lights[idx as usize];
         data.color = light.color.into();
         data.cos_attenuation = light.cos_attenuation;
@@ -544,12 +544,12 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_projection_mat(&mut self, mat: Mat4) {
+    fn set_projection_mat(&mut self, mat: Mat4) {
         self.current_config.projection_mat = mat;
         self.current_config_dirty = true;
     }
 
-    pub fn set_texenv_config(&mut self, config: TexEnvConfig) {
+    fn set_texenv_config(&mut self, config: TexEnvConfig) {
         self.flush(format_args!("texenv changed"));
         self.pipeline_settings
             .shader
@@ -561,7 +561,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_texgen_config(&mut self, config: TexGenConfig) {
+    fn set_texgen_config(&mut self, config: TexGenConfig) {
         self.flush(format_args!("texgen changed"));
         self.pipeline_settings.shader.texgen.stages = config
             .stages
@@ -584,18 +584,18 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn load_texture(&mut self, id: TextureId, texture: Texture) {
+    fn load_texture(&mut self, id: TextureId, texture: Texture) {
         if self.texture_cache.update_raw(id, texture) {
             // HACK: avoid keeping old textures alive with a dependent bind group
             self.textures_group_cache.clear();
         }
     }
 
-    pub fn load_clut(&mut self, id: ClutAddress, clut: ClutData) {
+    fn load_clut(&mut self, id: ClutAddress, clut: ClutData) {
         self.texture_cache.update_clut(id, clut);
     }
 
-    pub fn set_texture_slot(
+    fn set_texture_slot(
         &mut self,
         slot: usize,
         raw_id: TextureId,
@@ -644,7 +644,7 @@ impl Renderer {
         indices
     }
 
-    pub fn draw_quad_list(&mut self, stream: &VertexStream) {
+    fn draw_quad_list(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -661,7 +661,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_triangle_list(&mut self, stream: &VertexStream) {
+    fn draw_triangle_list(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -677,7 +677,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_triangle_strip(&mut self, stream: &VertexStream) {
+    fn draw_triangle_strip(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -706,7 +706,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_triangle_fan(&mut self, stream: &VertexStream) {
+    fn draw_triangle_fan(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -796,7 +796,7 @@ impl Renderer {
             .clone()
     }
 
-    pub fn flush(&mut self, reason: std::fmt::Arguments) {
+    fn flush(&mut self, reason: std::fmt::Arguments) {
         if self.vertices.is_empty() {
             return;
         }
@@ -875,7 +875,7 @@ impl Renderer {
     }
 
     // Finishes the current render pass and starts the next one.
-    pub fn next_pass(&mut self) {
+    fn submit(&mut self) {
         self.flush(format_args!("finishing pass"));
 
         let color = self.embedded_fb.color();
@@ -929,7 +929,7 @@ impl Renderer {
         self.shared.rendered_anything.store(true, Ordering::Relaxed);
     }
 
-    pub fn get_color_data(
+    fn get_color_data(
         &mut self,
         x: u16,
         y: u16,
@@ -1049,14 +1049,7 @@ impl Renderer {
         pixels
     }
 
-    pub fn get_depth_data(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-    ) -> Vec<u32> {
+    fn get_depth_data(&mut self, x: u16, y: u16, width: u16, height: u16, half: bool) -> Vec<u32> {
         let depth = self.embedded_fb.depth();
 
         let divisor = if half { 2 } else { 1 };
@@ -1171,7 +1164,7 @@ impl Renderer {
         depth
     }
 
-    pub fn clear(&mut self, x: u32, y: u32, width: u32, height: u32) {
+    fn clear(&mut self, x: u32, y: u32, width: u32, height: u32) {
         let color = self
             .pipeline_settings
             .blend
@@ -1219,7 +1212,7 @@ impl Renderer {
         });
         let view = texture.create_view(&Default::default());
 
-        self.next_pass();
+        self.submit();
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
@@ -1248,12 +1241,7 @@ impl Renderer {
         view
     }
 
-    pub fn copy_color(
-        &mut self,
-        args: CopyArgs,
-        response: Option<Sender<ColorData>>,
-        id: TextureId,
-    ) {
+    fn copy_color(&mut self, args: CopyArgs, response: Option<Sender<ColorData>>, id: TextureId) {
         let CopyArgs {
             src,
             dims,
@@ -1301,12 +1289,7 @@ impl Renderer {
         }
     }
 
-    pub fn copy_depth(
-        &mut self,
-        args: CopyArgs,
-        response: Option<Sender<DepthData>>,
-        id: TextureId,
-    ) {
+    fn copy_depth(&mut self, args: CopyArgs, response: Option<Sender<DepthData>>, id: TextureId) {
         let CopyArgs {
             src,
             dims,
@@ -1323,7 +1306,7 @@ impl Renderer {
             half
         ));
 
-        self.next_pass();
+        self.submit();
         if let Some(response) = response {
             let data = self.get_depth_data(
                 src.x().value(),
@@ -1345,7 +1328,7 @@ impl Renderer {
         }
     }
 
-    pub fn copy_xfb(&mut self, args: CopyArgs, id: u32) {
+    fn copy_xfb(&mut self, args: CopyArgs, id: u32) {
         let CopyArgs {
             src,
             dims,
@@ -1356,7 +1339,7 @@ impl Renderer {
         assert!(!half);
 
         self.debug("XFB copy requested");
-        self.next_pass();
+        self.submit();
 
         let x = src.x().value() as u32;
         let y = src.y().value() as u32;
@@ -1393,10 +1376,10 @@ impl Renderer {
         }
     }
 
-    pub fn present_xfb(&mut self, parts: Vec<XfbPart>) {
+    fn present_xfb(&mut self, parts: Vec<XfbPart>) {
         self.external_fb
             .build(&mut self.current_transfer_encoder, parts);
 
-        self.next_pass();
+        self.submit();
     }
 }
