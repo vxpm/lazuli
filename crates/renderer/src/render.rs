@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use glam::{Mat4, Vec2};
 use lazuli::modules::render::oneshot::Sender;
 use lazuli::modules::render::{
-    Action, Clut, ClutAddress, ColorData, CopyArgs, DepthData, Sampler, Scaling, TexEnvConfig,
-    TexGenConfig, Texture, TextureId, Viewport, XfbPart, oneshot,
+    Action, ClutAddress, ClutData, ClutId, ColorData, CopyArgs, DepthData, Sampler, Scaling,
+    TexEnvConfig, TexGenConfig, Texture, TextureId, Viewport, XfbPart, oneshot,
 };
 use lazuli::system::gx::color::{Rgba, Rgba8};
 use lazuli::system::gx::pix::{
@@ -22,7 +22,7 @@ use lazuli::system::gx::pix::{
 use lazuli::system::gx::xform::{ChannelControl, Light};
 use lazuli::system::gx::{
     CullingMode, DEPTH_24_BIT_MAX, EFB_HEIGHT, EFB_WIDTH, MatrixId, Topology, Vertex, VertexStream,
-    tev, tex,
+    tev,
 };
 use lazuli::system::vi::Dimensions;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -261,11 +261,10 @@ impl Renderer {
             Action::SetTextureSlot {
                 slot,
                 texture_id,
+                clut_id,
                 sampler,
                 scaling,
-                clut_addr,
-                clut_fmt,
-            } => self.set_texture_slot(slot, texture_id, sampler, scaling, clut_addr, clut_fmt),
+            } => self.set_texture_slot(slot, texture_id, clut_id, sampler, scaling),
             Action::Draw(topology, vertices) => match topology {
                 Topology::QuadList => self.draw_quad_list(&vertices),
                 Topology::TriangleList => self.draw_triangle_list(&vertices),
@@ -592,7 +591,7 @@ impl Renderer {
         }
     }
 
-    pub fn load_clut(&mut self, id: ClutAddress, clut: Clut) {
+    pub fn load_clut(&mut self, id: ClutAddress, clut: ClutData) {
         self.texture_cache.update_clut(id, clut);
     }
 
@@ -600,27 +599,27 @@ impl Renderer {
         &mut self,
         slot: usize,
         raw_id: TextureId,
+        clut_id: Option<ClutId>,
         sampler: Sampler,
         scaling: Scaling,
-        clut_addr: ClutAddress,
-        clut_fmt: tex::ClutFormat,
     ) {
-        let new = TexSlotSettings {
-            settings: TextureSettings {
-                raw_id,
-                clut_addr,
-                clut_fmt,
-            },
+        let tex_settings = match clut_id {
+            Some(clut_id) => TextureSettings::Indirect { raw_id, clut_id },
+            None => TextureSettings::Direct(raw_id),
+        };
+
+        let slot_settings = TexSlotSettings {
+            settings: tex_settings,
             sampler,
             scaling,
         };
 
-        if self.tex_slots[slot] == new {
+        if self.tex_slots[slot] == slot_settings {
             return;
         }
 
         self.flush(format_args!("texture slot changed"));
-        self.tex_slots[slot] = new;
+        self.tex_slots[slot] = slot_settings;
     }
 
     fn flush_config(&mut self) {
@@ -1191,6 +1190,64 @@ impl Renderer {
             .clear_target(color, depth, &mut self.current_pass);
     }
 
+    fn get_color_texture(
+        &mut self,
+        x: u16,
+        y: u16,
+        width: u16,
+        height: u16,
+        half: bool,
+    ) -> wgpu::TextureView {
+        let divisor = if half { 2 } else { 1 };
+        let target_width = width as u32 / divisor;
+        let target_height = height as u32 / divisor;
+        let size = wgpu::Extent3d {
+            width: target_width,
+            height: target_height,
+            depth_or_array_layers: 1,
+        };
+
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            dimension: wgpu::TextureDimension::D2,
+            size,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+            mip_level_count: 1,
+            sample_count: 1,
+        });
+        let view = texture.create_view(&Default::default());
+
+        self.next_pass();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        let color = self.embedded_fb.color();
+        self.color_blitter.blit_to_texture(
+            &self.device,
+            color,
+            wgpu::Origin3d {
+                x: x as u32,
+                y: y as u32,
+                z: 0,
+            },
+            wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            &view,
+            &mut encoder,
+        );
+
+        let cmd = encoder.finish();
+        self.queue.submit([cmd]);
+
+        view
+    }
+
     pub fn copy_color(
         &mut self,
         args: CopyArgs,
@@ -1213,7 +1270,15 @@ impl Renderer {
             half
         ));
 
-        self.next_pass();
+        let texture = self.get_color_texture(
+            src.x().value(),
+            src.y().value(),
+            dims.width(),
+            dims.height(),
+            half,
+        );
+        self.texture_cache
+            .insert(TextureSettings::Direct(id), texture);
 
         if let Some(response) = response {
             let data = self.get_color_data(

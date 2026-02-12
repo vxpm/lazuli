@@ -576,9 +576,19 @@ pub fn update_texture(sys: &mut System, index: usize) {
     let scale_u = map.scaling.u.scale().unwrap_or(width) as f32 / width as f32;
     let scale_v = map.scaling.v.scale().unwrap_or(height) as f32 / height as f32;
 
+    let clut_id = if !format.is_direct() {
+        Some(render::ClutId {
+            addr: clut_addr,
+            fmt: clut_fmt,
+        })
+    } else {
+        None
+    };
+
     sys.modules.render.exec(render::Action::SetTextureSlot {
         slot: index,
         texture_id,
+        clut_id,
         sampler: render::Sampler {
             mode: map.sampler,
             lods: map.lods.limits,
@@ -587,8 +597,6 @@ pub fn update_texture(sys: &mut System, index: usize) {
             u: scale_u,
             v: scale_v,
         },
-        clut_addr,
-        clut_fmt,
     });
 }
 
@@ -608,7 +616,7 @@ pub fn update_clut(sys: &mut System) {
 
         sys.modules.render.exec(render::Action::LoadClut {
             addr: clut_addr,
-            clut: render::Clut(clut),
+            clut: render::ClutData(clut),
         });
     }
 }

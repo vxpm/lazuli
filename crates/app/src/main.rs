@@ -151,6 +151,7 @@ impl App {
                 ipl_lle: cfg.ipl_lle,
                 ipl,
                 sideload: executable,
+                perform_efb_copies: false,
             },
         );
 

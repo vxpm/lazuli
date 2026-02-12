@@ -119,7 +119,7 @@ pub struct Scaling {
 }
 
 #[derive(Debug, Clone)]
-pub struct Clut(pub Vec<u16>);
+pub struct ClutData(pub Vec<u16>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TextureId(pub u32);
@@ -134,6 +134,12 @@ impl ClutAddress {
         // replicated 16 times, the CLUT length is 256 16-bit words
         self.0 as usize * 256
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ClutId {
+    pub addr: ClutAddress,
+    pub fmt: tex::ClutFormat,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,15 +186,14 @@ pub enum Action {
     },
     LoadClut {
         addr: ClutAddress,
-        clut: Clut,
+        clut: ClutData,
     },
     SetTextureSlot {
         slot: usize,
         texture_id: TextureId,
+        clut_id: Option<ClutId>,
         sampler: Sampler,
         scaling: Scaling,
-        clut_addr: ClutAddress,
-        clut_fmt: tex::ClutFormat,
     },
     Draw(Topology, VertexStream),
     CopyColor {

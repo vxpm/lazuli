@@ -1,15 +1,29 @@
 use std::collections::hash_map::Entry;
 
-use lazuli::modules::render::{Clut, ClutAddress, Texture, TextureId};
+use lazuli::modules::render::{ClutAddress, ClutData, ClutId, Texture, TextureId};
 use lazuli::system::gx::color::Rgba8;
 use lazuli::system::gx::tex::{ClutFormat, TextureData};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct TextureSettings {
-    pub raw_id: TextureId,
-    pub clut_addr: ClutAddress,
-    pub clut_fmt: ClutFormat,
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TextureSettings {
+    Direct(TextureId),
+    Indirect { raw_id: TextureId, clut_id: ClutId },
+}
+
+impl TextureSettings {
+    pub fn raw_id(self) -> TextureId {
+        match self {
+            Self::Direct(raw_id) => raw_id,
+            Self::Indirect { raw_id, .. } => raw_id,
+        }
+    }
+}
+
+impl Default for TextureSettings {
+    fn default() -> Self {
+        Self::Direct(Default::default())
+    }
 }
 
 struct WithDeps<T> {
@@ -67,7 +81,7 @@ impl Cache {
         tmem: &mut TmemHigh,
         settings: TextureSettings,
     ) -> wgpu::TextureView {
-        let raw = raws.get_mut(&settings.raw_id).unwrap();
+        let raw = raws.get_mut(&settings.raw_id()).unwrap();
         raw.deps.insert(settings);
 
         let owned_data;
@@ -77,12 +91,16 @@ impl Cache {
                 .map(|lod| zerocopy::transmute_ref!(lod.as_slice()))
                 .collect::<Vec<_>>(),
             TextureData::Indirect(data) => {
-                let clut_base = settings.clut_addr.to_tmem_addr();
+                let TextureSettings::Indirect { clut_id, .. } = settings else {
+                    panic!("UWAAAAAAA");
+                };
+
+                let clut_base = clut_id.addr.to_tmem_addr();
                 let clut = &tmem[clut_base..];
 
                 owned_data = data
                     .iter()
-                    .map(|lod| Self::create_texture_data_indirect(lod, clut, settings.clut_fmt))
+                    .map(|lod| Self::create_texture_data_indirect(lod, clut, clut_id.fmt))
                     .collect::<Vec<_>>();
 
                 owned_data
@@ -158,7 +176,7 @@ impl Cache {
         }
     }
 
-    pub fn update_clut(&mut self, addr: ClutAddress, clut: Clut) {
+    pub fn update_clut(&mut self, addr: ClutAddress, clut: ClutData) {
         let mut current = addr.to_tmem_addr();
 
         // each clut is replicated sequentially 16 times
@@ -183,5 +201,9 @@ impl Cache {
                 v.insert(texture)
             }
         }
+    }
+
+    pub fn insert(&mut self, settings: TextureSettings, texture: wgpu::TextureView) {
+        self.textures.insert(settings, texture);
     }
 }
