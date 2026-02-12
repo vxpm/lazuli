@@ -1151,9 +1151,32 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     }
 }
 
-pub fn flush_xfb(sys: &mut System, base: Address) {
-    println!("{}", base);
-    for copy in sys.gpu.xfb_copies.drain(..) {
-        println!("{:?}", copy);
+pub fn present(sys: &mut System) {
+    if sys.gpu.xfb_copies.is_empty() {
+        return;
     }
+
+    let base = sys.gpu.xfb_copies.iter().min_by_key(|x| x.0).unwrap();
+
+    println!("======================================================== FLUSH START");
+    dbg!(sys.video.frame_dimensions());
+    dbg!(base.0);
+
+    // compute x and y from base
+    let frame_dimensions = sys.video.frame_dimensions();
+    let stride_in_pixels = sys.video.xfb_stride() as u32;
+    for copy in sys.gpu.xfb_copies.iter() {
+        let delta_pixels = (copy.0.value() - base.0.value()) / 2;
+        let offset_x = delta_pixels % stride_in_pixels;
+        let offset_y = delta_pixels / stride_in_pixels;
+
+        if offset_x >= frame_dimensions.width as u32 || offset_y >= frame_dimensions.height as u32 {
+            continue;
+        }
+
+        dbg!(offset_x, offset_y, copy);
+    }
+    println!("======================================================== FLUSH END");
+
+    sys.gpu.xfb_copies.clear();
 }

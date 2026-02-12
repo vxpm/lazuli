@@ -307,6 +307,33 @@ impl Interface {
         }
     }
 
+    /// Dimensions of an external framebuffer.
+    pub fn xfb_dimensions(&self) -> Dimensions {
+        let width = self.xfb_width.width();
+        let height = self.vertical_timing.active_video_lines().value();
+
+        Dimensions { width, height }
+    }
+
+    /// Stride of the rows in an external framebuffer, in pixels.
+    pub fn xfb_stride(&self) -> u16 {
+        // YCbYCr format has 2 pixels every 4 bytes
+        self.xfb_width.stride() / 2
+    }
+
+    /// Dimensions of the entire frame, which may consist of either one or two extenral
+    /// framebuffers.
+    pub fn frame_dimensions(&self) -> Dimensions {
+        let xfb = self.xfb_dimensions();
+        match self.display_config.field_mode() {
+            FieldMode::Double => Dimensions {
+                width: xfb.width,
+                height: xfb.height * 2,
+            },
+            FieldMode::Single => xfb,
+        }
+    }
+
     /// Height of the video output.
     fn video_height(&self) -> u16 {
         let active_lines = self.vertical_timing.active_video_lines().value();
@@ -318,6 +345,7 @@ impl Interface {
         height_multiplier * active_lines
     }
 
+    /// Width of the video output.
     fn video_width(&self) -> u16 {
         self.horizontal_timing.halfline_width().value()
             + self.horizontal_timing.halfline_to_blank_start().value()
@@ -328,14 +356,6 @@ impl Interface {
     pub fn video_dimensions(&self) -> Dimensions {
         let width = self.video_width();
         let height = self.video_height();
-
-        Dimensions { width, height }
-    }
-
-    /// Dimensions of an external framebuffer.
-    pub fn xfb_dimensions(&self) -> Dimensions {
-        let width = self.xfb_width.width();
-        let height = self.vertical_timing.active_video_lines().value();
 
         Dimensions { width, height }
     }
@@ -387,14 +407,12 @@ pub fn update_display_interrupts(sys: &mut System) {
 pub fn vertical_count(sys: &mut System) {
     self::update_display_interrupts(sys);
 
-    if sys.video.vertical_count == 4 {
-        println!("flush top");
-        gx::flush_xfb(sys, sys.video.top_xfb_address());
-    } else if sys.video.display_config.field_mode() == FieldMode::Double
-        && sys.video.vertical_count as u32 == sys.video.lines_per_frame() / 2 + 4
-    {
-        println!("flush bottom");
-        gx::flush_xfb(sys, sys.video.top_xfb_address());
+    let start_of_top_field = sys.video.vertical_count == 1;
+    let start_of_bottom_field = sys.video.display_config.field_mode() == FieldMode::Double
+        && sys.video.vertical_count as u32 == sys.video.lines_per_frame() / 2 + 1;
+
+    if start_of_top_field || start_of_bottom_field {
+        gx::present(sys);
     }
 
     sys.video.vertical_count += 1;
