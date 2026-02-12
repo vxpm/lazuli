@@ -129,14 +129,15 @@ impl External {
         self.framebuffer = Self::create_framebuffer(device, size);
     }
 
-    pub fn save_copy(&mut self, id: u32, tex: wgpu::TextureView) {
+    /// Saves the given texture as the source for the copy with the given ID.
+    pub fn insert_copy(&mut self, id: u32, tex: wgpu::TextureView) {
         self.saved_copies.insert(id, tex);
     }
 
-    pub fn build(&mut self, device: &wgpu::Device, parts: Vec<XfbPart>) -> wgpu::CommandBuffer {
+    /// Builds the XFB texture from a list of parts describing where to put each copy. Copies must
+    /// have been previously added with `insert_copy` and are consumed by this method.
+    pub fn build(&mut self, encoder: &mut wgpu::CommandEncoder, parts: Vec<XfbPart>) {
         let framebuffer = self.framebuffer.texture();
-
-        let mut encoder = device.create_command_encoder(&Default::default());
         encoder.clear_texture(
             framebuffer,
             &wgpu::ImageSubresourceRange {
@@ -172,6 +173,5 @@ impl External {
         }
 
         self.saved_copies.clear();
-        encoder.finish()
     }
 }

@@ -1297,8 +1297,7 @@ impl Renderer {
         });
         let target = target.create_view(&Default::default());
 
-        let mut encoder = self.device.create_command_encoder(&Default::default());
-        encoder.copy_texture_to_texture(
+        self.current_transfer_encoder.copy_texture_to_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: color.texture(),
                 mip_level: 0,
@@ -1314,10 +1313,7 @@ impl Renderer {
             size,
         );
 
-        let cmd = encoder.finish();
-        self.queue.submit([cmd]);
-
-        self.external_fb.save_copy(id, target);
+        self.external_fb.insert_copy(id, target);
 
         if clear {
             self.clear(x, y, width, height);
@@ -1325,7 +1321,9 @@ impl Renderer {
     }
 
     pub fn present_xfb(&mut self, parts: Vec<XfbPart>) {
-        let cmd = self.external_fb.build(&self.device, parts);
-        self.queue.submit([cmd]);
+        self.external_fb
+            .build(&mut self.current_transfer_encoder, parts);
+
+        self.next_pass();
     }
 }
