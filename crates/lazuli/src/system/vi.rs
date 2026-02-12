@@ -463,11 +463,12 @@ pub fn present(sys: &mut System) {
     let stride_in_pixels = sys.video.xfb_stride() as u32;
     let base_copy = sys.gpu.xfb_copies.iter().min_by_key(|x| x.addr).unwrap();
 
-    let mut parts = vec![];
+    let mut parts = Vec::with_capacity(sys.gpu.xfb_copies.len());
     for (id, copy) in sys.gpu.xfb_copies.iter().enumerate() {
         let delta_pixels = (copy.addr.value() - base_copy.addr.value()) / 2;
         let offset_x = delta_pixels % stride_in_pixels;
         let offset_y = delta_pixels / stride_in_pixels;
+        dbg!(copy, offset_y);
 
         if offset_x >= frame_dimensions.width as u32 || offset_y >= frame_dimensions.height as u32 {
             continue;
