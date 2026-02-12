@@ -144,11 +144,15 @@ pub struct CopyArgs {
     pub clear: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct XfbPart {
     pub id: u32,
     pub offset_x: u32,
     pub offset_y: u32,
 }
+
+pub type ColorData = Vec<Rgba8>;
+pub type DepthData = Vec<u32>;
 
 pub enum Action {
     SetXfbDimensions(Dimensions),
@@ -189,11 +193,13 @@ pub enum Action {
     Draw(Topology, VertexStream),
     CopyColor {
         args: CopyArgs,
-        response: Sender<Vec<Rgba8>>,
+        response: Option<Sender<ColorData>>,
+        id: TextureId,
     },
     CopyDepth {
         args: CopyArgs,
-        response: Sender<Vec<u32>>,
+        response: Option<Sender<DepthData>>,
+        id: TextureId,
     },
     CopyXfb {
         args: CopyArgs,

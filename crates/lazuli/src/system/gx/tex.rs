@@ -349,7 +349,7 @@ impl std::fmt::Debug for Interface {
 }
 
 impl Interface {
-    pub fn is_tex_dirty(&mut self, addr: Address, data: &[u8]) -> bool {
+    pub fn insert_tex_hash(&mut self, addr: Address, data: &[u8]) -> bool {
         let new_hash = twox_hash::XxHash3_64::oneshot(data);
         let Some(old_hash) = self.tex_cache.get(&addr) else {
             self.tex_cache.insert(addr, new_hash);
@@ -560,7 +560,7 @@ pub fn update_texture(sys: &mut System, index: usize) {
     };
 
     let data = &sys.mem.ram()[base.value() as usize..][..len];
-    if sys.gpu.tex.is_tex_dirty(base, data) {
+    if sys.gpu.tex.insert_tex_hash(base, data) {
         let data = self::decode_mipmap(data, width, height, format, lods);
         sys.modules.render.exec(render::Action::LoadTexture {
             id: texture_id,

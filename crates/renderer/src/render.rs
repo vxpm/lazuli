@@ -10,9 +10,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use glam::{Mat4, Vec2};
+use lazuli::modules::render::oneshot::Sender;
 use lazuli::modules::render::{
-    Action, Clut, ClutAddress, CopyArgs, Sampler, Scaling, TexEnvConfig, TexGenConfig, Texture,
-    TextureId, Viewport, XfbPart, oneshot,
+    Action, Clut, ClutAddress, ColorData, CopyArgs, DepthData, Sampler, Scaling, TexEnvConfig,
+    TexGenConfig, Texture, TextureId, Viewport, XfbPart, oneshot,
 };
 use lazuli::system::gx::color::{Rgba, Rgba8};
 use lazuli::system::gx::pix::{
@@ -279,8 +280,8 @@ impl Renderer {
             Action::SetColorChannel(idx, control) => self.set_color_channel(idx, control),
             Action::SetAlphaChannel(idx, control) => self.set_alpha_channel(idx, control),
             Action::SetLight(idx, light) => self.set_light(idx, light),
-            Action::CopyColor { args, response } => self.copy_color(args, response),
-            Action::CopyDepth { args, response } => self.copy_depth(args, response),
+            Action::CopyColor { args, response, id } => self.copy_color(args, response, id),
+            Action::CopyDepth { args, response, id } => self.copy_depth(args, response, id),
             Action::CopyXfb { args, id } => self.copy_xfb(args, id),
             Action::PresentXfb(parts) => self.present_xfb(parts),
         }
@@ -1190,7 +1191,12 @@ impl Renderer {
             .clear_target(color, depth, &mut self.current_pass);
     }
 
-    pub fn copy_color(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<Rgba8>>) {
+    pub fn copy_color(
+        &mut self,
+        args: CopyArgs,
+        response: Option<Sender<ColorData>>,
+        id: TextureId,
+    ) {
         let CopyArgs {
             src,
             dims,
@@ -1208,14 +1214,17 @@ impl Renderer {
         ));
 
         self.next_pass();
-        let data = self.get_color_data(
-            src.x().value(),
-            src.y().value(),
-            dims.width(),
-            dims.height(),
-            half,
-        );
-        response.send(data).unwrap();
+
+        if let Some(response) = response {
+            let data = self.get_color_data(
+                src.x().value(),
+                src.y().value(),
+                dims.width(),
+                dims.height(),
+                half,
+            );
+            response.send(data).unwrap();
+        }
 
         if clear {
             self.clear(
@@ -1227,7 +1236,12 @@ impl Renderer {
         }
     }
 
-    pub fn copy_depth(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<u32>>) {
+    pub fn copy_depth(
+        &mut self,
+        args: CopyArgs,
+        response: Option<Sender<DepthData>>,
+        id: TextureId,
+    ) {
         let CopyArgs {
             src,
             dims,
@@ -1245,14 +1259,16 @@ impl Renderer {
         ));
 
         self.next_pass();
-        let data = self.get_depth_data(
-            src.x().value(),
-            src.y().value(),
-            dims.width(),
-            dims.height(),
-            half,
-        );
-        response.send(data).unwrap();
+        if let Some(response) = response {
+            let data = self.get_depth_data(
+                src.x().value(),
+                src.y().value(),
+                dims.width(),
+                dims.height(),
+                half,
+            );
+            response.send(data).unwrap();
+        }
 
         if clear {
             self.clear(
