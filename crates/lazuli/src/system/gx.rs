@@ -533,6 +533,12 @@ impl MatrixSet {
     }
 }
 
+#[derive(Debug)]
+pub struct XfbCopy {
+    pub addr: Address,
+    pub args: render::CopyArgs,
+}
+
 pub struct Gpu {
     pub mode: GenMode,
     pub cmd: cmd::Interface,
@@ -541,6 +547,7 @@ pub struct Gpu {
     pub tex: tex::Interface,
     pub pix: pix::Interface,
     pub write_mask: u32,
+    pub xfb_copies: Vec<XfbCopy>,
     matrix_set: Box<MatrixSet>,
 }
 
@@ -555,6 +562,7 @@ impl Default for Gpu {
             pix: Default::default(),
             write_mask: 0x00FF_FFFF,
             matrix_set: Box::default(),
+            xfb_copies: Vec::with_capacity(4),
         }
     }
 }
@@ -1096,27 +1104,37 @@ fn call(sys: &mut System, address: Address, length: u32) {
 }
 
 fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
+    let args = render::CopyArgs {
+        src: sys.gpu.pix.copy_src,
+        dims: sys.gpu.pix.copy_dims,
+        half: cmd.half(),
+        clear: cmd.clear(),
+    };
+
+    let divisor = if args.half { 2 } else { 1 };
+    let width = args.dims.width() as u32 / divisor;
+    let height = args.dims.height() as u32 / divisor;
+    let dst = sys.gpu.pix.copy_dst;
+    let stride = sys.gpu.pix.copy_stride;
+
     if cmd.to_xfb() {
-        let args = render::CopyArgs {
-            src: sys.gpu.pix.copy_src,
-            dims: sys.gpu.pix.copy_dims,
-            half: cmd.half(),
-            clear: cmd.clear(),
-        };
+        let id = sys.gpu.xfb_copies.len() as u32;
+        sys.gpu.xfb_copies.push(XfbCopy { addr: dst, args });
 
-        sys.modules.render.exec(render::Action::XfbCopy { args });
-    } else if sys.gpu.pix.control.format().is_depth() {
+        sys.modules
+            .render
+            .exec(render::Action::CopyXfb { args, id });
+
+        return;
+    }
+
+    let id = render::TextureId(dst.value());
+    if sys.gpu.pix.control.format().is_depth() {
         let (sender, receiver) = oneshot::channel();
-        let args = render::CopyArgs {
-            src: sys.gpu.pix.copy_src,
-            dims: sys.gpu.pix.copy_dims,
-            half: cmd.half(),
-            clear: cmd.clear(),
-        };
-
-        sys.modules.render.exec(render::Action::DepthCopy {
+        sys.modules.render.exec(render::Action::CopyDepth {
             args,
-            response: sender,
+            response: Some(sender),
+            id,
         });
 
         let Ok(pixels) = receiver.recv() else {
@@ -1124,38 +1142,35 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
             return;
         };
 
-        let divisor = if cmd.half() { 2 } else { 1 };
-        let width = args.dims.width() as u32 / divisor;
-        let height = args.dims.height() as u32 / divisor;
-        let dst = sys.gpu.pix.copy_dst;
-        let stride = sys.gpu.pix.copy_stride;
         let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
         tex::encode_depth_texture(pixels, cmd.depth_format(), stride, width, height, output);
     } else {
-        let (sender, receiver) = oneshot::channel();
-        let args = render::CopyArgs {
-            src: sys.gpu.pix.copy_src,
-            dims: sys.gpu.pix.copy_dims,
-            half: cmd.half(),
-            clear: cmd.clear(),
+        let (sender, receiver) = if sys.config.perform_efb_copies {
+            let (sender, receiver) = oneshot::channel();
+            (Some(sender), Some(receiver))
+        } else {
+            (None, None)
         };
 
-        sys.modules.render.exec(render::Action::ColorCopy {
+        sys.modules.render.exec(render::Action::CopyColor {
             args,
             response: sender,
+            id,
         });
 
-        let Ok(pixels) = receiver.recv() else {
-            tracing::error!("render module did not answer color copy (tex) request");
-            return;
-        };
+        if let Some(receiver) = receiver {
+            let Ok(pixels) = receiver.recv() else {
+                tracing::error!("render module did not answer color copy request");
+                return;
+            };
 
-        let divisor = if cmd.half() { 2 } else { 1 };
-        let width = args.dims.width() as u32 / divisor;
-        let height = args.dims.height() as u32 / divisor;
-        let dst = sys.gpu.pix.copy_dst;
-        let stride = sys.gpu.pix.copy_stride;
-        let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
-        tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
+            let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
+            tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
+        }
+
+        let len =
+            tex::Encoding::length_for(width, height, cmd.color_format().texture_format()) as usize;
+        let data = &sys.mem.ram()[dst.value() as usize..][..len];
+        sys.gpu.tex.update_tex_hash(dst, data);
     }
 }

@@ -151,6 +151,7 @@ impl App {
                 ipl_lle: cfg.ipl_lle,
                 ipl,
                 sideload: executable,
+                perform_efb_copies: false,
             },
         );
 
@@ -185,7 +186,7 @@ impl App {
             app.create_window(windows::disasm());
             app.create_window(windows::control());
             app.create_window(windows::call_stack());
-            app.create_window(windows::efb());
+            app.create_window(windows::display());
             app.organize = true;
         }
 
@@ -241,12 +242,8 @@ impl eframe::App for App {
                         self.create_window(windows::variables());
                     }
 
-                    if ui.button("XFB").clicked() {
-                        self.create_window(windows::xfb());
-                    }
-
-                    if ui.button("EFB").clicked() {
-                        self.create_window(windows::efb());
+                    if ui.button("Display").clicked() {
+                        self.create_window(windows::display());
                     }
 
                     if ui.button("Renderer").clicked() {
@@ -424,12 +421,14 @@ fn main() -> Result<()> {
         required_features |= wgpu::Features::DUAL_SOURCE_BLENDING;
         required_features |= wgpu::Features::FLOAT32_FILTERABLE;
         required_features |= wgpu::Features::PUSH_CONSTANTS;
+        required_features |= wgpu::Features::CLEAR_TEXTURE;
+        required_features |= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS;
 
         if matches!(
             info.device_type,
             wgpu::DeviceType::IntegratedGpu | wgpu::DeviceType::Cpu
         ) {
-            required_features |= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS
+            required_features |= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS;
         }
 
         let mut required_limits = wgpu::Limits::defaults();

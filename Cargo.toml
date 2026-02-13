@@ -153,7 +153,7 @@ cranelift-codegen = { version = "0.128", default-features = false, features = [
 ] }
 easyerr = "0.1"
 eyre-pretty = { git = "https://github.com/vxpm/eyre-pretty.git" }
-glam = { version = "0.31", features = ["zerocopy"] }
+glam = { version = "0.32", features = ["zerocopy"] }
 indexmap = "2"
 insta = "1.46"
 nanorand = { version = "0.8", features = ["tls"], default-features = false }

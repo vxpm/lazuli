@@ -138,9 +138,9 @@ impl System {
             Mmio::VideoVerticalTiming => ne!(self.video.vertical_timing.as_bytes()),
             Mmio::VideoDisplayConfig => ne!(self.video.display_config.as_bytes()),
             Mmio::VideoHorizontalTiming => ne!(self.video.horizontal_timing.as_bytes()),
-            Mmio::VideoOddVerticalTiming => ne!(self.video.odd_vertical_timing.as_bytes()),
+            Mmio::VideoOddVerticalTiming => ne!(self.video.top_vertical_timing.as_bytes()),
             Mmio::VideoEvenVerticalTiming => {
-                ne!(self.video.even_vertical_timing.as_bytes())
+                ne!(self.video.bottom_vertical_timing.as_bytes())
             }
             Mmio::VideoTopBaseLeft => ne!(self.video.top_base_left.as_bytes()),
             Mmio::VideoTopBaseRight => ne!(self.video.top_base_right.as_bytes()),
@@ -449,10 +449,10 @@ impl System {
                 ne!(self.video.horizontal_timing.as_mut_bytes())
             }
             Mmio::VideoOddVerticalTiming => {
-                ne!(self.video.odd_vertical_timing.as_mut_bytes())
+                ne!(self.video.top_vertical_timing.as_mut_bytes())
             }
             Mmio::VideoEvenVerticalTiming => {
-                ne!(self.video.even_vertical_timing.as_mut_bytes())
+                ne!(self.video.bottom_vertical_timing.as_mut_bytes())
             }
             Mmio::VideoTopBaseLeft => ne!(self.video.top_base_left.as_mut_bytes()),
             Mmio::VideoTopBaseRight => ne!(self.video.top_base_right.as_mut_bytes()),

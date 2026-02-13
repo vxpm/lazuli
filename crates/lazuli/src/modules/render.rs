@@ -11,6 +11,7 @@ use crate::system::gx::pix::{
 };
 use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
+use crate::system::vi::Dimensions;
 
 #[rustfmt::skip]
 pub use oneshot;
@@ -118,7 +119,7 @@ pub struct Scaling {
 }
 
 #[derive(Debug, Clone)]
-pub struct Clut(pub Vec<u16>);
+pub struct ClutData(pub Vec<u16>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TextureId(pub u32);
@@ -135,6 +136,12 @@ impl ClutAddress {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ClutId {
+    pub addr: ClutAddress,
+    pub fmt: tex::ClutFormat,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CopyArgs {
     pub src: CopySrc,
@@ -143,7 +150,18 @@ pub struct CopyArgs {
     pub clear: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct XfbPart {
+    pub id: u32,
+    pub offset_x: u32,
+    pub offset_y: u32,
+}
+
+pub type ColorData = Vec<Rgba8>;
+pub type DepthData = Vec<u32>;
+
 pub enum Action {
+    SetXfbDimensions(Dimensions),
     SetFramebufferFormat(BufferFormat),
     SetViewport(Viewport),
     SetScissor(Scissor),
@@ -168,28 +186,31 @@ pub enum Action {
     },
     LoadClut {
         addr: ClutAddress,
-        clut: Clut,
+        clut: ClutData,
     },
     SetTextureSlot {
         slot: usize,
         texture_id: TextureId,
+        clut_id: Option<ClutId>,
         sampler: Sampler,
         scaling: Scaling,
-        clut_addr: ClutAddress,
-        clut_fmt: tex::ClutFormat,
     },
     Draw(Topology, VertexStream),
-    ColorCopy {
+    CopyColor {
         args: CopyArgs,
-        response: Sender<Vec<Rgba8>>,
+        response: Option<Sender<ColorData>>,
+        id: TextureId,
     },
-    DepthCopy {
+    CopyDepth {
         args: CopyArgs,
-        response: Sender<Vec<u32>>,
+        response: Option<Sender<DepthData>>,
+        id: TextureId,
     },
-    XfbCopy {
+    CopyXfb {
         args: CopyArgs,
+        id: u32,
     },
+    PresentXfb(Vec<XfbPart>),
 }
 
 const_assert!(size_of::<Action>() <= 64);

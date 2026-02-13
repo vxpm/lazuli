@@ -44,6 +44,7 @@ pub struct Config {
     pub ipl_lle: bool,
     pub ipl: Option<Vec<u8>>,
     pub sideload: Option<Executable>,
+    pub perform_efb_copies: bool,
 }
 
 /// System modules.

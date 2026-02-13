@@ -3,6 +3,7 @@ use bitos::bitos;
 use bitos::integer::{u4, u7, u9, u10, u24};
 use gekko::{Address, FREQUENCY};
 
+use crate::modules::render;
 use crate::system::{System, pi, si};
 
 #[bitos(16)]
@@ -11,7 +12,7 @@ pub struct VerticalTiming {
     /// Length of the equalization pulse, in halflines.
     #[bits(0..4)]
     pub equalization_pulse: u4,
-    /// Amount of scan lines in the active video of a field.
+    /// Amount of lines in the active video of a field.
     #[bits(4..14)]
     pub active_video_lines: u10,
 }
@@ -36,6 +37,16 @@ pub enum VideoFormat {
     Debug = 3,
 }
 
+#[bitos(1)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FieldMode {
+    /// Interlaced rendering: both fields are used.
+    #[default]
+    Double = 0,
+    /// Non-interlaced rendering: only one field is used. Also known as "double-strike".
+    Single = 1,
+}
+
 #[bitos(16)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DisplayConfig {
@@ -45,17 +56,9 @@ pub struct DisplayConfig {
     /// Clears all data requests and puts the interface into its idle state.
     #[bits(1)]
     pub reset: bool,
-    /// Whether progressive video mode is enabled (interlaced otherwise).
+    /// The current field mode.
     #[bits(2)]
-    pub progressive: bool,
-    /// Whether the 3D display mode is enabled. This is _not_ 3D rendering - it is a stereoscopic
-    /// 3D effect.
-    #[bits(3)]
-    pub stereoscopic_effect: bool,
-    #[bits(4..6)]
-    pub display_latch0_mode: DisplayLatchMode,
-    #[bits(6..8)]
-    pub display_latch1_mode: DisplayLatchMode,
+    pub field_mode: FieldMode,
     /// Current video format.
     #[bits(8..10)]
     pub video_format: VideoFormat,
@@ -111,6 +114,13 @@ pub struct FieldBase {
     pub shift_xfb_addr: bool,
 }
 
+impl FieldBase {
+    /// Physical address of the XFB for this field.
+    pub fn xfb_address(&self) -> Address {
+        Address((self.xfb_address_base().value()) >> (5 * self.shift_xfb_addr() as usize))
+    }
+}
+
 #[bitos(32)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DisplayInterrupt {
@@ -142,21 +152,21 @@ pub struct HorizontalScaling {
 pub struct ExternalFramebufferWidth {
     /// Stride of the XFB divided by 16.
     #[bits(0..8)]
-    pub stride_by_16: u8,
+    pub stride_div_16: u8,
     /// Width of the XFB divided by 16.
     #[bits(8..15)]
-    pub width_by_16: u7,
+    pub width_div_16: u7,
 }
 
 impl ExternalFramebufferWidth {
     /// Stride of the XFB.
     pub fn stride(&self) -> u16 {
-        self.stride_by_16() as u16 * 16
+        self.stride_div_16() as u16 * 16
     }
 
     /// Width of the XFB.
     pub fn width(&self) -> u16 {
-        self.width_by_16().value() as u16 * 16
+        self.width_div_16().value() as u16 * 16
     }
 }
 
@@ -167,22 +177,34 @@ pub struct ClockMode {
     pub double: bool,
 }
 
-impl FieldBase {
-    /// Physical address of the XFB for this field.
-    pub fn xfb_address(&self) -> Address {
-        Address((self.xfb_address_base().value()) >> (5 * self.shift_xfb_addr() as usize))
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoMode {
+    NonInterlaced,
+    Interlaced,
+    Progressive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Dimensions {
+    pub width: u16,
+    pub height: u16,
+}
+
+impl Dimensions {
+    pub fn is_degenerate(self) -> bool {
+        self.width == 0 || self.height == 0
     }
 }
 
 #[derive(Debug, Default)]
 pub struct Interface {
-    pub vertical_timing: VerticalTiming,
     pub display_config: DisplayConfig,
+    pub vertical_timing: VerticalTiming,
     pub horizontal_timing: HorizontalTiming,
-    pub odd_vertical_timing: FieldVerticalTiming,
-    pub even_vertical_timing: FieldVerticalTiming,
+    pub top_vertical_timing: FieldVerticalTiming,
     pub top_base_left: FieldBase,
     pub top_base_right: u32,
+    pub bottom_vertical_timing: FieldVerticalTiming,
     pub bottom_base_left: FieldBase,
     pub bottom_base_right: u32,
     pub vertical_count: u16,
@@ -194,7 +216,7 @@ pub struct Interface {
 }
 
 impl Interface {
-    /// The current video clock.
+    /// The current video clock frequency.
     pub fn video_clock(&self) -> u32 {
         if self.clock.double() {
             54_000_000
@@ -213,45 +235,40 @@ impl Interface {
         self.cycles_per_sample() * self.horizontal_timing.halfline_width().value() as u32
     }
 
-    /// How many halflines long an even field is.
-    pub fn halflines_per_even_field(&self) -> u32 {
+    /// How many halflines long a top field is.
+    pub fn halflines_per_top_field(&self) -> u32 {
         3 * self.vertical_timing.equalization_pulse().value() as u32
-            + self.even_vertical_timing.pre_blanking().value() as u32
+            + self.top_vertical_timing.pre_blanking().value() as u32
             + 2 * self.vertical_timing.active_video_lines().value() as u32
-            + self.even_vertical_timing.post_blanking().value() as u32
+            + self.top_vertical_timing.post_blanking().value() as u32
     }
 
-    /// How many CPU cycles long an even field is.
-    pub fn cycles_per_even_field(&self) -> u32 {
-        self.cycles_per_halfline() * self.halflines_per_even_field()
-    }
-
-    /// How many halflines long an odd field is.
-    pub fn halflines_per_odd_field(&self) -> u32 {
+    /// How many halflines long a bottom field is.
+    pub fn halflines_per_bottom_field(&self) -> u32 {
         3 * self.vertical_timing.equalization_pulse().value() as u32
-            + self.odd_vertical_timing.pre_blanking().value() as u32
+            + self.bottom_vertical_timing.pre_blanking().value() as u32
             + 2 * self.vertical_timing.active_video_lines().value() as u32
-            + self.odd_vertical_timing.post_blanking().value() as u32
+            + self.bottom_vertical_timing.post_blanking().value() as u32
     }
 
-    /// How many halflines long a frame is.
+    /// How many halflines long a single frame is.
     pub fn halflines_per_frame(&self) -> u32 {
-        self.halflines_per_even_field()
-            + if self.display_config.progressive() {
-                0
+        self.halflines_per_top_field()
+            + if self.display_config.field_mode() == FieldMode::Double {
+                self.halflines_per_bottom_field()
             } else {
-                self.halflines_per_odd_field()
+                0
             }
     }
 
-    /// How many lines long an even field is.
-    pub fn lines_per_even_field(&self) -> u32 {
-        self.halflines_per_even_field() / 2
+    /// How many CPU cycles long a top field is.
+    pub fn cycles_per_top_field(&self) -> u32 {
+        self.cycles_per_halfline() * self.halflines_per_top_field()
     }
 
-    /// How many lines long an even field is.
-    pub fn lines_per_odd_field(&self) -> u32 {
-        self.halflines_per_odd_field() / 2
+    /// How many CPU cycles long an even field is.
+    pub fn cycles_per_bottom_field(&self) -> u32 {
+        self.cycles_per_halfline() * self.halflines_per_bottom_field()
     }
 
     /// How many lines long a frame is.
@@ -259,15 +276,20 @@ impl Interface {
         self.halflines_per_frame() / 2
     }
 
-    /// How many CPU cycles long an odd field is.
-    pub fn cycles_per_odd_field(&self) -> u32 {
-        self.cycles_per_halfline() * self.halflines_per_odd_field()
+    /// How many times a field is rendered in a second, on average.
+    pub fn field_rate(&self) -> f64 {
+        let cycles_per_frame =
+            (self.cycles_per_top_field() + self.cycles_per_bottom_field()) as f64 / 2.0;
+
+        FREQUENCY as f64 / cycles_per_frame
     }
 
-    /// The refresh rate of the video output.
-    pub fn refresh_rate(&self) -> f64 {
-        let cycles_per_frame = self.cycles_per_even_field() + self.cycles_per_odd_field();
-        2.0 * FREQUENCY as f64 / cycles_per_frame as f64
+    /// The refresh rate of the video output, i.e. how many times a frame is rendered in a second.
+    pub fn frame_rate(&self) -> f64 {
+        match self.display_config.field_mode() {
+            FieldMode::Double => self.field_rate() / 2.0,
+            FieldMode::Single => self.field_rate(),
+        }
     }
 
     /// Address of the XFB for the top field.
@@ -280,33 +302,77 @@ impl Interface {
         self.bottom_base_left.xfb_address()
     }
 
-    /// Height of the XFB.
-    pub fn xfb_height(&self) -> u16 {
-        let acv = self.vertical_timing.active_video_lines().value();
-        let height_multiplier = if self.display_config.progressive() {
-            1
-        } else {
-            2
-        };
+    /// Returns the current video mode.
+    pub fn video_mode(&self) -> VideoMode {
+        if self.clock.double() {
+            return VideoMode::Progressive;
+        }
 
-        height_multiplier * acv
-    }
-
-    /// Width of the XFB.
-    pub fn xfb_width(&self) -> u16 {
-        let width = self.xfb_width.width();
-        if width != 0 {
-            width
-        } else {
-            self.horizontal_timing.halfline_width().value()
-                + self.horizontal_timing.halfline_to_blank_start().value()
-                - self.horizontal_timing.sync_start_to_blank_end().value()
+        match self.display_config.field_mode() {
+            FieldMode::Single => VideoMode::NonInterlaced,
+            FieldMode::Double => VideoMode::Interlaced,
         }
     }
 
-    /// Resolution of the XFB.
-    pub fn xfb_resolution(&self) -> (u16, u16) {
-        (self.xfb_width(), self.xfb_height())
+    /// Dimensions of an external framebuffer.
+    pub fn xfb_dimensions(&self) -> Dimensions {
+        let width = self.xfb_width.width();
+        let height = self.vertical_timing.active_video_lines().value();
+
+        Dimensions { width, height }
+    }
+
+    /// Stride of the rows in an external framebuffer, in pixels.
+    pub fn xfb_stride(&self) -> u16 {
+        // YCbYCr format has 2 pixels every 4 bytes
+        self.xfb_width.stride() / 2
+    }
+
+    /// Dimensions of the entire frame, which may consist of either one or two extenral
+    /// framebuffers.
+    pub fn frame_dimensions(&self) -> Dimensions {
+        let xfb = self.xfb_dimensions();
+        match self.display_config.field_mode() {
+            FieldMode::Double => Dimensions {
+                width: xfb.width,
+                height: xfb.height * 2,
+            },
+            FieldMode::Single => xfb,
+        }
+    }
+
+    /// Height of the video output.
+    fn video_height(&self) -> u16 {
+        let active_lines = self.vertical_timing.active_video_lines().value();
+        let height_multiplier = match self.display_config.field_mode() {
+            FieldMode::Double => 2,
+            FieldMode::Single => 1,
+        };
+
+        height_multiplier * active_lines
+    }
+
+    /// Width of the video output.
+    fn video_width(&self) -> u16 {
+        self.horizontal_timing.halfline_width().value()
+            + self.horizontal_timing.halfline_to_blank_start().value()
+            - self.horizontal_timing.sync_start_to_blank_end().value()
+    }
+
+    /// Dimensions of the video output.
+    pub fn video_dimensions(&self) -> Dimensions {
+        Dimensions {
+            width: self.video_width(),
+            height: self.video_height(),
+        }
+    }
+
+    /// Dimensions of the region in the video output which contain image data.
+    pub fn video_dimensions_cropped(&self) -> Dimensions {
+        Dimensions {
+            width: self.xfb_dimensions().width,
+            height: self.video_height(),
+        }
     }
 
     pub fn write_interrupt<const N: usize>(&mut self, new: DisplayInterrupt) {
@@ -316,15 +382,26 @@ impl Interface {
 }
 
 pub fn update_display_interrupts(sys: &mut System) {
+    let video_width = sys.video.video_width();
     let mut raised = false;
-    for (index, interrupt) in sys.video.interrupts.iter_mut().enumerate() {
-        if interrupt.enable() && interrupt.vertical_count().value() == sys.video.vertical_count {
+    for interrupt in sys.video.interrupts.iter_mut() {
+        interrupt.set_status(false);
+        if !interrupt.enable() {
+            continue;
+        }
+
+        if interrupt.horizontal_count().value() > video_width {
+            continue;
+        }
+
+        sys.video.horizontal_count = sys
+            .video
+            .horizontal_count
+            .max(interrupt.horizontal_count().value());
+
+        if interrupt.vertical_count().value() == sys.video.vertical_count {
             raised = true;
             interrupt.set_status(true);
-            sys.video.horizontal_count = interrupt.horizontal_count().value();
-            tracing::debug!("raised display interrupt {index} ({interrupt:?})");
-        } else {
-            interrupt.set_status(false);
         }
     }
 
@@ -335,6 +412,14 @@ pub fn update_display_interrupts(sys: &mut System) {
 
 pub fn vertical_count(sys: &mut System) {
     self::update_display_interrupts(sys);
+
+    let start_of_top_field = sys.video.vertical_count == 1;
+    let start_of_bottom_field = sys.video.display_config.field_mode() == FieldMode::Double
+        && sys.video.vertical_count as u32 == sys.video.lines_per_frame() / 2 + 1;
+
+    if start_of_top_field || start_of_bottom_field {
+        self::present(sys);
+    }
 
     sys.video.vertical_count += 1;
     sys.video.horizontal_count = 1;
@@ -354,20 +439,20 @@ pub fn vertical_count(sys: &mut System) {
         si::poll_controller(sys, 3);
     }
 
-    let cycles_per_frame = (FREQUENCY as f64 / sys.video.refresh_rate()) as u32;
-
-    // TODO: this is actually cycles per half line for some reason????
+    let cycles_per_frame = (FREQUENCY as f64 / sys.video.frame_rate()) as u32;
     let cycles_per_line = cycles_per_frame
         .checked_div(sys.video.lines_per_frame())
         .unwrap_or(cycles_per_frame);
 
     sys.scheduler
-        .schedule(2 * cycles_per_line as u64, self::vertical_count);
+        .schedule(cycles_per_line as u64, self::vertical_count);
 }
 
 pub fn update(sys: &mut System) {
-    sys.video.horizontal_count = 1;
-    sys.video.vertical_count = 1;
+    if sys.video.vertical_count as u32 > sys.video.lines_per_frame() {
+        sys.video.horizontal_count = 1;
+        sys.video.vertical_count = 1;
+    }
 
     sys.scheduler.cancel(self::vertical_count);
     if sys.video.display_config.enable() {
@@ -375,27 +460,40 @@ pub fn update(sys: &mut System) {
     }
 }
 
-fn xfb_inner(sys: &System, base: Address) -> Option<&[u8]> {
-    let xfb = base.value();
-    let (width, height) = sys.video.xfb_resolution();
-
-    let pixels = width as u32 * height as u32;
-    if pixels == 0 {
-        return None;
+pub fn present(sys: &mut System) {
+    if sys.gpu.xfb_copies.is_empty() {
+        return;
     }
 
-    let length = 2 * pixels;
-    Some(&sys.mem.ram()[xfb as usize..xfb as usize + length as usize])
-}
+    let frame_dimensions = sys.video.frame_dimensions();
+    let stride_in_pixels = sys.video.xfb_stride() as u32;
+    let base_copy = sys.gpu.xfb_copies.iter().min_by_key(|x| x.addr).unwrap();
 
-/// Returns the data of the top XFB in YCbCr format (y0, cb, y1, cr).
-pub fn top_xfb(sys: &System) -> Option<&[u8]> {
-    let base = sys.video.top_xfb_address();
-    xfb_inner(sys, base)
-}
+    if frame_dimensions.is_degenerate() {
+        // TODO: black out VI
+    } else {
+        sys.modules
+            .render
+            .exec(render::Action::SetXfbDimensions(frame_dimensions));
+    }
 
-/// Returns the data of the bottom XFB in YCbCr format (y0, cb, y1, cr).
-pub fn bottom_xfb(sys: &System) -> Option<&[u8]> {
-    let base = sys.video.bottom_xfb_address();
-    xfb_inner(sys, base)
+    let mut parts = Vec::with_capacity(sys.gpu.xfb_copies.len());
+    for (id, copy) in sys.gpu.xfb_copies.iter().enumerate() {
+        let delta_pixels = (copy.addr.value() - base_copy.addr.value()) / 2;
+        let offset_x = delta_pixels % stride_in_pixels;
+        let offset_y = delta_pixels / stride_in_pixels;
+
+        if offset_x >= frame_dimensions.width as u32 || offset_y >= frame_dimensions.height as u32 {
+            continue;
+        }
+
+        parts.push(render::XfbPart {
+            id: id as u32,
+            offset_x,
+            offset_y,
+        });
+    }
+
+    sys.modules.render.exec(render::Action::PresentXfb(parts));
+    sys.gpu.xfb_copies.clear();
 }

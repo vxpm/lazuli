@@ -10,9 +10,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use glam::{Mat4, Vec2};
+use lazuli::modules::render::oneshot::Sender;
 use lazuli::modules::render::{
-    Action, Clut, ClutAddress, CopyArgs, Sampler, Scaling, TexEnvConfig, TexGenConfig, Texture,
-    TextureId, Viewport, oneshot,
+    Action, ClutAddress, ClutData, ClutId, ColorData, CopyArgs, DepthData, Sampler, Scaling,
+    TexEnvConfig, TexGenConfig, Texture, TextureId, Viewport, XfbPart, oneshot,
 };
 use lazuli::system::gx::color::{Rgba, Rgba8};
 use lazuli::system::gx::pix::{
@@ -21,8 +22,9 @@ use lazuli::system::gx::pix::{
 use lazuli::system::gx::xform::{ChannelControl, Light};
 use lazuli::system::gx::{
     CullingMode, DEPTH_24_BIT_MAX, EFB_HEIGHT, EFB_WIDTH, MatrixId, Topology, Vertex, VertexStream,
-    tev, tex,
+    tev,
 };
+use lazuli::system::vi::Dimensions;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use schnellru::{ByLength, LruMap};
 use seq_macro::seq;
@@ -31,12 +33,11 @@ use zerocopy::{FromBytes, IntoBytes};
 use crate::alloc::Allocator;
 use crate::blit::{ColorBlitter, DepthBlitter};
 use crate::clear::Cleaner;
-use crate::render::framebuffer::Framebuffer;
 use crate::render::pipeline::TexGenStageSettings;
 use crate::render::texture::TextureSettings;
 
 pub struct Shared {
-    pub xfb: Mutex<wgpu::TextureView>,
+    pub output: Mutex<wgpu::TextureView>,
     pub rendered_anything: AtomicBool,
 }
 
@@ -78,7 +79,8 @@ pub struct Renderer {
 
     // components
     pipeline_settings: pipeline::Settings,
-    framebuffer: Framebuffer,
+    embedded_fb: framebuffer::Embedded,
+    external_fb: framebuffer::External,
     allocators: Allocators,
     tex_slots: [TexSlotSettings; 8],
     cleaner: Cleaner,
@@ -126,7 +128,9 @@ fn set_channel(channel: &mut data::Channel, control: ChannelControl) {
 
 impl Renderer {
     pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> (Self, Arc<Shared>) {
-        let framebuffer = Framebuffer::new(&device);
+        let embedded_fb = framebuffer::Embedded::new(&device);
+        let external_fb = framebuffer::External::new(&device);
+
         let allocators = Allocators {
             index: Allocator::new(&device, wgpu::BufferUsages::INDEX),
             storage: Allocator::new(&device, wgpu::BufferUsages::STORAGE),
@@ -136,13 +140,12 @@ impl Renderer {
         let texture_cache = texture::Cache::default();
         let sampler_cache = sampler::Cache::default();
 
-        let color = framebuffer.color();
-        let multisampled_color = framebuffer.multisampled_color();
-        let depth = framebuffer.depth();
-        let external = framebuffer.external();
+        let color = embedded_fb.color();
+        let multisampled_color = embedded_fb.multisampled_color();
+        let depth = embedded_fb.depth();
 
         let shared = Arc::new(Shared {
-            xfb: Mutex::new(external.clone()),
+            output: Mutex::new(external_fb.framebuffer().clone()),
             rendered_anything: AtomicBool::new(false),
         });
 
@@ -201,7 +204,8 @@ impl Renderer {
             current_pass: pass,
 
             pipeline_settings: Default::default(),
-            framebuffer,
+            embedded_fb,
+            external_fb,
             allocators,
             tex_slots: Default::default(),
             cleaner,
@@ -238,6 +242,7 @@ impl Renderer {
 
     pub fn exec(&mut self, action: Action) {
         match action {
+            Action::SetXfbDimensions(dims) => self.set_xfb_dimensions(dims),
             Action::SetFramebufferFormat(fmt) => self.set_framebuffer_format(fmt),
             Action::SetViewport(viewport) => self.set_viewport(viewport),
             Action::SetScissor(scissor) => self.set_scissor(scissor),
@@ -256,11 +261,10 @@ impl Renderer {
             Action::SetTextureSlot {
                 slot,
                 texture_id,
+                clut_id,
                 sampler,
                 scaling,
-                clut_addr,
-                clut_fmt,
-            } => self.set_texture_slot(slot, texture_id, sampler, scaling, clut_addr, clut_fmt),
+            } => self.set_texture_slot(slot, texture_id, clut_id, sampler, scaling),
             Action::Draw(topology, vertices) => match topology {
                 Topology::QuadList => self.draw_quad_list(&vertices),
                 Topology::TriangleList => self.draw_triangle_list(&vertices),
@@ -275,9 +279,10 @@ impl Renderer {
             Action::SetColorChannel(idx, control) => self.set_color_channel(idx, control),
             Action::SetAlphaChannel(idx, control) => self.set_alpha_channel(idx, control),
             Action::SetLight(idx, light) => self.set_light(idx, light),
-            Action::ColorCopy { args, response } => self.color_copy(args, response),
-            Action::DepthCopy { args, response } => self.depth_copy(args, response),
-            Action::XfbCopy { args } => self.xfb_copy(args),
+            Action::CopyColor { args, response, id } => self.copy_color(args, response, id),
+            Action::CopyDepth { args, response, id } => self.copy_depth(args, response, id),
+            Action::CopyXfb { args, id } => self.copy_xfb(args, id),
+            Action::PresentXfb(parts) => self.present_xfb(parts),
         }
 
         self.actions += 1;
@@ -321,7 +326,25 @@ impl Renderer {
         idx as u32
     }
 
-    pub fn set_framebuffer_format(&mut self, format: pix::BufferFormat) {
+    fn set_xfb_dimensions(&mut self, dims: Dimensions) {
+        if dims == self.external_fb.dimensions() {
+            return;
+        }
+
+        self.external_fb.resize(
+            &self.device,
+            wgpu::Extent3d {
+                width: dims.width as u32,
+                height: dims.height as u32,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        let mut output = self.shared.output.lock().unwrap();
+        *output = self.external_fb.framebuffer().clone();
+    }
+
+    fn set_framebuffer_format(&mut self, format: pix::BufferFormat) {
         self.flush(format_args!("framebuffer format changed to {format:?}"));
 
         match format {
@@ -333,25 +356,32 @@ impl Renderer {
         }
     }
 
-    pub fn apply_scissor_and_viewport(&mut self) {
-        let (x, y) = self.scissor.top_left();
-        let (width, height) = self.scissor.dimensions();
+    fn apply_scissor_and_viewport(&mut self) {
+        let (scissor_x, scissor_y) = self.scissor.top_left();
+        let (scissor_width, scissor_height) = self.scissor.dimensions();
+        let (scissor_offset_x, scissor_offset_y) = self.scissor.offset();
 
-        // HACK: ignore broken scissors for now - requires handling scissor offset...
-        if x + width <= 640 && y + height <= 528 {
-            self.current_pass.set_scissor_rect(
-                self.scissor.top_left().0,
-                self.scissor.top_left().1,
-                self.scissor.dimensions().0,
-                self.scissor.dimensions().1,
-            );
-        } else {
-            tracing::warn!("out of bounds scissor: {:?}", self.scissor);
-        }
+        let (scissor_effective_x, scissor_effective_y) = (
+            scissor_x
+                .saturating_sub_signed(scissor_offset_x)
+                .min(EFB_WIDTH as u32),
+            scissor_y
+                .saturating_sub_signed(scissor_offset_y)
+                .min(EFB_HEIGHT as u32),
+        );
+
+        let scissor_max_width = EFB_WIDTH as u32 - scissor_effective_x;
+        let scissor_max_height = EFB_HEIGHT as u32 - scissor_effective_y;
+        self.current_pass.set_scissor_rect(
+            scissor_effective_x,
+            scissor_effective_y,
+            scissor_width.min(scissor_max_width),
+            scissor_height.min(scissor_max_height),
+        );
 
         self.current_pass.set_viewport(
-            self.viewport.top_left_x,
-            self.viewport.top_left_y,
+            self.viewport.top_left_x - scissor_offset_x as f32,
+            self.viewport.top_left_y - scissor_offset_y as f32,
             self.viewport.width,
             self.viewport.height,
             self.viewport.near_depth.clamp(0.0, 1.0),
@@ -359,33 +389,33 @@ impl Renderer {
         );
     }
 
-    pub fn set_viewport(&mut self, viewport: Viewport) {
+    fn set_viewport(&mut self, viewport: Viewport) {
         if self.viewport != viewport {
             self.flush(format_args!("changed viewport to {viewport:?}"));
             self.viewport = viewport;
         }
     }
 
-    pub fn set_scissor(&mut self, scissor: Scissor) {
+    fn set_scissor(&mut self, scissor: Scissor) {
         if self.scissor != scissor {
             self.flush(format_args!("changed scissor to {scissor:?}"));
             self.scissor = scissor;
         }
     }
 
-    pub fn set_culling_mode(&mut self, mode: CullingMode) {
+    fn set_culling_mode(&mut self, mode: CullingMode) {
         if self.pipeline_settings.culling != mode {
             self.flush(format_args!("changed culling mode to {mode:?}"));
             self.pipeline_settings.culling = mode;
         }
     }
 
-    pub fn set_clear_color(&mut self, rgba: Rgba) {
+    fn set_clear_color(&mut self, rgba: Rgba) {
         self.debug(format!("set clear color to {rgba:?}"));
         self.clear_color = rgba;
     }
 
-    pub fn set_blend_mode(&mut self, mode: BlendMode) {
+    fn set_blend_mode(&mut self, mode: BlendMode) {
         let src = match mode.src_factor() {
             SrcBlendFactor::Zero => wgpu::BlendFactor::Zero,
             SrcBlendFactor::One => wgpu::BlendFactor::One,
@@ -429,7 +459,7 @@ impl Renderer {
         }
     }
 
-    pub fn set_depth_mode(&mut self, mode: DepthMode) {
+    fn set_depth_mode(&mut self, mode: DepthMode) {
         let compare = match mode.compare() {
             CompareMode::Never => wgpu::CompareFunction::Never,
             CompareMode::Less => wgpu::CompareFunction::Less,
@@ -453,7 +483,7 @@ impl Renderer {
         }
     }
 
-    pub fn set_alpha_function(&mut self, func: tev::alpha::Function) {
+    fn set_alpha_function(&mut self, func: tev::alpha::Function) {
         let settings = pipeline::AlphaFuncSettings {
             comparison: func.comparison(),
             logic: func.logic(),
@@ -468,7 +498,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_constant_alpha_mode(&mut self, mode: ConstantAlpha) {
+    fn set_constant_alpha_mode(&mut self, mode: ConstantAlpha) {
         self.debug(format!("set constant alpha mode to {mode:?}"));
         self.current_config.constant_alpha = if mode.enabled() {
             mode.value() as u32
@@ -478,17 +508,17 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_ambient(&mut self, idx: u8, color: Rgba) {
+    fn set_ambient(&mut self, idx: u8, color: Rgba) {
         self.current_config.ambient[idx as usize] = color;
         self.current_config_dirty = true;
     }
 
-    pub fn set_material(&mut self, idx: u8, color: Rgba) {
+    fn set_material(&mut self, idx: u8, color: Rgba) {
         self.current_config.material[idx as usize] = color;
         self.current_config_dirty = true;
     }
 
-    pub fn set_color_channel(&mut self, idx: u8, control: ChannelControl) {
+    fn set_color_channel(&mut self, idx: u8, control: ChannelControl) {
         set_channel(
             &mut self.current_config.color_channels[idx as usize],
             control,
@@ -496,7 +526,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_alpha_channel(&mut self, idx: u8, control: ChannelControl) {
+    fn set_alpha_channel(&mut self, idx: u8, control: ChannelControl) {
         set_channel(
             &mut self.current_config.alpha_channels[idx as usize],
             control,
@@ -504,7 +534,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_light(&mut self, idx: u8, light: Light) {
+    fn set_light(&mut self, idx: u8, light: Light) {
         let data = &mut self.current_config.lights[idx as usize];
         data.color = light.color.into();
         data.cos_attenuation = light.cos_attenuation;
@@ -514,12 +544,12 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_projection_mat(&mut self, mat: Mat4) {
+    fn set_projection_mat(&mut self, mat: Mat4) {
         self.current_config.projection_mat = mat;
         self.current_config_dirty = true;
     }
 
-    pub fn set_texenv_config(&mut self, config: TexEnvConfig) {
+    fn set_texenv_config(&mut self, config: TexEnvConfig) {
         self.flush(format_args!("texenv changed"));
         self.pipeline_settings
             .shader
@@ -531,7 +561,7 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn set_texgen_config(&mut self, config: TexGenConfig) {
+    fn set_texgen_config(&mut self, config: TexGenConfig) {
         self.flush(format_args!("texgen changed"));
         self.pipeline_settings.shader.texgen.stages = config
             .stages
@@ -554,42 +584,42 @@ impl Renderer {
         self.current_config_dirty = true;
     }
 
-    pub fn load_texture(&mut self, id: TextureId, texture: Texture) {
+    fn load_texture(&mut self, id: TextureId, texture: Texture) {
         if self.texture_cache.update_raw(id, texture) {
             // HACK: avoid keeping old textures alive with a dependent bind group
             self.textures_group_cache.clear();
         }
     }
 
-    pub fn load_clut(&mut self, id: ClutAddress, clut: Clut) {
+    fn load_clut(&mut self, id: ClutAddress, clut: ClutData) {
         self.texture_cache.update_clut(id, clut);
     }
 
-    pub fn set_texture_slot(
+    fn set_texture_slot(
         &mut self,
         slot: usize,
         raw_id: TextureId,
+        clut_id: Option<ClutId>,
         sampler: Sampler,
         scaling: Scaling,
-        clut_addr: ClutAddress,
-        clut_fmt: tex::ClutFormat,
     ) {
-        let new = TexSlotSettings {
-            settings: TextureSettings {
-                raw_id,
-                clut_addr,
-                clut_fmt,
-            },
+        let tex_settings = match clut_id {
+            Some(clut_id) => TextureSettings::Indirect { raw_id, clut_id },
+            None => TextureSettings::Direct(raw_id),
+        };
+
+        let slot_settings = TexSlotSettings {
+            settings: tex_settings,
             sampler,
             scaling,
         };
 
-        if self.tex_slots[slot] == new {
+        if self.tex_slots[slot] == slot_settings {
             return;
         }
 
         self.flush(format_args!("texture slot changed"));
-        self.tex_slots[slot] = new;
+        self.tex_slots[slot] = slot_settings;
     }
 
     fn flush_config(&mut self) {
@@ -614,7 +644,7 @@ impl Renderer {
         indices
     }
 
-    pub fn draw_quad_list(&mut self, stream: &VertexStream) {
+    fn draw_quad_list(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -631,7 +661,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_triangle_list(&mut self, stream: &VertexStream) {
+    fn draw_triangle_list(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -647,7 +677,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_triangle_strip(&mut self, stream: &VertexStream) {
+    fn draw_triangle_strip(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -676,7 +706,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_triangle_fan(&mut self, stream: &VertexStream) {
+    fn draw_triangle_fan(&mut self, stream: &VertexStream) {
         let matrices = stream.matrices();
         let vertices = stream.vertices();
 
@@ -766,7 +796,7 @@ impl Renderer {
             .clone()
     }
 
-    pub fn flush(&mut self, reason: std::fmt::Arguments) {
+    fn flush(&mut self, reason: std::fmt::Arguments) {
         if self.vertices.is_empty() {
             return;
         }
@@ -845,12 +875,12 @@ impl Renderer {
     }
 
     // Finishes the current render pass and starts the next one.
-    pub fn next_pass(&mut self, copy_to_xfb: bool) {
+    fn submit(&mut self) {
         self.flush(format_args!("finishing pass"));
 
-        let color = self.framebuffer.color();
-        let depth = self.framebuffer.depth();
-        let multisampled_color = self.framebuffer.multisampled_color();
+        let color = self.embedded_fb.color();
+        let depth = self.embedded_fb.depth();
+        let multisampled_color = self.embedded_fb.multisampled_color();
 
         let transfer_encoder = self.device.create_command_encoder(&Default::default());
         let mut render_encoder = self.device.create_command_encoder(&Default::default());
@@ -881,29 +911,11 @@ impl Renderer {
 
         let prev_transfer_encoder =
             std::mem::replace(&mut self.current_transfer_encoder, transfer_encoder);
-        let mut prev_render_encoder =
+        let prev_render_encoder =
             std::mem::replace(&mut self.current_render_encoder, render_encoder);
-        let previous_pass = std::mem::replace(&mut self.current_pass, pass);
 
+        let previous_pass = std::mem::replace(&mut self.current_pass, pass);
         std::mem::drop(previous_pass);
-        if copy_to_xfb {
-            let external = self.framebuffer.external();
-            prev_render_encoder.copy_texture_to_texture(
-                wgpu::TexelCopyTextureInfoBase {
-                    texture: color.texture(),
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                wgpu::TexelCopyTextureInfoBase {
-                    texture: external.texture(),
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                external.texture().size(),
-            );
-        }
 
         let transfer_cmds = prev_transfer_encoder.finish();
         let render_cmds = prev_render_encoder.finish();
@@ -917,7 +929,7 @@ impl Renderer {
         self.shared.rendered_anything.store(true, Ordering::Relaxed);
     }
 
-    pub fn get_color_data(
+    fn get_color_data(
         &mut self,
         x: u16,
         y: u16,
@@ -925,7 +937,7 @@ impl Renderer {
         height: u16,
         half: bool,
     ) -> Vec<Rgba8> {
-        let color = self.framebuffer.color();
+        let color = self.embedded_fb.color();
 
         let divisor = if half { 2 } else { 1 };
         let target_width = width as u32 / divisor;
@@ -1037,15 +1049,8 @@ impl Renderer {
         pixels
     }
 
-    pub fn get_depth_data(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-    ) -> Vec<u32> {
-        let depth = self.framebuffer.depth();
+    fn get_depth_data(&mut self, x: u16, y: u16, width: u16, height: u16, half: bool) -> Vec<u32> {
+        let depth = self.embedded_fb.depth();
 
         let divisor = if half { 2 } else { 1 };
         let target_width = width as u32 / divisor;
@@ -1159,7 +1164,7 @@ impl Renderer {
         depth
     }
 
-    pub fn clear(&mut self, x: u32, y: u32, width: u32, height: u32) {
+    fn clear(&mut self, x: u32, y: u32, width: u32, height: u32) {
         let color = self
             .pipeline_settings
             .blend
@@ -1178,7 +1183,65 @@ impl Renderer {
             .clear_target(color, depth, &mut self.current_pass);
     }
 
-    pub fn color_copy(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<Rgba8>>) {
+    fn get_color_texture(
+        &mut self,
+        x: u16,
+        y: u16,
+        width: u16,
+        height: u16,
+        half: bool,
+    ) -> wgpu::TextureView {
+        let divisor = if half { 2 } else { 1 };
+        let target_width = width as u32 / divisor;
+        let target_height = height as u32 / divisor;
+        let size = wgpu::Extent3d {
+            width: target_width,
+            height: target_height,
+            depth_or_array_layers: 1,
+        };
+
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            dimension: wgpu::TextureDimension::D2,
+            size,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+            mip_level_count: 1,
+            sample_count: 1,
+        });
+        let view = texture.create_view(&Default::default());
+
+        self.submit();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        let color = self.embedded_fb.color();
+        self.color_blitter.blit_to_texture(
+            &self.device,
+            color,
+            wgpu::Origin3d {
+                x: x as u32,
+                y: y as u32,
+                z: 0,
+            },
+            wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            &view,
+            &mut encoder,
+        );
+
+        let cmd = encoder.finish();
+        self.queue.submit([cmd]);
+
+        view
+    }
+
+    fn copy_color(&mut self, args: CopyArgs, response: Option<Sender<ColorData>>, id: TextureId) {
         let CopyArgs {
             src,
             dims,
@@ -1195,15 +1258,26 @@ impl Renderer {
             half
         ));
 
-        self.next_pass(false);
-        let data = self.get_color_data(
+        let texture = self.get_color_texture(
             src.x().value(),
             src.y().value(),
             dims.width(),
             dims.height(),
             half,
         );
-        response.send(data).unwrap();
+        self.texture_cache
+            .insert(TextureSettings::Direct(id), texture);
+
+        if let Some(response) = response {
+            let data = self.get_color_data(
+                src.x().value(),
+                src.y().value(),
+                dims.width(),
+                dims.height(),
+                half,
+            );
+            response.send(data).unwrap();
+        }
 
         if clear {
             self.clear(
@@ -1215,7 +1289,7 @@ impl Renderer {
         }
     }
 
-    pub fn depth_copy(&mut self, args: CopyArgs, response: oneshot::Sender<Vec<u32>>) {
+    fn copy_depth(&mut self, args: CopyArgs, response: Option<Sender<DepthData>>, _: TextureId) {
         let CopyArgs {
             src,
             dims,
@@ -1232,15 +1306,17 @@ impl Renderer {
             half
         ));
 
-        self.next_pass(false);
-        let data = self.get_depth_data(
-            src.x().value(),
-            src.y().value(),
-            dims.width(),
-            dims.height(),
-            half,
-        );
-        response.send(data).unwrap();
+        self.submit();
+        if let Some(response) = response {
+            let data = self.get_depth_data(
+                src.x().value(),
+                src.y().value(),
+                dims.width(),
+                dims.height(),
+                half,
+            );
+            response.send(data).unwrap();
+        }
 
         if clear {
             self.clear(
@@ -1252,24 +1328,58 @@ impl Renderer {
         }
     }
 
-    pub fn xfb_copy(&mut self, args: CopyArgs) {
+    fn copy_xfb(&mut self, args: CopyArgs, id: u32) {
         let CopyArgs {
             src,
             dims,
-            half: _,
+            half,
             clear,
         } = args;
 
+        assert!(!half);
+
         self.debug("XFB copy requested");
-        self.next_pass(true);
+        self.submit();
+
+        let x = src.x().value() as u32;
+        let y = src.y().value() as u32;
+        let width = dims.width() as u32;
+        let height = dims.height() as u32;
+
+        let size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+
+        let color = self.embedded_fb.color();
+        let target = self.external_fb.create_copy(&self.device, id, size);
+
+        self.current_transfer_encoder.copy_texture_to_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: color.texture(),
+                mip_level: 0,
+                origin: wgpu::Origin3d { x, y, z: 0 },
+                aspect: wgpu::TextureAspect::default(),
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture: target.texture(),
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::default(),
+            },
+            size,
+        );
 
         if clear {
-            self.clear(
-                src.x().value() as u32,
-                src.y().value() as u32,
-                dims.width() as u32,
-                dims.height() as u32,
-            );
+            self.clear(x, y, width, height);
         }
+    }
+
+    fn present_xfb(&mut self, parts: Vec<XfbPart>) {
+        self.external_fb
+            .build(&mut self.current_transfer_encoder, parts);
+
+        self.submit();
     }
 }

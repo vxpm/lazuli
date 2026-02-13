@@ -330,9 +330,9 @@ pub struct ScissorCorner {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ScissorOffset {
     #[bits(0..10)]
-    pub y_plus_342_div_2: u10,
-    #[bits(10..20)]
     pub x_plus_342_div_2: u10,
+    #[bits(10..20)]
+    pub y_plus_342_div_2: u10,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -375,6 +375,14 @@ impl Scissor {
             + 1;
 
         (width as u32, height as u32)
+    }
+
+    pub fn offset(&self) -> (i32, i32) {
+        let base_x = self.offset.x_plus_342_div_2().value() as u32 * 2;
+        let base_y = self.offset.y_plus_342_div_2().value() as u32 * 2;
+        let x = base_x as i32 - 342;
+        let y = base_y as i32 - 342;
+        (x, y)
     }
 }
 

@@ -10,7 +10,6 @@ use std::sync::atomic::Ordering;
 
 use flume::{Receiver, Sender};
 use lazuli::modules::render::{Action, RenderModule};
-use lazuli::system::gx::{EFB_HEIGHT, EFB_WIDTH};
 
 use crate::blit::XfbBlitter;
 use crate::render::Renderer as RendererInner;
@@ -66,16 +65,15 @@ impl Renderer {
     }
 
     pub fn render(&self, pass: &mut wgpu::RenderPass<'_>) {
-        let xfb = self.inner.shared.xfb.lock().unwrap();
+        let output = self.inner.shared.output.lock().unwrap();
+        let size = output.texture().size();
+
+        // TODO: change this
         self.inner.blitter.blit_to_target(
             &self.inner.device,
-            &xfb,
+            &output,
             wgpu::Origin3d::ZERO,
-            wgpu::Extent3d {
-                width: EFB_WIDTH as u32,
-                height: EFB_HEIGHT as u32,
-                depth_or_array_layers: 1,
-            },
+            size,
             pass,
         );
     }

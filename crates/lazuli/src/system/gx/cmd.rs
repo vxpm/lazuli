@@ -745,7 +745,7 @@ pub fn process(sys: &mut System) {
         }
     }
 
-    sys.scheduler.schedule(1 << 20, self::process);
+    sys.scheduler.schedule(1 << 16, self::process);
 }
 
 /// Synchronizes the CP fifo to the PI fifo.

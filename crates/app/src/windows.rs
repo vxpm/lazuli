@@ -1,7 +1,7 @@
 mod call_stack;
 mod control;
 mod disasm;
-mod efb;
+mod display;
 mod registers;
 mod renderer_info;
 mod subsystem;
@@ -62,11 +62,11 @@ pub fn variables() -> variables::Window {
     Default::default()
 }
 
-pub fn xfb() -> xfb::Window {
-    Default::default()
-}
+// pub fn xfb() -> xfb::Window {
+//     Default::default()
+// }
 
-pub fn efb() -> efb::Window {
+pub fn display() -> display::Window {
     Default::default()
 }
 
