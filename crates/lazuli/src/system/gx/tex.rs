@@ -576,14 +576,10 @@ pub fn update_texture(sys: &mut System, index: usize) {
     let scale_u = map.scaling.u.scale().unwrap_or(width) as f32 / width as f32;
     let scale_v = map.scaling.v.scale().unwrap_or(height) as f32 / height as f32;
 
-    let clut_id = if !format.is_direct() {
-        Some(render::ClutId {
-            addr: clut_addr,
-            fmt: clut_fmt,
-        })
-    } else {
-        None
-    };
+    let clut_id = (!format.is_direct()).then_some(render::ClutId {
+        addr: clut_addr,
+        fmt: clut_fmt,
+    });
 
     sys.modules.render.exec(render::Action::SetTextureSlot {
         slot: index,

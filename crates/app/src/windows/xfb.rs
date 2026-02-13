@@ -1,4 +1,4 @@
-use eframe::egui::{self};
+use eframe::egui;
 use serde::{Deserialize, Serialize};
 
 use crate::State;
@@ -16,7 +16,7 @@ use crate::windows::{AppWindow, Ctx};
 // }
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct Window {}
+pub struct Window;
 
 #[typetag::serde(name = "xfb")]
 impl AppWindow for Window {

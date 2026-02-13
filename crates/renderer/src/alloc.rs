@@ -28,7 +28,7 @@ impl BufferPair {
                 }
 
                 secondary.unmap();
-                encoder.copy_buffer_to_buffer(&secondary, 0, &self.primary, 0, Some(size));
+                encoder.copy_buffer_to_buffer(secondary, 0, &self.primary, 0, Some(size));
             }
             None => {
                 {
