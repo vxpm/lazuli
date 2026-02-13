@@ -422,7 +422,6 @@ fn main() -> Result<()> {
         required_features |= wgpu::Features::FLOAT32_FILTERABLE;
         required_features |= wgpu::Features::PUSH_CONSTANTS;
         required_features |= wgpu::Features::CLEAR_TEXTURE;
-        required_features |= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS;
 
         if matches!(
             info.device_type,
