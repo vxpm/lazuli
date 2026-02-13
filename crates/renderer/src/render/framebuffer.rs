@@ -186,6 +186,16 @@ impl External {
 
         for part in parts {
             let saved = self.copies.get(&part.id).unwrap();
+            let saved_size = saved.texture().size();
+            let framebuffer_size = framebuffer.size();
+
+            // HACK: this isnt the right way to deal with this... Animal Crossing needs it,
+            // investigate further (XFB dimensions seem incorrect?)
+            let width = saved_size.width.min(framebuffer_size.width - part.offset_x);
+            let height = saved_size
+                .height
+                .min(framebuffer_size.height - part.offset_y);
+
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
                     texture: saved.texture(),
@@ -203,7 +213,11 @@ impl External {
                     },
                     aspect: wgpu::TextureAspect::default(),
                 },
-                saved.texture().size(),
+                wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
             );
         }
 

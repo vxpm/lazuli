@@ -25,10 +25,10 @@ impl CallbackTrait for RendererCallback {
 #[derive(Default, Serialize, Deserialize)]
 pub struct Window;
 
-#[typetag::serde(name = "efb")]
+#[typetag::serde(name = "display")]
 impl AppWindow for Window {
     fn title(&self) -> &str {
-        "EFB"
+        "Display"
     }
 
     fn default_size(&self) -> Option<egui::Vec2> {

@@ -1171,6 +1171,6 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
         let len =
             tex::Encoding::length_for(width, height, cmd.color_format().texture_format()) as usize;
         let data = &sys.mem.ram()[dst.value() as usize..][..len];
-        sys.gpu.tex.insert_tex_hash(dst, data);
+        sys.gpu.tex.update_tex_hash(dst, data);
     }
 }

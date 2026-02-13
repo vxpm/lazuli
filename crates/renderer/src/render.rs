@@ -1289,7 +1289,7 @@ impl Renderer {
         }
     }
 
-    fn copy_depth(&mut self, args: CopyArgs, response: Option<Sender<DepthData>>, id: TextureId) {
+    fn copy_depth(&mut self, args: CopyArgs, response: Option<Sender<DepthData>>, _: TextureId) {
         let CopyArgs {
             src,
             dims,

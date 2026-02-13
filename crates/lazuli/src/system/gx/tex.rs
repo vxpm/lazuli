@@ -349,7 +349,7 @@ impl std::fmt::Debug for Interface {
 }
 
 impl Interface {
-    pub fn insert_tex_hash(&mut self, addr: Address, data: &[u8]) -> bool {
+    pub fn update_tex_hash(&mut self, addr: Address, data: &[u8]) -> bool {
         let new_hash = twox_hash::XxHash3_64::oneshot(data);
         let Some(old_hash) = self.tex_cache.get(&addr) else {
             self.tex_cache.insert(addr, new_hash);
@@ -364,17 +364,17 @@ impl Interface {
         }
     }
 
-    pub fn is_clut_dirty(&mut self, addr: Address, data: &[u8]) -> bool {
+    pub fn update_clut_hash(&mut self, addr: Address, data: &[u8]) -> bool {
         let new_hash = twox_hash::XxHash3_64::oneshot(data);
-        let Some(old_hash) = self.tex_cache.get(&addr) else {
-            self.tex_cache.insert(addr, new_hash);
+        let Some(old_hash) = self.clut_cache.get(&addr) else {
+            self.clut_cache.insert(addr, new_hash);
             return true;
         };
 
         if *old_hash == new_hash {
             false
         } else {
-            self.tex_cache.insert(addr, new_hash);
+            self.clut_cache.insert(addr, new_hash);
             true
         }
     }
@@ -560,7 +560,7 @@ pub fn update_texture(sys: &mut System, index: usize) {
     };
 
     let data = &sys.mem.ram()[base.value() as usize..][..len];
-    if sys.gpu.tex.insert_tex_hash(base, data) {
+    if sys.gpu.tex.update_tex_hash(base, data) {
         let data = self::decode_mipmap(data, width, height, format, lods);
         sys.modules.render.exec(render::Action::LoadTexture {
             id: texture_id,
@@ -608,7 +608,7 @@ pub fn update_clut(sys: &mut System) {
     let len = load.count().value() as usize * 16 * 2;
     let data = &sys.mem.ram()[base.value() as usize..][..len];
 
-    if sys.gpu.tex.is_clut_dirty(base, data) {
+    if sys.gpu.tex.update_clut_hash(base, data) {
         let clut = data
             .chunks_exact(2)
             .map(|x| u16::from_be_bytes([x[0], x[1]]))
