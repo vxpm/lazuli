@@ -248,7 +248,7 @@ impl CpalModule {
                         fill_buffer(&state, out);
                     }
                 },
-                move |e| eprintln!("audio error: {}", e),
+                move |e| tracing::error!("audio error: {}", e),
                 None,
             )
             .unwrap();

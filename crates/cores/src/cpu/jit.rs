@@ -610,7 +610,7 @@ impl Core {
 
             let current = addr + 4 * count;
             let Some(physical) = sys.translate_inst_addr(current) else {
-                println!("failed to translate {current} at {}", addr);
+                tracing::error!("failed to translate {current} at {}", addr);
                 return None;
             };
 
