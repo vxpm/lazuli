@@ -171,9 +171,9 @@ impl Cache {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        config: TextureRef,
+        tex: TextureRef,
     ) -> &wgpu::TextureView {
-        let family = self.families.get_mut(&config.id).unwrap();
+        let family = self.families.get_mut(&tex.id).unwrap();
         match &mut family.processed {
             Processed::Direct(processed) => processed.get_or_insert_with(|| {
                 Self::create_texture(
@@ -181,10 +181,10 @@ impl Cache {
                     queue,
                     &mut self.tmem,
                     family.raw.as_ref().unwrap(),
-                    config.clut,
+                    tex.clut,
                 )
             }),
-            Processed::Indirect(processed) => match processed.entry(config.clut) {
+            Processed::Indirect(processed) => match processed.entry(tex.clut) {
                 Entry::Occupied(o) => o.into_mut(),
                 Entry::Vacant(v) => {
                     let texture = Self::create_texture(
@@ -192,7 +192,7 @@ impl Cache {
                         queue,
                         &mut self.tmem,
                         family.raw.as_ref().unwrap(),
-                        config.clut,
+                        tex.clut,
                     );
 
                     v.insert(texture)

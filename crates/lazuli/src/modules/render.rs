@@ -130,8 +130,8 @@ pub struct ClutId(pub u16);
 impl ClutId {
     /// Returns the address of this CLUT in the high bank of TMEM, assuming 16-bit addressing.
     pub fn to_tmem_addr(&self) -> usize {
-        // the offset is in multiples of the CLUT length. since each CLUT has 16 entries that are
-        // replicated 16 times, the CLUT length is 256 16-bit words
+        // the offset is in multiples of the minimum CLUT length. since each CLUT has at least 16
+        // entries that are replicated 16 times, the minimum CLUT length is 256 16-bit words
         self.0 as usize * 256
     }
 }

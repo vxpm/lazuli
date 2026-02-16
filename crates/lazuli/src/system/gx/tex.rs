@@ -297,7 +297,7 @@ pub struct TextureMap {
     pub encoding: Encoding,
     pub sampler: SamplerMode,
     pub scaling: Scaling,
-    pub clut: LutRef,
+    pub clut: ClutRef,
     pub lods: Lods,
     pub dirty: bool,
 }
@@ -323,7 +323,7 @@ pub struct ClutLoad {
 
 #[bitos(32)]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct LutRef {
+pub struct ClutRef {
     #[bits(0..10)]
     pub tmem_offset: u10,
     #[bits(10..12)]
