@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use glam::{Mat4, Vec2};
 use lazuli::modules::render::oneshot::Sender;
 use lazuli::modules::render::{
-    Action, ClutAddress, ClutData, ClutId, ColorData, CopyArgs, DepthData, Sampler, Scaling,
+    Action, ClutData, ClutId, ClutRef, ColorData, CopyArgs, DepthData, Sampler, Scaling,
     TexEnvConfig, TexGenConfig, Texture, TextureId, Viewport, XfbPart, oneshot,
 };
 use lazuli::system::gx::color::{Rgba, Rgba8};
@@ -34,7 +34,7 @@ use crate::alloc::Allocator;
 use crate::blit::{ColorBlitter, DepthBlitter};
 use crate::clear::Cleaner;
 use crate::render::pipeline::TexGenStageSettings;
-use crate::render::texture::TextureSettings;
+use crate::render::texture::TextureRef;
 
 pub struct Shared {
     pub output: Mutex<wgpu::TextureView>,
@@ -48,7 +48,7 @@ struct Allocators {
 
 #[derive(Clone, Copy, PartialEq, Default)]
 struct TexSlotSettings {
-    settings: TextureSettings,
+    texture: TextureRef,
     sampler: Sampler,
     scaling: Scaling,
 }
@@ -257,14 +257,14 @@ impl Renderer {
             Action::SetTexEnvConfig(config) => self.set_texenv_config(config),
             Action::SetTexGenConfig(config) => self.set_texgen_config(config),
             Action::LoadTexture { id, texture } => self.load_texture(id, texture),
-            Action::LoadClut { addr: id, clut } => self.load_clut(id, clut),
+            Action::LoadClut { id, clut } => self.load_clut(id, clut),
             Action::SetTextureSlot {
                 slot,
                 texture_id,
-                clut_id,
+                clut_ref,
                 sampler,
                 scaling,
-            } => self.set_texture_slot(slot, texture_id, clut_id, sampler, scaling),
+            } => self.set_texture_slot(slot, texture_id, clut_ref, sampler, scaling),
             Action::Draw(topology, vertices) => match topology {
                 Topology::QuadList => self.draw_quad_list(&vertices),
                 Topology::TriangleList => self.draw_triangle_list(&vertices),
@@ -591,35 +591,30 @@ impl Renderer {
         }
     }
 
-    fn load_clut(&mut self, id: ClutAddress, clut: ClutData) {
+    fn load_clut(&mut self, id: ClutId, clut: ClutData) {
         self.texture_cache.update_clut(id, clut);
     }
 
     fn set_texture_slot(
         &mut self,
         slot: usize,
-        raw_id: TextureId,
-        clut_id: Option<ClutId>,
+        id: TextureId,
+        clut: ClutRef,
         sampler: Sampler,
         scaling: Scaling,
     ) {
-        let tex_settings = match clut_id {
-            Some(clut_id) => TextureSettings::Indirect { raw_id, clut_id },
-            None => TextureSettings::Direct(raw_id),
-        };
-
-        let slot_settings = TexSlotSettings {
-            settings: tex_settings,
+        let settings = TexSlotSettings {
+            texture: TextureRef { id, clut },
             sampler,
             scaling,
         };
 
-        if self.tex_slots[slot] == slot_settings {
+        if self.tex_slots[slot] == settings {
             return;
         }
 
         self.flush(format_args!("texture slot changed"));
-        self.tex_slots[slot] = slot_settings;
+        self.tex_slots[slot] = settings;
     }
 
     fn flush_config(&mut self) {
@@ -834,7 +829,7 @@ impl Renderer {
 
         let textures = self.tex_slots.map(|s| {
             self.texture_cache
-                .get(&self.device, &self.queue, s.settings)
+                .get(&self.device, &self.queue, s.texture)
                 .clone()
         });
 
@@ -1265,8 +1260,8 @@ impl Renderer {
             dims.height(),
             half,
         );
-        self.texture_cache
-            .insert(TextureSettings::Direct(id), texture);
+
+        self.texture_cache.insert_direct(id, texture);
 
         if let Some(response) = response {
             let data = self.get_color_data(

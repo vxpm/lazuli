@@ -1,34 +1,27 @@
 use std::collections::hash_map::Entry;
 
-use lazuli::modules::render::{ClutAddress, ClutData, ClutId, Texture, TextureId};
+use lazuli::modules::render::{ClutData, ClutId, ClutRef, Texture, TextureId};
 use lazuli::system::gx::color::Rgba8;
 use lazuli::system::gx::tex::{ClutFormat, TextureData};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TextureSettings {
-    Direct(TextureId),
-    Indirect { raw_id: TextureId, clut_id: ClutId },
+/// Configuration of a processed texture.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TextureRef {
+    pub id: TextureId,
+    pub clut: ClutRef,
 }
 
-impl TextureSettings {
-    pub fn raw_id(self) -> TextureId {
-        match self {
-            Self::Direct(raw_id) => raw_id,
-            Self::Indirect { raw_id, .. } => raw_id,
-        }
-    }
+/// Processed textures derived from a parent raw texture.
+enum Processed {
+    Direct(Option<wgpu::TextureView>),
+    Indirect(FxHashMap<ClutRef, wgpu::TextureView>),
 }
 
-impl Default for TextureSettings {
-    fn default() -> Self {
-        Self::Direct(Default::default())
-    }
-}
-
-struct WithDeps<T> {
-    value: T,
-    deps: FxHashSet<TextureSettings>,
+/// A texture family.
+struct Family {
+    raw: Option<Texture>,
+    processed: Processed,
 }
 
 const TMEM_HIGH_LEN: usize = 512 * 1024 / 2;
@@ -37,16 +30,14 @@ type TmemHigh = Box<[u16; TMEM_HIGH_LEN]>;
 
 pub struct Cache {
     tmem: TmemHigh,
-    raws: FxHashMap<TextureId, WithDeps<Texture>>,
-    textures: FxHashMap<TextureSettings, wgpu::TextureView>,
+    families: FxHashMap<TextureId, Family>,
 }
 
 impl Default for Cache {
     fn default() -> Self {
         Self {
             tmem: util::boxed_array(0),
-            raws: Default::default(),
-            textures: Default::default(),
+            families: Default::default(),
         }
     }
 }
@@ -77,30 +68,23 @@ impl Cache {
     fn create_texture(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        raws: &mut FxHashMap<TextureId, WithDeps<Texture>>,
         tmem: &mut TmemHigh,
-        settings: TextureSettings,
+        raw: &Texture,
+        clut: ClutRef,
     ) -> wgpu::TextureView {
-        let raw = raws.get_mut(&settings.raw_id()).unwrap();
-        raw.deps.insert(settings);
-
         let owned_data;
-        let data: Vec<&[u8]> = match &raw.value.data {
+        let data: Vec<&[u8]> = match &raw.data {
             TextureData::Direct(data) => data
                 .iter()
                 .map(|lod| zerocopy::transmute_ref!(lod.as_slice()))
                 .collect::<Vec<_>>(),
             TextureData::Indirect(data) => {
-                let TextureSettings::Indirect { clut_id, .. } = settings else {
-                    panic!("UWAAAAAAA");
-                };
-
-                let clut_base = clut_id.addr.to_tmem_addr();
-                let clut = &tmem[clut_base..];
+                let clut_base = clut.id.to_tmem_addr();
+                let clut_data = &tmem[clut_base..];
 
                 owned_data = data
                     .iter()
-                    .map(|lod| Self::create_texture_data_indirect(lod, clut, clut_id.fmt))
+                    .map(|lod| Self::create_texture_data_indirect(lod, clut_data, clut.fmt))
                     .collect::<Vec<_>>();
 
                 owned_data
@@ -114,19 +98,19 @@ impl Cache {
             label: None,
             dimension: wgpu::TextureDimension::D2,
             size: wgpu::Extent3d {
-                width: raw.value.width,
-                height: raw.value.height,
+                width: raw.width,
+                height: raw.height,
                 depth_or_array_layers: 1,
             },
             format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
-            mip_level_count: raw.value.data.lod_count(),
+            mip_level_count: raw.data.lod_count(),
             sample_count: 1,
         });
 
-        let mut current_width = raw.value.width;
-        let mut current_height = raw.value.height;
+        let mut current_width = raw.width;
+        let mut current_height = raw.height;
         for (idx, lod) in data.iter().enumerate() {
             queue.write_texture(
                 wgpu::TexelCopyTextureInfo {
@@ -156,27 +140,24 @@ impl Cache {
     }
 
     /// Returns whether this is texture ID was already present in the cache.
-    pub fn update_raw(&mut self, id: TextureId, texture: Texture) -> bool {
-        let old = self.raws.insert(
+    pub fn update_raw(&mut self, id: TextureId, raw: Texture) -> bool {
+        let processed = match raw.data {
+            TextureData::Direct(_) => Processed::Direct(None),
+            TextureData::Indirect(_) => Processed::Indirect(Default::default()),
+        };
+
+        let old = self.families.insert(
             id,
-            WithDeps {
-                value: texture,
-                deps: Default::default(),
+            Family {
+                raw: Some(raw),
+                processed,
             },
         );
 
-        if let Some(old) = old {
-            for dep in old.deps {
-                self.textures.remove(&dep);
-            }
-
-            true
-        } else {
-            false
-        }
+        old.is_some()
     }
 
-    pub fn update_clut(&mut self, addr: ClutAddress, clut: ClutData) {
+    pub fn update_clut(&mut self, addr: ClutId, clut: ClutData) {
         let mut current = addr.to_tmem_addr();
 
         // each clut is replicated sequentially 16 times
@@ -190,20 +171,43 @@ impl Cache {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        settings: TextureSettings,
+        config: TextureRef,
     ) -> &wgpu::TextureView {
-        match self.textures.entry(settings) {
-            Entry::Occupied(o) => o.into_mut(),
-            Entry::Vacant(v) => {
-                let texture =
-                    Self::create_texture(device, queue, &mut self.raws, &mut self.tmem, settings);
+        let family = self.families.get_mut(&config.id).unwrap();
+        match &mut family.processed {
+            Processed::Direct(processed) => processed.get_or_insert_with(|| {
+                Self::create_texture(
+                    device,
+                    queue,
+                    &mut self.tmem,
+                    family.raw.as_ref().unwrap(),
+                    config.clut,
+                )
+            }),
+            Processed::Indirect(processed) => match processed.entry(config.clut) {
+                Entry::Occupied(o) => o.into_mut(),
+                Entry::Vacant(v) => {
+                    let texture = Self::create_texture(
+                        device,
+                        queue,
+                        &mut self.tmem,
+                        family.raw.as_ref().unwrap(),
+                        config.clut,
+                    );
 
-                v.insert(texture)
-            }
+                    v.insert(texture)
+                }
+            },
         }
     }
 
-    pub fn insert(&mut self, settings: TextureSettings, texture: wgpu::TextureView) {
-        self.textures.insert(settings, texture);
+    pub fn insert_direct(&mut self, id: TextureId, tex: wgpu::TextureView) {
+        self.families.insert(
+            id,
+            Family {
+                raw: None,
+                processed: Processed::Direct(Some(tex)),
+            },
+        );
     }
 }

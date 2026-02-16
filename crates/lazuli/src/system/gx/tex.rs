@@ -547,7 +547,7 @@ pub fn update_texture(sys: &mut System, index: usize) {
     let height = map.encoding.height();
     let format = map.encoding.format();
     let texture_id = render::TextureId(base.value());
-    let clut_addr = render::ClutAddress(map.clut.tmem_offset().value());
+    let clut_id = render::ClutId(map.clut.tmem_offset().value());
     let clut_fmt = map.clut.format();
 
     let (len, lods) = if map.sampler.min_filter().uses_lods() {
@@ -576,15 +576,13 @@ pub fn update_texture(sys: &mut System, index: usize) {
     let scale_u = map.scaling.u.scale().unwrap_or(width) as f32 / width as f32;
     let scale_v = map.scaling.v.scale().unwrap_or(height) as f32 / height as f32;
 
-    let clut_id = (!format.is_direct()).then_some(render::ClutId {
-        addr: clut_addr,
-        fmt: clut_fmt,
-    });
-
     sys.modules.render.exec(render::Action::SetTextureSlot {
         slot: index,
         texture_id,
-        clut_id,
+        clut_ref: render::ClutRef {
+            id: clut_id,
+            fmt: clut_fmt,
+        },
         sampler: render::Sampler {
             mode: map.sampler,
             lods: map.lods.limits,
@@ -598,7 +596,7 @@ pub fn update_texture(sys: &mut System, index: usize) {
 
 pub fn update_clut(sys: &mut System) {
     let load = sys.gpu.tex.clut_load;
-    let clut_addr = render::ClutAddress(load.tmem_offset().value());
+    let clut_addr = render::ClutId(load.tmem_offset().value());
 
     let base = sys.gpu.tex.clut_addr;
     let len = load.count().value() as usize * 16 * 2;
@@ -611,7 +609,7 @@ pub fn update_clut(sys: &mut System) {
             .collect();
 
         sys.modules.render.exec(render::Action::LoadClut {
-            addr: clut_addr,
+            id: clut_addr,
             clut: render::ClutData(clut),
         });
     }

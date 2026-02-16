@@ -125,9 +125,9 @@ pub struct ClutData(pub Vec<u16>);
 pub struct TextureId(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ClutAddress(pub u16);
+pub struct ClutId(pub u16);
 
-impl ClutAddress {
+impl ClutId {
     /// Returns the address of this CLUT in the high bank of TMEM, assuming 16-bit addressing.
     pub fn to_tmem_addr(&self) -> usize {
         // the offset is in multiples of the CLUT length. since each CLUT has 16 entries that are
@@ -137,8 +137,8 @@ impl ClutAddress {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ClutId {
-    pub addr: ClutAddress,
+pub struct ClutRef {
+    pub id: ClutId,
     pub fmt: tex::ClutFormat,
 }
 
@@ -185,13 +185,13 @@ pub enum Action {
         id: TextureId,
     },
     LoadClut {
-        addr: ClutAddress,
         clut: ClutData,
+        id: ClutId,
     },
     SetTextureSlot {
         slot: usize,
         texture_id: TextureId,
-        clut_id: Option<ClutId>,
+        clut_ref: ClutRef,
         sampler: Sampler,
         scaling: Scaling,
     },
