@@ -14,6 +14,7 @@ use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
 use eyre_pretty::eyre::Result;
 use lazuli::Lazuli;
 use lazuli::cores::Cores;
+use lazuli::disks::cso::Cso;
 use lazuli::disks::rvz::Rvz;
 use lazuli::modules::debug::{DebugModule, NopDebugModule};
 use lazuli::modules::disk::{DiskModule, NopDiskModule};
@@ -21,7 +22,7 @@ use lazuli::system::executable::Executable;
 use lazuli::system::{self, Modules};
 use modules::audio::CpalModule;
 use modules::debug::{Addr2LineModule, MapFileModule};
-use modules::disk::{IsoModule, RvzModule};
+use modules::disk::{CsoModule, IsoModule, RvzModule};
 use modules::input::GilrsModule;
 use nanorand::Rng;
 use renderer::Renderer;
@@ -54,20 +55,23 @@ impl App {
 
         let disk: Box<dyn DiskModule> = if let Some(path) = &cfg.rom {
             let extension = path.extension().and_then(|ext| ext.to_str()).unwrap();
+            let file = std::fs::File::open(path)?;
+            let reader = BufReader::new(file);
             match extension {
                 "iso" => {
-                    let file = std::fs::File::open(path)?;
-                    let reader = BufReader::new(file);
                     Box::new(IsoModule(Some(reader)))
                 }
                 "rvz" => {
-                    let file = std::fs::File::open(path)?;
-                    let reader = BufReader::new(file);
                     let rvz = Rvz::new(reader).unwrap();
                     let rvz = RvzModule::new(rvz);
                     Box::new(rvz)
                 }
-                _ => todo!(),
+                "cso" | "ciso" => {
+                    let cso = Cso::new(reader).unwrap();
+                    let cso = CsoModule::new(cso);
+                    Box::new(cso)
+                }
+                _ => unimplemented!(),
             }
         } else {
             Box::new(NopDiskModule)

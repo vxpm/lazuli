@@ -1,5 +1,6 @@
 use std::io::{Read, Seek, SeekFrom};
 
+use lazuli::disks::cso::{Cso, CsoReader};
 use lazuli::disks::rvz::{Rvz, RvzReader};
 use lazuli::modules::disk::DiskModule;
 
@@ -70,6 +71,42 @@ where
 }
 
 impl<R> DiskModule for RvzModule<R>
+where
+    R: Read + Seek + Send,
+{
+    fn has_disk(&self) -> bool {
+        true
+    }
+}
+
+/// An implementation of [`DiskModule`] for .cso/.ciso disks.
+pub struct CsoModule<R>(CsoReader<R>);
+
+impl<R> CsoModule<R> {
+    pub fn new(cso: Cso<R>) -> Self {
+        Self(CsoReader::new(cso))
+    }
+}
+
+impl<R> Read for CsoModule<R>
+where
+    R: Read + Seek,
+{
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+
+impl<R> Seek for CsoModule<R>
+where
+    R: Read + Seek,
+{
+    fn seek(&mut self, from: SeekFrom) -> std::io::Result<u64> {
+        self.0.seek(from)
+    }
+}
+
+impl<R> DiskModule for CsoModule<R>
 where
     R: Read + Seek + Send,
 {

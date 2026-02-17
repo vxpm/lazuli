@@ -78,7 +78,7 @@ xattr -d com.apple.quarantine lazuli
 ## Running a game
 
 Once you have a `lazuli` executable (either by building it or by grabbing one of the nightly releases),
-you can run it in the terminal with a path to the ROM you want to run (supports `.iso` and `.rvz`):
+you can run it in the terminal with a path to the ROM you want to run (supports `.iso`,`.rvz` and `.ciso/.cso`):
 
 ```sh
 lazuli --rom path/to/gamecube/game.iso
@@ -97,6 +97,15 @@ use the provided IPL ROM to boot. This will take you to the system menu, from wh
 the game.
 
 For more CLI options, `--help` is your friend.
+
+## Running on macOS
+
+If you have built lazuli yourself, you are ready to go. But if you have grabbed the zip file from 
+the nightly releases, just extract the zip file to your desired folder and remove it from quarantine:
+
+```sh
+xattr -d com.apple.quarantine lazuli
+```
 
 ## Inputs
 

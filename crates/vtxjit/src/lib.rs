@@ -25,6 +25,11 @@ use rustc_hash::FxHashMap;
 use crate::builder::ParserBuilder;
 use crate::parser::{Config, Meta};
 
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    unsafe fn sys_icache_invalidate(start: *mut std::ffi::c_void, len: usize);
+}
+
 #[repr(C)]
 struct UnpackedDefaultMatrices {
     pub view: u8,

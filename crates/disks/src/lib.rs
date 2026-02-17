@@ -3,6 +3,7 @@
 pub mod apploader;
 pub mod dol;
 pub mod iso;
+pub mod cso;
 pub mod rvz;
 
 pub use binrw;
