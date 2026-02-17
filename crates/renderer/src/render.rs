@@ -924,11 +924,9 @@ impl Renderer {
         encoder: &mut wgpu::CommandEncoder,
     ) -> wgpu::TextureView {
         let divisor = if half { 2 } else { 1 };
-        let target_width = width as u32 / divisor;
-        let target_height = height as u32 / divisor;
         let size = wgpu::Extent3d {
-            width: target_width,
-            height: target_height,
+            width: width as u32 / divisor,
+            height: height as u32 / divisor,
             depth_or_array_layers: 1,
         };
 
@@ -969,7 +967,6 @@ impl Renderer {
 
     fn copy_depth_to_tex(
         &mut self,
-        format: DepthCopyFormat,
         x: u16,
         y: u16,
         width: u16,
@@ -978,11 +975,9 @@ impl Renderer {
         encoder: &mut wgpu::CommandEncoder,
     ) -> wgpu::TextureView {
         let divisor = if half { 2 } else { 1 };
-        let target_width = width as u32 / divisor;
-        let target_height = height as u32 / divisor;
         let size = wgpu::Extent3d {
-            width: target_width,
-            height: target_height,
+            width: width as u32 / divisor,
+            height: height as u32 / divisor,
             depth_or_array_layers: 1,
         };
 
@@ -990,7 +985,7 @@ impl Renderer {
             label: None,
             dimension: wgpu::TextureDimension::D2,
             size,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: wgpu::TextureFormat::R32Float,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::COPY_SRC,
@@ -1003,7 +998,6 @@ impl Renderer {
         let depth = self.embedded_fb.depth();
         self.depth_blitter.blit_to_texture(
             &self.device,
-            format,
             depth,
             wgpu::Origin3d {
                 x: x as u32,
@@ -1186,8 +1180,7 @@ impl Renderer {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        let texture = self.copy_depth_to_tex(
-            format,
+        let depth_texture = self.copy_depth_to_tex(
             src.x().value(),
             src.y().value(),
             dims.width(),
@@ -1197,14 +1190,14 @@ impl Renderer {
         );
 
         if let Some(response) = response {
-            let data = self.get_texture_data(&texture, encoder);
+            let data = self.get_texture_data(&depth_texture, encoder);
             response.send(data).unwrap();
         } else {
             let cmd = encoder.finish();
             self.queue.submit([cmd]);
         }
 
-        self.texture_cache.insert_direct(id, texture);
+        self.texture_cache.insert_direct(id, depth_texture);
 
         if clear {
             self.clear(
