@@ -88,7 +88,6 @@ pub struct Renderer {
     depth_blitter: DepthBlitter,
     color_copy_buffer: wgpu::Buffer,
     depth_copy_buffer: wgpu::Buffer,
-    color_copy_texture_pool: FxHashMap<wgpu::Extent3d, wgpu::TextureView>,
     depth_copy_texture_pool: FxHashMap<wgpu::Extent3d, wgpu::TextureView>,
 
     // caches
@@ -213,7 +212,6 @@ impl Renderer {
             depth_blitter,
             color_copy_buffer,
             depth_copy_buffer,
-            color_copy_texture_pool: HashMap::default(),
             depth_copy_texture_pool: HashMap::default(),
 
             pipeline_cache,
@@ -924,16 +922,15 @@ impl Renderer {
         self.shared.rendered_anything.store(true, Ordering::Relaxed);
     }
 
-    fn get_color_data(
+    fn copy_color_to_tex(
         &mut self,
         x: u16,
         y: u16,
         width: u16,
         height: u16,
         half: bool,
-    ) -> Vec<Rgba8> {
-        let color = self.embedded_fb.color();
-
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> wgpu::TextureView {
         let divisor = if half { 2 } else { 1 };
         let target_width = width as u32 / divisor;
         let target_height = height as u32 / divisor;
@@ -943,31 +940,21 @@ impl Renderer {
             depth_or_array_layers: 1,
         };
 
-        let row_size = target_width * 4;
-        let row_stride = row_size.next_multiple_of(256);
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            dimension: wgpu::TextureDimension::D2,
+            size,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+            mip_level_count: 1,
+            sample_count: 1,
+        });
+        let view = texture.create_view(&Default::default());
 
-        let copy_target = match self.color_copy_texture_pool.entry(size) {
-            Entry::Occupied(o) => o.into_mut(),
-            Entry::Vacant(v) => {
-                let tex = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("color copy texture"),
-                    dimension: wgpu::TextureDimension::D2,
-                    size,
-                    format: wgpu::TextureFormat::Rgba8Unorm,
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-                    view_formats: &[],
-                    mip_level_count: 1,
-                    sample_count: 1,
-                });
-
-                v.insert(tex.create_view(&wgpu::TextureViewDescriptor::default()))
-            }
-        };
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
+        let color = self.embedded_fb.color();
         self.color_blitter.blit_to_texture(
             &self.device,
             color,
@@ -981,13 +968,25 @@ impl Renderer {
                 height: height as u32,
                 depth_or_array_layers: 1,
             },
-            copy_target,
-            &mut encoder,
+            &view,
+            encoder,
         );
+
+        view
+    }
+
+    fn get_color_data(
+        &mut self,
+        view: &wgpu::TextureView,
+        mut encoder: wgpu::CommandEncoder,
+    ) -> Vec<Rgba8> {
+        let size = view.texture().size();
+        let row_size = size.width * 4;
+        let row_stride = row_size.next_multiple_of(256);
 
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
-                texture: copy_target.texture(),
+                texture: view.texture(),
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::default(),
@@ -1000,11 +999,7 @@ impl Renderer {
                     rows_per_image: None,
                 },
             },
-            wgpu::Extent3d {
-                width: target_width,
-                height: target_height,
-                depth_or_array_layers: 1,
-            },
+            size,
         );
 
         let (sender, receiver) = oneshot::channel();
@@ -1027,8 +1022,8 @@ impl Renderer {
         let mapped = self.color_copy_buffer.get_mapped_range(..);
         let data = &*mapped;
 
-        let mut pixels = Vec::with_capacity(target_width as usize * target_height as usize);
-        for row in 0..target_height as usize {
+        let mut pixels = Vec::with_capacity(size.width as usize * size.height as usize);
+        for row in 0..size.height as usize {
             let row_data = &data[row * row_stride as usize..][..row_size as usize];
             pixels.extend(
                 row_data
@@ -1178,64 +1173,6 @@ impl Renderer {
             .clear_target(color, depth, &mut self.current_pass);
     }
 
-    fn get_color_texture(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        half: bool,
-    ) -> wgpu::TextureView {
-        let divisor = if half { 2 } else { 1 };
-        let target_width = width as u32 / divisor;
-        let target_height = height as u32 / divisor;
-        let size = wgpu::Extent3d {
-            width: target_width,
-            height: target_height,
-            depth_or_array_layers: 1,
-        };
-
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            dimension: wgpu::TextureDimension::D2,
-            size,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-            mip_level_count: 1,
-            sample_count: 1,
-        });
-        let view = texture.create_view(&Default::default());
-
-        self.submit();
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-        let color = self.embedded_fb.color();
-        self.color_blitter.blit_to_texture(
-            &self.device,
-            color,
-            wgpu::Origin3d {
-                x: x as u32,
-                y: y as u32,
-                z: 0,
-            },
-            wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            &view,
-            &mut encoder,
-        );
-
-        let cmd = encoder.finish();
-        self.queue.submit([cmd]);
-
-        view
-    }
-
     fn copy_color(&mut self, args: CopyArgs, response: Option<Sender<ColorData>>, id: TextureId) {
         let CopyArgs {
             src,
@@ -1253,26 +1190,30 @@ impl Renderer {
             half
         ));
 
-        let texture = self.get_color_texture(
+        self.submit();
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        let texture = self.copy_color_to_tex(
             src.x().value(),
             src.y().value(),
             dims.width(),
             dims.height(),
             half,
+            &mut encoder,
         );
 
-        self.texture_cache.insert_direct(id, texture);
-
         if let Some(response) = response {
-            let data = self.get_color_data(
-                src.x().value(),
-                src.y().value(),
-                dims.width(),
-                dims.height(),
-                half,
-            );
+            let data = self.get_color_data(&texture, encoder);
             response.send(data).unwrap();
+        } else {
+            let cmd = encoder.finish();
+            self.queue.submit([cmd]);
         }
+
+        self.texture_cache.insert_direct(id, texture);
 
         if clear {
             self.clear(
