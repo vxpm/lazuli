@@ -55,7 +55,7 @@ jobs:
 
   build_macos:
     name: Build nightly (macos)
-    runs-on: macos-latest
+    runs-on: macos-13
     needs: [check_date, generate_name]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     steps:
