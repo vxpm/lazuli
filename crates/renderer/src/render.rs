@@ -575,10 +575,7 @@ impl Renderer {
     }
 
     fn load_texture(&mut self, id: TextureId, texture: Texture) {
-        if self.texture_cache.update_raw(id, texture) {
-            // HACK: avoid keeping old textures alive with a dependent bind group
-            self.textures_group_cache.clear();
-        }
+        self.texture_cache.update_raw(id, texture);
     }
 
     fn load_clut(&mut self, id: ClutId, clut: ClutData) {
@@ -910,6 +907,7 @@ impl Renderer {
 
         self.allocators.index.free();
         self.allocators.storage.free();
+        self.textures_group_cache.clear();
 
         self.shared.rendered_anything.store(true, Ordering::Relaxed);
     }
