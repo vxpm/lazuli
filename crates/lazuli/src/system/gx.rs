@@ -1129,21 +1129,32 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     }
 
     let id = render::TextureId(dst.value());
-    if sys.gpu.pix.control.format().is_depth() {
-        let (sender, receiver) = oneshot::channel();
+    let format = if sys.gpu.pix.control.format().is_depth() {
+        let (sender, receiver) = if sys.config.perform_efb_copies {
+            let (sender, receiver) = oneshot::channel();
+            (Some(sender), Some(receiver))
+        } else {
+            (None, None)
+        };
+
         sys.modules.render.exec(render::Action::CopyDepth {
             args,
-            response: Some(sender),
+            format: cmd.depth_format(),
+            response: sender,
             id,
         });
 
-        let Ok(pixels) = receiver.recv() else {
-            tracing::error!("render module did not answer depth copy request");
-            return;
-        };
+        if let Some(receiver) = receiver {
+            let Ok(texels) = receiver.recv() else {
+                tracing::error!("render module did not answer color copy request");
+                return;
+            };
 
-        let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
-        tex::encode_depth_texture(pixels, cmd.depth_format(), stride, width, height, output);
+            let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
+            tex::encode_depth_texture(texels, cmd.depth_format(), stride, width, height, output);
+        }
+
+        cmd.depth_format().texture_format()
     } else {
         let (sender, receiver) = if sys.config.perform_efb_copies {
             let (sender, receiver) = oneshot::channel();
@@ -1159,18 +1170,19 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
         });
 
         if let Some(receiver) = receiver {
-            let Ok(pixels) = receiver.recv() else {
+            let Ok(texels) = receiver.recv() else {
                 tracing::error!("render module did not answer color copy request");
                 return;
             };
 
             let output = &mut sys.mem.ram_mut()[dst.value() as usize..];
-            tex::encode_color_texture(pixels, cmd.color_format(), stride, width, height, output);
+            tex::encode_color_texture(texels, cmd.color_format(), stride, width, height, output);
         }
 
-        let len =
-            tex::Encoding::length_for(width, height, cmd.color_format().texture_format()) as usize;
-        let data = &sys.mem.ram()[dst.value() as usize..][..len];
-        sys.gpu.tex.update_tex_hash(dst, data);
-    }
+        cmd.color_format().texture_format()
+    };
+
+    let len = tex::Encoding::length_for(width, height, format) as usize;
+    let data = &sys.mem.ram()[dst.value() as usize..][..len];
+    sys.gpu.tex.update_tex_hash(dst, data);
 }

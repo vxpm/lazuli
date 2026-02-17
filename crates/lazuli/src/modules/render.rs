@@ -1,13 +1,13 @@
 //! Renderer module interface.
 
-use color::{Abgr8, Rgba, Rgba8, Rgba16};
+use color::{Abgr8, Rgba, Rgba16};
 use glam::Mat4;
 use oneshot::Sender;
 use ordered_float::OrderedFloat;
 use static_assertions::const_assert;
 
 use crate::system::gx::pix::{
-    BlendMode, BufferFormat, ConstantAlpha, CopyDims, CopySrc, DepthMode, Scissor,
+    BlendMode, BufferFormat, ConstantAlpha, CopyDims, CopySrc, DepthCopyFormat, DepthMode, Scissor,
 };
 use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
@@ -157,8 +157,9 @@ pub struct XfbPart {
     pub offset_y: u32,
 }
 
-pub type ColorData = Vec<Rgba8>;
-pub type DepthData = Vec<u32>;
+/// A vector of texture data (i.e. it's texels). For color textures, the data is encoded as
+/// RGBA8. For depth textures, it's encoded as a F32 (little-endian).
+pub type Texels = Vec<u32>;
 
 pub enum Action {
     SetXfbDimensions(Dimensions),
@@ -198,12 +199,13 @@ pub enum Action {
     Draw(Topology, VertexStream),
     CopyColor {
         args: CopyArgs,
-        response: Option<Sender<ColorData>>,
+        response: Option<Sender<Texels>>,
         id: TextureId,
     },
     CopyDepth {
         args: CopyArgs,
-        response: Option<Sender<DepthData>>,
+        format: DepthCopyFormat,
+        response: Option<Sender<Texels>>,
         id: TextureId,
     },
     CopyXfb {

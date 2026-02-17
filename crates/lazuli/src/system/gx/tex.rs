@@ -441,7 +441,7 @@ fn decode_mipmap(
 }
 
 pub fn encode_color_texture(
-    data: Vec<Rgba8>,
+    texels: Vec<u32>,
     format: ColorCopyFormat,
     stride: u32,
     width: u32,
@@ -453,14 +453,9 @@ pub fn encode_color_texture(
         RedChannel, Rgb5A3, Rgba8, encode,
     };
 
-    let pixels = data
+    let pixels = texels
         .into_iter()
-        .map(|c| gxtex::Pixel {
-            r: c.r,
-            g: c.g,
-            b: c.b,
-            a: c.a,
-        })
+        .map(|c| zerocopy::transmute!(c))
         .collect::<Vec<_>>();
 
     macro_rules! encode {

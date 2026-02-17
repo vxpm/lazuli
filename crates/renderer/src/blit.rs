@@ -1,4 +1,5 @@
 use glam::Vec4;
+use lazuli::system::gx::pix::DepthCopyFormat;
 use wesl::include_wesl;
 use zerocopy::IntoBytes;
 
@@ -591,6 +592,7 @@ impl DepthBlitter {
     pub fn blit_to_texture(
         &self,
         device: &wgpu::Device,
+        format: DepthCopyFormat,
         source: &wgpu::TextureView,
         top_left: wgpu::Origin3d,
         dimensions: wgpu::Extent3d,
