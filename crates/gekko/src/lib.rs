@@ -1,8 +1,6 @@
 //! The `powerpc` crate, which is a disassembler of PowerPC instructions, is re-exported under
 //! [`disasm`].
 
-#![feature(cold_path)]
-
 use std::time::Duration;
 
 use bitos::integer::{i6, u2, u4, u5, u7, u11, u15, u27};

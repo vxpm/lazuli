@@ -1,5 +1,3 @@
-#![feature(cold_path)]
-
 mod exec;
 
 pub mod ins;

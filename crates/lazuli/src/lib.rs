@@ -1,4 +1,3 @@
-#![feature(cold_path)]
 #![feature(deque_extend_front)]
 
 pub mod primitive;
