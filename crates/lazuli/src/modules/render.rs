@@ -7,7 +7,8 @@ use ordered_float::OrderedFloat;
 use static_assertions::const_assert;
 
 use crate::system::gx::pix::{
-    BlendMode, BufferFormat, ConstantAlpha, CopyDims, CopySrc, DepthCopyFormat, DepthMode, Scissor,
+    BlendMode, BufferFormat, ColorCopyFormat, ConstantAlpha, CopyDims, CopySrc, DepthCopyFormat,
+    DepthMode, Scissor,
 };
 use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
@@ -199,6 +200,7 @@ pub enum Action {
     Draw(Topology, VertexStream),
     CopyColor {
         args: CopyArgs,
+        format: ColorCopyFormat,
         response: Option<Sender<Texels>>,
         id: TextureId,
     },

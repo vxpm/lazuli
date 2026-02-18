@@ -1165,6 +1165,7 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
 
         sys.modules.render.exec(render::Action::CopyColor {
             args,
+            format: cmd.color_format(),
             response: sender,
             id,
         });

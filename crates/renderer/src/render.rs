@@ -15,8 +15,8 @@ use lazuli::modules::render::{
 };
 use lazuli::system::gx::color::Rgba;
 use lazuli::system::gx::pix::{
-    self, BlendMode, CompareMode, ConstantAlpha, DepthCopyFormat, DepthMode, DstBlendFactor,
-    Scissor, SrcBlendFactor,
+    self, BlendMode, ColorCopyFormat, CompareMode, ConstantAlpha, DepthCopyFormat, DepthMode,
+    DstBlendFactor, Scissor, SrcBlendFactor,
 };
 use lazuli::system::gx::xform::{ChannelControl, Light};
 use lazuli::system::gx::{
@@ -29,7 +29,7 @@ use seq_macro::seq;
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::alloc::Allocator;
-use crate::blit::{ColorBlitter, DepthBlitter, DepthConverter};
+use crate::blit::{ColorBlitter, Converter, DepthBlitter};
 use crate::clear::Cleaner;
 use crate::render::pipeline::TexGenStageSettings;
 use crate::render::texture::TextureRef;
@@ -82,9 +82,9 @@ pub struct Renderer {
     allocators: Allocators,
     tex_slots: [TexSlotSettings; 8],
     cleaner: Cleaner,
+    converter: Converter,
     color_blitter: ColorBlitter,
     depth_blitter: DepthBlitter,
-    depth_converter: DepthConverter,
     data_read_buffer: wgpu::Buffer,
 
     // caches
@@ -146,9 +146,9 @@ impl Renderer {
         });
 
         let cleaner = Cleaner::new(&device);
+        let converter = Converter::new(&device);
         let color_blitter = ColorBlitter::new(&device);
         let depth_blitter = DepthBlitter::new(&device);
-        let depth_converter = DepthConverter::new(&device);
 
         let data_read_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("data read buffer"),
@@ -199,9 +199,9 @@ impl Renderer {
             allocators,
             tex_slots: Default::default(),
             cleaner,
+            converter,
             color_blitter,
             depth_blitter,
-            depth_converter,
             data_read_buffer,
 
             pipeline_cache,
@@ -267,7 +267,12 @@ impl Renderer {
             Action::SetColorChannel(idx, control) => self.set_color_channel(idx, control),
             Action::SetAlphaChannel(idx, control) => self.set_alpha_channel(idx, control),
             Action::SetLight(idx, light) => self.set_light(idx, light),
-            Action::CopyColor { args, response, id } => self.copy_color(args, response, id),
+            Action::CopyColor {
+                args,
+                format,
+                response,
+                id,
+            } => self.copy_color(args, format, response, id),
             Action::CopyDepth {
                 args,
                 format,
@@ -1017,13 +1022,37 @@ impl Renderer {
         view
     }
 
-    fn encode_depth_as_color(
+    fn encode_color(
+        &mut self,
+        color: &wgpu::TextureView,
+        format: ColorCopyFormat,
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> wgpu::TextureView {
+        let output = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            dimension: wgpu::TextureDimension::D2,
+            size: color.texture().size(),
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+            mip_level_count: 1,
+            sample_count: 1,
+        });
+
+        let view = output.create_view(&Default::default());
+        self.converter
+            .convert_color(&self.device, format, color, &view, encoder);
+
+        view
+    }
+
+    fn encode_depth(
         &mut self,
         depth: &wgpu::TextureView,
         format: DepthCopyFormat,
         encoder: &mut wgpu::CommandEncoder,
     ) -> wgpu::TextureView {
-        let color = self.device.create_texture(&wgpu::TextureDescriptor {
+        let output = self.device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             dimension: wgpu::TextureDimension::D2,
             size: depth.texture().size(),
@@ -1033,10 +1062,10 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
         });
-        let view = color.create_view(&Default::default());
 
-        self.depth_converter
-            .convert(&self.device, format, depth, &view, encoder);
+        let view = output.create_view(&Default::default());
+        self.converter
+            .convert_depth(&self.device, format, depth, &view, encoder);
 
         view
     }
@@ -1124,7 +1153,13 @@ impl Renderer {
             .clear_target(color, depth, &mut self.current_pass);
     }
 
-    fn copy_color(&mut self, args: CopyArgs, response: Option<Sender<Texels>>, id: TextureId) {
+    fn copy_color(
+        &mut self,
+        args: CopyArgs,
+        format: ColorCopyFormat,
+        response: Option<Sender<Texels>>,
+        id: TextureId,
+    ) {
         let CopyArgs {
             src,
             dims,
@@ -1147,7 +1182,7 @@ impl Renderer {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        let texture = self.copy_color_to_tex(
+        let raw_texture = self.copy_color_to_tex(
             src.x().value(),
             src.y().value(),
             dims.width(),
@@ -1156,15 +1191,16 @@ impl Renderer {
             &mut encoder,
         );
 
+        let encoded_texture = self.encode_color(&raw_texture, format, &mut encoder);
         if let Some(response) = response {
-            let data = self.get_texture_data(&texture, encoder);
+            let data = self.get_texture_data(&raw_texture, encoder);
             response.send(data).unwrap();
         } else {
             let cmd = encoder.finish();
             self.queue.submit([cmd]);
         }
 
-        self.texture_cache.insert_direct(id, texture);
+        self.texture_cache.insert_direct(id, encoded_texture);
         if clear {
             self.clear(
                 src.x().value() as u32,
@@ -1204,7 +1240,7 @@ impl Renderer {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        let depth_texture = self.copy_depth_to_tex(
+        let raw_texture = self.copy_depth_to_tex(
             src.x().value(),
             src.y().value(),
             dims.width(),
@@ -1213,16 +1249,16 @@ impl Renderer {
             &mut encoder,
         );
 
-        let color_texture = self.encode_depth_as_color(&depth_texture, format, &mut encoder);
+        let encoded_texture = self.encode_depth(&raw_texture, format, &mut encoder);
         if let Some(response) = response {
-            let data = self.get_texture_data(&depth_texture, encoder);
+            let data = self.get_texture_data(&raw_texture, encoder);
             response.send(data).unwrap();
         } else {
             let cmd = encoder.finish();
             self.queue.submit([cmd]);
         }
 
-        self.texture_cache.insert_direct(id, color_texture);
+        self.texture_cache.insert_direct(id, encoded_texture);
         if clear {
             self.clear(
                 src.x().value() as u32,

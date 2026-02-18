@@ -1,5 +1,5 @@
 use glam::Vec4;
-use lazuli::system::gx::pix::DepthCopyFormat;
+use lazuli::system::gx::pix::{ColorCopyFormat, DepthCopyFormat};
 use wesl::include_wesl;
 use zerocopy::IntoBytes;
 
@@ -626,12 +626,13 @@ impl DepthBlitter {
     }
 }
 
-pub struct DepthConverter {
+pub struct Converter {
     group_layout: wgpu::BindGroupLayout,
-    pipeline: wgpu::ComputePipeline,
+    color_pipeline: wgpu::ComputePipeline,
+    depth_pipeline: wgpu::ComputePipeline,
 }
 
-impl DepthConverter {
+impl Converter {
     pub fn new(device: &wgpu::Device) -> Self {
         let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -668,16 +669,34 @@ impl DepthConverter {
             }],
         });
 
-        let shader = include_wesl!("depth_convert");
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("depth convert"),
-            source: wgpu::ShaderSource::Wgsl(shader.into()),
+        let color_shader = include_wesl!("color_convert");
+        let color_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("color convert"),
+            source: wgpu::ShaderSource::Wgsl(color_shader.into()),
         });
 
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        let depth_shader = include_wesl!("depth_convert");
+        let depth_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("depth convert"),
+            source: wgpu::ShaderSource::Wgsl(depth_shader.into()),
+        });
+
+        let color_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("color convert pipeline"),
+            layout: Some(&layout),
+            module: &color_module,
+            entry_point: None,
+            compilation_options: wgpu::PipelineCompilationOptions {
+                constants: &[],
+                zero_initialize_workgroup_memory: false,
+            },
+            cache: None,
+        });
+
+        let depth_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("depth convert pipeline"),
             layout: Some(&layout),
-            module: &module,
+            module: &depth_module,
             entry_point: None,
             compilation_options: wgpu::PipelineCompilationOptions {
                 constants: &[],
@@ -688,16 +707,54 @@ impl DepthConverter {
 
         Self {
             group_layout,
-            pipeline,
+            color_pipeline,
+            depth_pipeline,
         }
     }
 
-    pub fn convert(
+    pub fn convert_color(
+        &self,
+        device: &wgpu::Device,
+        format: ColorCopyFormat,
+        color: &wgpu::TextureView,
+        output: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+    ) {
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("color convert pass"),
+            timestamp_writes: None,
+        });
+
+        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(color),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(output),
+                },
+            ],
+        });
+
+        let size = color.texture().size();
+        pass.set_pipeline(&self.color_pipeline);
+        pass.set_push_constants(0, (format as u32).as_bytes());
+        pass.set_bind_group(0, &group, &[]);
+        pass.dispatch_workgroups(size.width.div_ceil(8), size.height.div_ceil(8), 1);
+
+        std::mem::drop(pass);
+    }
+
+    pub fn convert_depth(
         &self,
         device: &wgpu::Device,
         format: DepthCopyFormat,
         depth: &wgpu::TextureView,
-        color: &wgpu::TextureView,
+        output: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -715,13 +772,13 @@ impl DepthConverter {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(color),
+                    resource: wgpu::BindingResource::TextureView(output),
                 },
             ],
         });
 
         let size = depth.texture().size();
-        pass.set_pipeline(&self.pipeline);
+        pass.set_pipeline(&self.depth_pipeline);
         pass.set_push_constants(0, (format as u32).as_bytes());
         pass.set_bind_group(0, &group, &[]);
         pass.dispatch_workgroups(size.width.div_ceil(8), size.height.div_ceil(8), 1);

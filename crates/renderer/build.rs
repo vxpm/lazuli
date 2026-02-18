@@ -17,6 +17,7 @@ fn main() {
     wesl.build_artifact(&"package::xfb_blit".parse().unwrap(), "xfb_blit");
     wesl.build_artifact(&"package::color_blit".parse().unwrap(), "color_blit");
     wesl.build_artifact(&"package::depth_blit".parse().unwrap(), "depth_blit");
-    wesl.build_artifact(&"package::depth_resolve".parse().unwrap(), "depth_resolve");
+    wesl.build_artifact(&"package::color_convert".parse().unwrap(), "color_convert");
     wesl.build_artifact(&"package::depth_convert".parse().unwrap(), "depth_convert");
+    wesl.build_artifact(&"package::depth_resolve".parse().unwrap(), "depth_resolve");
 }
