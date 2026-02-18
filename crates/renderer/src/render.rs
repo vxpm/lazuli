@@ -29,7 +29,7 @@ use seq_macro::seq;
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::alloc::Allocator;
-use crate::blit::{ColorBlitter, DepthBlitter};
+use crate::blit::{ColorBlitter, DepthBlitter, DepthConverter};
 use crate::clear::Cleaner;
 use crate::render::pipeline::TexGenStageSettings;
 use crate::render::texture::TextureRef;
@@ -84,6 +84,7 @@ pub struct Renderer {
     cleaner: Cleaner,
     color_blitter: ColorBlitter,
     depth_blitter: DepthBlitter,
+    depth_converter: DepthConverter,
     data_read_buffer: wgpu::Buffer,
 
     // caches
@@ -147,6 +148,7 @@ impl Renderer {
         let cleaner = Cleaner::new(&device);
         let color_blitter = ColorBlitter::new(&device);
         let depth_blitter = DepthBlitter::new(&device);
+        let depth_converter = DepthConverter::new(&device);
 
         let data_read_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("data read buffer"),
@@ -199,6 +201,7 @@ impl Renderer {
             cleaner,
             color_blitter,
             depth_blitter,
+            depth_converter,
             data_read_buffer,
 
             pipeline_cache,
@@ -1014,6 +1017,30 @@ impl Renderer {
         view
     }
 
+    fn encode_depth_as_color(
+        &mut self,
+        depth: &wgpu::TextureView,
+        format: DepthCopyFormat,
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> wgpu::TextureView {
+        let color = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            dimension: wgpu::TextureDimension::D2,
+            size: depth.texture().size(),
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+            mip_level_count: 1,
+            sample_count: 1,
+        });
+        let view = color.create_view(&Default::default());
+
+        self.depth_converter
+            .convert(&self.device, format, depth, &view, encoder);
+
+        view
+    }
+
     fn get_texture_data(
         &mut self,
         view: &wgpu::TextureView,
@@ -1187,6 +1214,7 @@ impl Renderer {
             &mut encoder,
         );
 
+        let color_texture = self.encode_depth_as_color(&depth_texture, format, &mut encoder);
         if let Some(response) = response {
             let data = self.get_texture_data(&depth_texture, encoder);
             response.send(data).unwrap();
@@ -1195,8 +1223,7 @@ impl Renderer {
             self.queue.submit([cmd]);
         }
 
-        self.texture_cache.insert_direct(id, depth_texture);
-
+        self.texture_cache.insert_direct(id, color_texture);
         if clear {
             self.clear(
                 src.x().value() as u32,
