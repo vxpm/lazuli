@@ -1165,7 +1165,6 @@ impl Renderer {
         }
 
         self.texture_cache.insert_direct(id, texture);
-
         if clear {
             self.clear(
                 src.x().value() as u32,

@@ -48,6 +48,9 @@ pub struct Config {
     /// Supported formats are .elf and .map.
     #[arg(long)]
     pub debug: Option<PathBuf>,
+    /// Whether to actually perform EFB->RAM copies.
+    #[arg(long, default_value_t = false)]
+    pub efb_ram_copies: bool,
     /// Whether to LLE the IPL instead of HLEing it for loading games
     #[arg(long, default_value_t = false)]
     pub ipl_lle: bool,

@@ -1182,7 +1182,9 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
         cmd.color_format().texture_format()
     };
 
-    let len = tex::Encoding::length_for(width, height, format) as usize;
-    let data = &sys.mem.ram()[dst.value() as usize..][..len];
-    sys.gpu.tex.update_tex_hash(dst, data);
+    if !sys.config.perform_efb_copies {
+        let len = tex::Encoding::length_for(width, height, format) as usize;
+        let data = &sys.mem.ram()[dst.value() as usize..][..len];
+        sys.gpu.tex.update_tex_hash(dst, data);
+    }
 }

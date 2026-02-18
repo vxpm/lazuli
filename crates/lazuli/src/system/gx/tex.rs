@@ -9,6 +9,7 @@ use gxtex::PaletteIndex;
 
 use crate::modules::render;
 use crate::system::System;
+use crate::system::gx::DEPTH_24_BIT_MAX;
 use crate::system::gx::pix::{ColorCopyFormat, DepthCopyFormat};
 
 #[derive(Debug, Clone)]
@@ -500,11 +501,13 @@ pub fn encode_depth_texture(
 
     let depth = data
         .into_iter()
+        .map(f32::from_bits)
+        .map(|x| (x * DEPTH_24_BIT_MAX as f32) as u32)
         .map(u32::to_le_bytes)
         .map(|c| gxtex::Pixel {
-            r: c[0], // low
+            r: c[2], // high
             g: c[1], // mid
-            b: c[2], // high
+            b: c[0], // low
             a: 0,
         })
         .collect::<Vec<_>>();
@@ -526,9 +529,9 @@ pub fn encode_depth_texture(
         DepthCopyFormat::Z8 => encode!(I8<RedChannel>), // not sure...
         DepthCopyFormat::Z16C => encode!(IA8<RedChannel, GreenChannel>),
         DepthCopyFormat::Z24X8 => encode!(Rgba8),
-        DepthCopyFormat::Z8H => encode!(I8<BlueChannel>),
+        DepthCopyFormat::Z8H => encode!(I8<RedChannel>),
         DepthCopyFormat::Z8M => encode!(I8<GreenChannel>),
-        DepthCopyFormat::Z8L => encode!(I8<RedChannel>),
+        DepthCopyFormat::Z8L => encode!(I8<BlueChannel>),
         DepthCopyFormat::Z16A => encode!(IA8<RedChannel, GreenChannel>),
         DepthCopyFormat::Z16B => encode!(IA8<GreenChannel, RedChannel>),
         _ => panic!("reserved depth format"),

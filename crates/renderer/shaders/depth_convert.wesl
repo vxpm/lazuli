@@ -10,7 +10,7 @@ const FMT_Z8L: Format = 0xA;
 const FMT_Z16A: Format = 0xB;
 const FMT_Z16B: Format = 0xC;
 
-const DEPTH_MAX: f32 = f32((1u << 24) - 1u);
+const DEPTH_MAX: f32 = 16777215.0;
 
 @group(0) @binding(0) var depth_texture: texture_2d<f32>;
 @group(0) @binding(1) var color_texture: texture_storage_2d<rgba8unorm, write>;
@@ -31,12 +31,32 @@ fn render(@builtin(global_invocation_id) global_id: vec3u) {
 
     var color: vec4u;
     switch (format) {
-        case FMT_Z16A: {
+        case FMT_Z8: {
+            // I8, I = R?
+            color = bytes.rrrr;
+        }
+        case FMT_Z8H: {
+            color = bytes.rrrr;   
+        }
+        case FMT_Z8M: {
+            color = bytes.gggg;
+        }
+        case FMT_Z8L: {
+            color = bytes.bbbb;
+        }
+        case FMT_Z16A, FMT_Z16C: {
             // IA8, I = R, A = G
             color = bytes.rrrg;
         }
+        case FMT_Z16B: {
+            // IA8, I = G, A = R
+            color = bytes.gggr;
+        }
+        case FMT_Z24X8: {
+            color = vec4u(bytes.rgb, 255);
+        }
         default: {
-            color = vec4u(coords, 0, 255);
+            color = 255 * vec4u(coords, 0, 1) / vec4u(dimensions, 1, 1);
         }
     }
 
