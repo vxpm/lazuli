@@ -7,6 +7,7 @@ members = [
     "crates/color",
     "crates/gxtex",
     "crates/jitalloc",
+    "crates/jitlink",
     "crates/lazuli",
     "crates/ppcjit",
     "crates/dspint",
@@ -28,6 +29,7 @@ default-members = [
     "crates/color",
     "crates/gxtex",
     "crates/jitalloc",
+    "crates/jitlink",
     "crates/lazuli",
     "crates/ppcjit",
     "crates/dspint",
@@ -128,6 +130,7 @@ gekko = { path = "./crates/gekko" }
 color = { path = "./crates/color" }
 gxtex = { path = "./crates/gxtex" }
 jitalloc = { path = "./crates/jitalloc" }
+jitlink = { path = "./crates/jitlink" }
 lazuli = { path = "./crates/lazuli" }
 ppcjit = { path = "./crates/ppcjit" }
 dspint = { path = "./crates/dspint" }
@@ -156,6 +159,7 @@ eyre-pretty = { git = "https://github.com/vxpm/eyre-pretty.git" }
 glam = { version = "0.32", features = ["zerocopy"] }
 indexmap = "2"
 insta = "1.46"
+libc = "0.2"
 nanorand = { version = "0.8", features = ["tls"], default-features = false }
 oneshot = { version = "0.1", default-features = false, features = ["std"] }
 ordered-float = "5"

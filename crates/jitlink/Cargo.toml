@@ -1,0 +1,13 @@
+[package]
+name = "jitlink"
+description = "Linking utilities for cranelift JITs"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[lints]
+workspace = true
+
+[dependencies]
+libc.workspace = true
+cranelift-codegen.workspace = true

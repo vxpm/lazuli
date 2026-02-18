@@ -1,4 +1,5 @@
 #![feature(debug_closure_helpers)]
+#![feature(maybe_uninit_array_assume_init)]
 
 mod builder;
 mod cache;
@@ -17,7 +18,6 @@ use std::path::PathBuf;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-use cranelift::codegen::binemit::Reloc;
 use cranelift::codegen::{self, ir};
 use cranelift::prelude::isa::TargetIsa;
 use cranelift::prelude::isa::unwind::UnwindInfo;
@@ -168,15 +168,76 @@ impl Codegen {
         })
     }
 
-    /// Writes a relocation in the given buffer.
-    fn write_relocation(code: &mut [u8], reloc: &FinalizedMachReloc, addr: usize) {
-        match reloc.kind {
-            Reloc::Abs8 => {
-                let base = reloc.offset;
-                code[base as usize..][..size_of::<usize>()].copy_from_slice(&addr.to_ne_bytes());
+    fn apply_user_relocation(
+        &mut self,
+        code: &mut [u8],
+        reloc: &FinalizedMachReloc,
+        name: ir::UserExternalName,
+    ) {
+        match name.namespace {
+            NAMESPACE_USER_HOOKS => {
+                let hook_kind = HookKind::from_repr(name.index).unwrap();
+                let addr = match hook_kind {
+                    HookKind::GetRegisters => self.hooks.get_registers as usize,
+                    HookKind::GetFastmem => self.hooks.get_fastmem as usize,
+                    HookKind::FollowLink => self.hooks.follow_link as usize,
+                    HookKind::TryLink => self.hooks.try_link as usize,
+                    HookKind::ReadI8 => self.hooks.read_i8 as usize,
+                    HookKind::ReadI16 => self.hooks.read_i16 as usize,
+                    HookKind::ReadI32 => self.hooks.read_i32 as usize,
+                    HookKind::ReadI64 => self.hooks.read_i64 as usize,
+                    HookKind::WriteI8 => self.hooks.write_i8 as usize,
+                    HookKind::WriteI16 => self.hooks.write_i16 as usize,
+                    HookKind::WriteI32 => self.hooks.write_i32 as usize,
+                    HookKind::WriteI64 => self.hooks.write_i64 as usize,
+                    HookKind::ReadQuant => self.hooks.read_quantized as usize,
+                    HookKind::WriteQuant => self.hooks.write_quantized as usize,
+                    HookKind::InvICache => self.hooks.invalidate_icache as usize,
+                    HookKind::ClearICache => self.hooks.clear_icache as usize,
+                    HookKind::DCacheDma => self.hooks.dcache_dma as usize,
+                    HookKind::MsrChanged => self.hooks.msr_changed as usize,
+                    HookKind::IBatChanged => self.hooks.ibat_changed as usize,
+                    HookKind::DBatChanged => self.hooks.dbat_changed as usize,
+                    HookKind::TbRead => self.hooks.tb_read as usize,
+                    HookKind::TbChanged => self.hooks.tb_changed as usize,
+                    HookKind::DecRead => self.hooks.dec_read as usize,
+                    HookKind::DecChanged => self.hooks.dec_changed as usize,
+                };
+
+                jitlink::write_relocation(code, reloc, addr);
             }
-            _ => todo!("relocation kind {:?}", reloc.kind),
+            NAMESPACE_INTERNALS => {
+                assert_eq!(name.index, INTERNAL_RAISE_EXCEPTION);
+                extern "sysv64-unwind" fn raise_exception(regs: &mut Cpu, exception: Exception) {
+                    regs.raise_exception(exception);
+                }
+
+                let addr = raise_exception as extern "sysv64-unwind" fn(_, _) as usize;
+                jitlink::write_relocation(code, reloc, addr);
+            }
+            NAMESPACE_LINK_DATA => {
+                let link_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
+
+                // initialize as None
+                unsafe {
+                    link_data.as_ptr().cast::<Option<LinkData>>().write(None);
+                }
+
+                let addr = unsafe { link_data.as_ptr().addr().get() };
+                jitlink::write_relocation(code, reloc, addr);
+            }
+            _ => unreachable!(),
         }
+    }
+
+    fn apply_libcall_relocation(
+        &mut self,
+        code: &mut [u8],
+        reloc: &FinalizedMachReloc,
+        libcall: ir::LibCall,
+    ) {
+        let addr = jitlink::libcall(libcall);
+        jitlink::write_relocation(code, reloc, addr);
     }
 
     /// Applies all relocations to the given buffer.
@@ -191,67 +252,15 @@ impl Codegen {
                 unreachable!()
             };
 
-            let ir::ExternalName::User(name_ref) = ext_name else {
-                unreachable!()
-            };
-
-            let name = mapping.get(*name_ref).unwrap();
-            match name.namespace {
-                NAMESPACE_USER_HOOKS => {
-                    let hook_kind = HookKind::from_repr(name.index).unwrap();
-                    let addr = match hook_kind {
-                        HookKind::GetRegisters => self.hooks.get_registers as usize,
-                        HookKind::GetFastmem => self.hooks.get_fastmem as usize,
-                        HookKind::FollowLink => self.hooks.follow_link as usize,
-                        HookKind::TryLink => self.hooks.try_link as usize,
-                        HookKind::ReadI8 => self.hooks.read_i8 as usize,
-                        HookKind::ReadI16 => self.hooks.read_i16 as usize,
-                        HookKind::ReadI32 => self.hooks.read_i32 as usize,
-                        HookKind::ReadI64 => self.hooks.read_i64 as usize,
-                        HookKind::WriteI8 => self.hooks.write_i8 as usize,
-                        HookKind::WriteI16 => self.hooks.write_i16 as usize,
-                        HookKind::WriteI32 => self.hooks.write_i32 as usize,
-                        HookKind::WriteI64 => self.hooks.write_i64 as usize,
-                        HookKind::ReadQuant => self.hooks.read_quantized as usize,
-                        HookKind::WriteQuant => self.hooks.write_quantized as usize,
-                        HookKind::InvICache => self.hooks.invalidate_icache as usize,
-                        HookKind::ClearICache => self.hooks.clear_icache as usize,
-                        HookKind::DCacheDma => self.hooks.dcache_dma as usize,
-                        HookKind::MsrChanged => self.hooks.msr_changed as usize,
-                        HookKind::IBatChanged => self.hooks.ibat_changed as usize,
-                        HookKind::DBatChanged => self.hooks.dbat_changed as usize,
-                        HookKind::TbRead => self.hooks.tb_read as usize,
-                        HookKind::TbChanged => self.hooks.tb_changed as usize,
-                        HookKind::DecRead => self.hooks.dec_read as usize,
-                        HookKind::DecChanged => self.hooks.dec_changed as usize,
-                    };
-
-                    Self::write_relocation(code, reloc, addr);
+            match ext_name {
+                ir::ExternalName::User(name_ref) => {
+                    let name = mapping.get(*name_ref).unwrap();
+                    self.apply_user_relocation(code, reloc, name.clone());
                 }
-                NAMESPACE_INTERNALS => {
-                    assert_eq!(name.index, INTERNAL_RAISE_EXCEPTION);
-                    extern "sysv64-unwind" fn raise_exception(
-                        regs: &mut Cpu,
-                        exception: Exception,
-                    ) {
-                        regs.raise_exception(exception);
-                    }
-
-                    let addr = raise_exception as extern "sysv64-unwind" fn(_, _) as usize;
-                    Self::write_relocation(code, reloc, addr);
+                ir::ExternalName::LibCall(libcall) => {
+                    self.apply_libcall_relocation(code, reloc, *libcall)
                 }
-                NAMESPACE_LINK_DATA => {
-                    let link_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
-
-                    // initialize as None
-                    unsafe {
-                        link_data.as_ptr().cast::<Option<LinkData>>().write(None);
-                    }
-
-                    let addr = unsafe { link_data.as_ptr().addr().get() };
-                    Self::write_relocation(code, reloc, addr);
-                }
-                _ => unreachable!(),
+                _ => unimplemented!("external reloc name: {ext_name:?}"),
             }
         }
     }
@@ -374,7 +383,11 @@ impl Jit {
 
     /// Creates a new [`Jit`] instance with the host's ISA.
     pub fn new(settings: Settings, hooks: Hooks) -> Self {
-        Self::with_isa(native::builder().unwrap(), settings, hooks)
+        Self::with_isa(
+            native::builder().expect("unsupported machine"),
+            settings,
+            hooks,
+        )
     }
 
     /// Translates a sequence of instructions into a cranelift function.
