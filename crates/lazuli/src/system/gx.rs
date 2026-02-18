@@ -1146,7 +1146,7 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
 
         if let Some(receiver) = receiver {
             let Ok(texels) = receiver.recv() else {
-                tracing::error!("render module did not answer color copy request");
+                tracing::error!("render module did not answer depth copy request");
                 return;
             };
 
