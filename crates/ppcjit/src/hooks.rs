@@ -1,5 +1,5 @@
 use cranelift::codegen::ir;
-use cranelift::prelude::isa;
+use cranelift_codegen::isa::CallConv;
 use gekko::{Address, Cpu, QuantReg};
 use strum::FromRepr;
 
@@ -8,22 +8,22 @@ use crate::block::{Info, LinkData};
 
 pub type Context = std::ffi::c_void;
 
-pub type GetRegistersHook = extern "sysv64-unwind" fn(*mut Context) -> *mut Cpu;
-pub type GetFastmemHook = extern "sysv64-unwind" fn(*mut Context) -> *mut FastmemLut;
+pub type GetRegistersHook = extern "C-unwind" fn(*mut Context) -> *mut Cpu;
+pub type GetFastmemHook = extern "C-unwind" fn(*mut Context) -> *mut FastmemLut;
 
 pub type FollowLinkHook =
-    extern "sysv64-unwind" fn(*const Info, *mut Context, *mut LinkData) -> bool;
-pub type TryLinkHook = extern "sysv64-unwind" fn(*mut Context, Address, *mut LinkData);
+    extern "C-unwind" fn(*const Info, *mut Context, *mut LinkData) -> bool;
+pub type TryLinkHook = extern "C-unwind" fn(*mut Context, Address, *mut LinkData);
 
-pub type ReadHook<T> = extern "sysv64-unwind" fn(*mut Context, Address, *mut T) -> bool;
-pub type WriteHook<T> = extern "sysv64-unwind" fn(*mut Context, Address, T) -> bool;
+pub type ReadHook<T> = extern "C-unwind" fn(*mut Context, Address, *mut T) -> bool;
+pub type WriteHook<T> = extern "C-unwind" fn(*mut Context, Address, T) -> bool;
 pub type ReadQuantizedHook =
-    extern "sysv64-unwind" fn(*mut Context, Address, QuantReg, *mut f64) -> u8;
-pub type WriteQuantizedHook = extern "sysv64-unwind" fn(*mut Context, Address, QuantReg, f64) -> u8;
+    extern "C-unwind" fn(*mut Context, Address, QuantReg, *mut f64) -> u8;
+pub type WriteQuantizedHook = extern "C-unwind" fn(*mut Context, Address, QuantReg, f64) -> u8;
 
-pub type InvalidateICache = extern "sysv64-unwind" fn(*mut Context, Address);
+pub type InvalidateICache = extern "C-unwind" fn(*mut Context, Address);
 
-pub type GenericHook = extern "sysv64-unwind" fn(*mut Context);
+pub type GenericHook = extern "C-unwind" fn(*mut Context);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 #[repr(u32)]
@@ -142,29 +142,29 @@ impl Hooks {
     }
 
     /// Returns the function signature for the `get_registers` hook.
-    pub(crate) fn get_registers_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn get_registers_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type), // ctx
             ],
             returns: vec![ir::AbiParam::new(ptr_type)], // registers
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for the `get_fastmem` hook.
-    pub(crate) fn get_fastmem_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn get_fastmem_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type), // ctx
             ],
             returns: vec![ir::AbiParam::new(ptr_type)], // fastmem lut
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for the `follow_link` hook.
-    pub(crate) fn follow_link_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn follow_link_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type), // info
@@ -172,12 +172,12 @@ impl Hooks {
                 ir::AbiParam::new(ptr_type), // lnk data
             ],
             returns: vec![ir::AbiParam::new(ir::types::I8)], // follow?
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for the `try_link` hook.
-    pub(crate) fn try_link_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn try_link_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
@@ -185,12 +185,12 @@ impl Hooks {
                 ir::AbiParam::new(ptr_type),       // link ptr storage
             ],
             returns: vec![],
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for a memory read hook.
-    pub(crate) fn read_sig(ptr_type: ir::Type, _read_type: ir::Type) -> ir::Signature {
+    pub(crate) fn read_sig(ptr_type: ir::Type, _read_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
@@ -198,12 +198,12 @@ impl Hooks {
                 ir::AbiParam::new(ptr_type),       // value ptr
             ],
             returns: vec![ir::AbiParam::new(ir::types::I8)], // success
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for a memory write hook.
-    pub(crate) fn write_sig(ptr_type: ir::Type, write_type: ir::Type) -> ir::Signature {
+    pub(crate) fn write_sig(ptr_type: ir::Type, write_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
@@ -211,12 +211,12 @@ impl Hooks {
                 ir::AbiParam::new(write_type),     // value
             ],
             returns: vec![ir::AbiParam::new(ir::types::I8)], // success
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for a quantized memory read hook.
-    pub(crate) fn read_quantized_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn read_quantized_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
@@ -225,12 +225,12 @@ impl Hooks {
                 ir::AbiParam::new(ptr_type),       // value ptr
             ],
             returns: vec![ir::AbiParam::new(ir::types::I8)], // size
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for a quantized memory read hook.
-    pub(crate) fn write_quantized_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn write_quantized_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
@@ -239,30 +239,30 @@ impl Hooks {
                 ir::AbiParam::new(ir::types::F64), // value
             ],
             returns: vec![ir::AbiParam::new(ir::types::I8)], // size
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for a invalidade icache hook.
-    pub(crate) fn invalidate_icache_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn invalidate_icache_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
                 ir::AbiParam::new(ir::types::I32), // address
             ],
             returns: vec![],
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
     /// Returns the function signature for a generic hook.
-    pub(crate) fn generic_hook_sig(ptr_type: ir::Type) -> ir::Signature {
+    pub(crate) fn generic_hook_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type), // ctx
             ],
             returns: vec![],
-            call_conv: isa::CallConv::SystemV,
+            call_conv,
         }
     }
 }

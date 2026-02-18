@@ -100,7 +100,7 @@ impl Block {
 /// A trampoline that allows calling blocks produced by a [`Jit`](super::Jit) compiler.
 pub(super) struct Trampoline(pub(super) Allocation<ReadExec>);
 
-type TrampolineFn = extern "sysv64-unwind" fn(*mut Info, *mut Context, BlockFn);
+type TrampolineFn = extern "C-unwind" fn(*mut Info, *mut Context, BlockFn);
 
 impl Trampoline {
     /// Calls the given block using this trampoline.

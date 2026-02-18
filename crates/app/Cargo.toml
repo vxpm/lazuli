@@ -40,7 +40,9 @@ egui_extras = "0.33"
 tracing-appender = "0.2"
 ron = { version = "0.11" }
 typetag = "0.2"
-renderdoc = "0.12"
 spin_sleep = "1.3"
 directories = "6"
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+renderdoc = "0.12"

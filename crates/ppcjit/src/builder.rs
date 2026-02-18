@@ -190,6 +190,7 @@ impl<'ctx> BlockBuilder<'ctx> {
         ));
 
         let ptr_type = codegen.isa.pointer_type();
+        let default = codegen.isa.default_call_conv();
         let params = builder.block_params(entry_bb);
         let info_ptr = params[0];
         let ctx_ptr = params[1];
@@ -199,23 +200,23 @@ impl<'ctx> BlockBuilder<'ctx> {
         let sigs = Signatures {
             block: builder.import_signature(builder.func.signature.clone()),
 
-            follow_link_hook: builder.import_signature(Hooks::follow_link_sig(ptr_type)),
-            try_link_hook: builder.import_signature(Hooks::try_link_sig(ptr_type)),
-            read_i8_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I8)),
-            read_i16_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I16)),
-            read_i32_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I32)),
-            read_i64_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I64)),
-            write_i8_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I8)),
-            write_i16_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I16)),
-            write_i32_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I32)),
-            write_i64_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I64)),
-            read_quant_hook: builder.import_signature(Hooks::read_quantized_sig(ptr_type)),
-            write_quant_hook: builder.import_signature(Hooks::write_quantized_sig(ptr_type)),
+            follow_link_hook: builder.import_signature(Hooks::follow_link_sig(ptr_type, default)),
+            try_link_hook: builder.import_signature(Hooks::try_link_sig(ptr_type, default)),
+            read_i8_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I8, default)),
+            read_i16_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I16, default)),
+            read_i32_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I32, default)),
+            read_i64_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I64, default)),
+            write_i8_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I8, default)),
+            write_i16_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I16, default)),
+            write_i32_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I32, default)),
+            write_i64_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I64, default)),
+            read_quant_hook: builder.import_signature(Hooks::read_quantized_sig(ptr_type, default)),
+            write_quant_hook: builder.import_signature(Hooks::write_quantized_sig(ptr_type, default)),
             invalidate_icache_hook: builder
-                .import_signature(Hooks::invalidate_icache_sig(ptr_type)),
-            generic_hook: builder.import_signature(Hooks::generic_hook_sig(ptr_type)),
+                .import_signature(Hooks::invalidate_icache_sig(ptr_type, default)),
+            generic_hook: builder.import_signature(Hooks::generic_hook_sig(ptr_type, default)),
 
-            raise_exception: builder.import_signature(exception::raise_exception_sig(ptr_type)),
+            raise_exception: builder.import_signature(exception::raise_exception_sig(ptr_type, default)),
         };
 
         let raise_exception = {

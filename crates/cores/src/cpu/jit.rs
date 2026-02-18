@@ -199,11 +199,11 @@ struct Context<'a> {
 }
 
 const CTX_HOOKS: Hooks = {
-    extern "sysv64-unwind" fn get_registers<'a>(ctx: &'a mut Context) -> &'a mut Cpu {
+    extern "C-unwind" fn get_registers<'a>(ctx: &'a mut Context) -> &'a mut Cpu {
         &mut ctx.sys.cpu
     }
 
-    extern "sysv64-unwind" fn get_fastmem<'a>(ctx: &'a mut Context) -> &'a FastmemLut {
+    extern "C-unwind" fn get_fastmem<'a>(ctx: &'a mut Context) -> &'a FastmemLut {
         if ctx.sys.cpu.supervisor.config.msr.data_addr_translation() {
             ctx.sys.mem.data_fastmem_lut_logical()
         } else {
@@ -211,7 +211,7 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "sysv64-unwind" fn follow_link(
+    extern "C-unwind" fn follow_link(
         info: &Info,
         ctx: &mut Context,
         link_data: &mut Option<LinkData>,
@@ -247,7 +247,7 @@ const CTX_HOOKS: Hooks = {
         follow
     }
 
-    extern "sysv64-unwind" fn try_link(
+    extern "C-unwind" fn try_link(
         ctx: &mut Context,
         addr: Address,
         link_data: &mut Option<LinkData>,
@@ -265,7 +265,7 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "sysv64-unwind" fn read<P: Primitive>(
+    extern "C-unwind" fn read<P: Primitive>(
         ctx: &mut Context,
         addr: Address,
         value: &mut P,
@@ -280,7 +280,7 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "sysv64-unwind" fn write<P: Primitive>(
+    extern "C-unwind" fn write<P: Primitive>(
         ctx: &mut Context,
         addr: Address,
         value: P,
@@ -294,7 +294,7 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "sysv64-unwind" fn read_quantized(
+    extern "C-unwind" fn read_quantized(
         ctx: &mut Context,
         addr: Address,
         gqr: QuantReg,
@@ -327,7 +327,7 @@ const CTX_HOOKS: Hooks = {
         ty.size()
     }
 
-    extern "sysv64-unwind" fn write_quantized(
+    extern "C-unwind" fn write_quantized(
         ctx: &mut Context,
         addr: Address,
         gqr: QuantReg,
@@ -358,7 +358,7 @@ const CTX_HOOKS: Hooks = {
         ty.size()
     }
 
-    extern "sysv64-unwind" fn invalidate_icache(ctx: &mut Context, addr: Address) {
+    extern "C-unwind" fn invalidate_icache(ctx: &mut Context, addr: Address) {
         let cacheline_base = addr.align_down(32);
         let is_logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
 
@@ -386,11 +386,11 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "sysv64-unwind" fn clear_icache(ctx: &mut Context) {
+    extern "C-unwind" fn clear_icache(ctx: &mut Context) {
         ctx.icache.clear();
     }
 
-    extern "sysv64-unwind" fn dcache_dma(ctx: &mut Context) {
+    extern "C-unwind" fn dcache_dma(ctx: &mut Context) {
         let dma = ctx.sys.cpu.supervisor.config.dma.clone();
 
         if dma.lower.trigger() {
@@ -416,11 +416,11 @@ const CTX_HOOKS: Hooks = {
         ctx.sys.cpu.supervisor.config.dma.lower.set_flush(false);
     }
 
-    extern "sysv64-unwind" fn msr_changed(ctx: &mut Context) {
+    extern "C-unwind" fn msr_changed(ctx: &mut Context) {
         ctx.sys.scheduler.schedule_now(system::pi::check_interrupts);
     }
 
-    extern "sysv64-unwind" fn ibat_changed(ctx: &mut Context) {
+    extern "C-unwind" fn ibat_changed(ctx: &mut Context) {
         tracing::info!("ibats changed - clearing blocks mapping and rebuilding ibat lut");
         ctx.blocks.clear();
         ctx.sys
@@ -428,18 +428,18 @@ const CTX_HOOKS: Hooks = {
             .build_inst_bat_lut(&ctx.sys.cpu.supervisor.memory.ibat);
     }
 
-    extern "sysv64-unwind" fn dbat_changed(ctx: &mut Context) {
+    extern "C-unwind" fn dbat_changed(ctx: &mut Context) {
         tracing::info!("dbats changed - rebuilding dbat lut");
         ctx.sys
             .mem
             .build_data_bat_lut(&ctx.sys.cpu.supervisor.memory.dbat);
     }
 
-    extern "sysv64-unwind" fn dec_read(ctx: &mut Context) {
+    extern "C-unwind" fn dec_read(ctx: &mut Context) {
         ctx.sys.update_decrementer();
     }
 
-    extern "sysv64-unwind" fn dec_changed(ctx: &mut Context) {
+    extern "C-unwind" fn dec_changed(ctx: &mut Context) {
         ctx.sys.lazy.last_updated_dec = ctx.sys.scheduler.elapsed_time_base();
         ctx.sys.scheduler.cancel(System::decrementer_overflow);
 
@@ -451,11 +451,11 @@ const CTX_HOOKS: Hooks = {
             .schedule(dec as u64, System::decrementer_overflow);
     }
 
-    extern "sysv64-unwind" fn tb_read(ctx: &mut Context) {
+    extern "C-unwind" fn tb_read(ctx: &mut Context) {
         ctx.sys.update_time_base();
     }
 
-    extern "sysv64-unwind" fn tb_changed(ctx: &mut Context) {
+    extern "C-unwind" fn tb_changed(ctx: &mut Context) {
         ctx.sys.lazy.last_updated_tb = ctx.sys.scheduler.elapsed_time_base();
         tracing::info!("time base changed to {}", ctx.sys.cpu.supervisor.misc.tb);
     }
@@ -468,55 +468,55 @@ const CTX_HOOKS: Hooks = {
         use std::mem::transmute;
 
         let get_registers =
-            transmute::<_, GetRegistersHook>(get_registers as extern "sysv64-unwind" fn(_) -> _);
+            transmute::<_, GetRegistersHook>(get_registers as extern "C-unwind" fn(_) -> _);
         let get_fastmem =
-            transmute::<_, GetFastmemHook>(get_fastmem as extern "sysv64-unwind" fn(_) -> _);
+            transmute::<_, GetFastmemHook>(get_fastmem as extern "C-unwind" fn(_) -> _);
 
         let follow_link =
-            transmute::<_, FollowLinkHook>(follow_link as extern "sysv64-unwind" fn(_, _, _) -> _);
-        let try_link = transmute::<_, TryLinkHook>(try_link as extern "sysv64-unwind" fn(_, _, _));
+            transmute::<_, FollowLinkHook>(follow_link as extern "C-unwind" fn(_, _, _) -> _);
+        let try_link = transmute::<_, TryLinkHook>(try_link as extern "C-unwind" fn(_, _, _));
 
         let read_i8 =
-            transmute::<_, ReadHook<i8>>(read::<i8> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, ReadHook<i8>>(read::<i8> as extern "C-unwind" fn(_, _, _) -> _);
         let write_i8 =
-            transmute::<_, WriteHook<i8>>(write::<i8> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, WriteHook<i8>>(write::<i8> as extern "C-unwind" fn(_, _, _) -> _);
         let read_i16 =
-            transmute::<_, ReadHook<i16>>(read::<i16> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, ReadHook<i16>>(read::<i16> as extern "C-unwind" fn(_, _, _) -> _);
         let write_i16 =
-            transmute::<_, WriteHook<i16>>(write::<i16> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, WriteHook<i16>>(write::<i16> as extern "C-unwind" fn(_, _, _) -> _);
         let read_i32 =
-            transmute::<_, ReadHook<i32>>(read::<i32> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, ReadHook<i32>>(read::<i32> as extern "C-unwind" fn(_, _, _) -> _);
         let write_i32 =
-            transmute::<_, WriteHook<i32>>(write::<i32> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, WriteHook<i32>>(write::<i32> as extern "C-unwind" fn(_, _, _) -> _);
         let read_i64 =
-            transmute::<_, ReadHook<i64>>(read::<i64> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, ReadHook<i64>>(read::<i64> as extern "C-unwind" fn(_, _, _) -> _);
         let write_i64 =
-            transmute::<_, WriteHook<i64>>(write::<i64> as extern "sysv64-unwind" fn(_, _, _) -> _);
+            transmute::<_, WriteHook<i64>>(write::<i64> as extern "C-unwind" fn(_, _, _) -> _);
         let read_quantized = transmute::<_, ReadQuantizedHook>(
-            read_quantized as extern "sysv64-unwind" fn(_, _, _, _) -> _,
+            read_quantized as extern "C-unwind" fn(_, _, _, _) -> _,
         );
         let write_quantized = transmute::<_, WriteQuantizedHook>(
-            write_quantized as extern "sysv64-unwind" fn(_, _, _, _) -> _,
+            write_quantized as extern "C-unwind" fn(_, _, _, _) -> _,
         );
 
         let invalidate_icache =
-            transmute::<_, InvalidateICache>(invalidate_icache as extern "sysv64-unwind" fn(_, _));
+            transmute::<_, InvalidateICache>(invalidate_icache as extern "C-unwind" fn(_, _));
         let clear_icache =
-            transmute::<_, GenericHook>(clear_icache as extern "sysv64-unwind" fn(_));
-        let dcache_dma = transmute::<_, GenericHook>(dcache_dma as extern "sysv64-unwind" fn(_));
+            transmute::<_, GenericHook>(clear_icache as extern "C-unwind" fn(_));
+        let dcache_dma = transmute::<_, GenericHook>(dcache_dma as extern "C-unwind" fn(_));
 
-        let msr_changed = transmute::<_, GenericHook>(msr_changed as extern "sysv64-unwind" fn(_));
+        let msr_changed = transmute::<_, GenericHook>(msr_changed as extern "C-unwind" fn(_));
 
         let ibat_changed =
-            transmute::<_, GenericHook>(ibat_changed as extern "sysv64-unwind" fn(_));
+            transmute::<_, GenericHook>(ibat_changed as extern "C-unwind" fn(_));
         let dbat_changed =
-            transmute::<_, GenericHook>(dbat_changed as extern "sysv64-unwind" fn(_));
+            transmute::<_, GenericHook>(dbat_changed as extern "C-unwind" fn(_));
 
-        let tb_read = transmute::<_, GenericHook>(tb_read as extern "sysv64-unwind" fn(_));
-        let tb_changed = transmute::<_, GenericHook>(tb_changed as extern "sysv64-unwind" fn(_));
+        let tb_read = transmute::<_, GenericHook>(tb_read as extern "C-unwind" fn(_));
+        let tb_changed = transmute::<_, GenericHook>(tb_changed as extern "C-unwind" fn(_));
 
-        let dec_read = transmute::<_, GenericHook>(dec_read as extern "sysv64-unwind" fn(_));
-        let dec_changed = transmute::<_, GenericHook>(dec_changed as extern "sysv64-unwind" fn(_));
+        let dec_read = transmute::<_, GenericHook>(dec_read as extern "C-unwind" fn(_));
+        let dec_changed = transmute::<_, GenericHook>(dec_changed as extern "C-unwind" fn(_));
 
         Hooks {
             get_registers,
