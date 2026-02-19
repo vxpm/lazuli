@@ -75,7 +75,11 @@ fn compile_sequence(isa: isa::Builder, sequence: Sequence) -> (Artifact, Meta) {
     jit.build_artifact(sequence.0.into_iter()).unwrap()
 }
 
-fn x86_isa() -> isa::Builder {
+fn x86_v1_isa() -> isa::Builder {
+    isa::lookup_by_name("x86_64").expect("tests should compile for x86_64")
+}
+
+fn x86_v3_isa() -> isa::Builder {
     let mut isa = isa::lookup_by_name("x86_64").expect("tests should compile for x86_64");
 
     isa.enable("has_sse3").unwrap();
@@ -93,24 +97,22 @@ fn x86_isa() -> isa::Builder {
     isa
 }
 
-fn arm_isa() -> isa::Builder {
+fn aarch64_isa() -> isa::Builder {
     isa::lookup_by_name("aarch64").expect("tests should compile for aarch64")
 }
 
 fn test_sequence(name: &str, sequence: Sequence) {
-    // x86
-    let (artifact, meta) = compile_sequence(x86_isa(), sequence.clone());
-    let clir = meta.clir.unwrap();
-    let disasm = artifact.disasm.unwrap();
-    insta::assert_snapshot!(format!("{}_x86_clir", name), clir);
-    insta::assert_snapshot!(format!("{}_x86_disasm", name), disasm);
+    fn inner(name: &str, sequence: Sequence, isa: isa::Builder, isa_name: &str) {
+        let (artifact, meta) = compile_sequence(isa, sequence.clone());
+        let clir = meta.clir.unwrap();
+        let disasm = artifact.disasm.unwrap();
+        insta::assert_snapshot!(format!("{isa_name}_{}_clir", name), clir);
+        insta::assert_snapshot!(format!("{isa_name}_{}_disasm", name), disasm);
+    }
 
-    // arm
-    let (artifact, meta) = compile_sequence(arm_isa(), sequence);
-    let clir = meta.clir.unwrap();
-    let disasm = artifact.disasm.unwrap();
-    insta::assert_snapshot!(format!("{}_arm_clir", name), clir);
-    insta::assert_snapshot!(format!("{}_arm_disasm", name), disasm);
+    inner(name, sequence.clone(), x86_v1_isa(), "x86_v1");
+    inner(name, sequence.clone(), x86_v3_isa(), "x86_v3");
+    inner(name, sequence.clone(), aarch64_isa(), "aarch64");
 }
 
 #[test]
