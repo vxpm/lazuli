@@ -18,14 +18,12 @@ use std::path::PathBuf;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
+use cranelift::codegen::entity::PrimaryMap;
+use cranelift::codegen::ir::InstBuilder;
+use cranelift::codegen::isa::TargetIsa;
+use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
-use cranelift::prelude::isa::TargetIsa;
-use cranelift::prelude::isa::unwind::UnwindInfo;
-use cranelift::prelude::{Configurable, InstBuilder};
 use cranelift::{frontend, native};
-use cranelift_codegen::entity::PrimaryMap;
-use cranelift_codegen::ir::{UserExternalName, UserExternalNameRef};
-use cranelift_codegen::{FinalizedMachReloc, FinalizedRelocTarget};
 use easyerr::{Error, ResultExt};
 use gekko::disasm::Ins;
 use gekko::{Cpu, Exception};
@@ -171,7 +169,7 @@ impl Codegen {
     fn apply_user_relocation(
         &mut self,
         code: &mut [u8],
-        reloc: &FinalizedMachReloc,
+        reloc: &codegen::FinalizedMachReloc,
         name: ir::UserExternalName,
     ) {
         match name.namespace {
@@ -230,25 +228,15 @@ impl Codegen {
         }
     }
 
-    fn apply_libcall_relocation(
-        &mut self,
-        code: &mut [u8],
-        reloc: &FinalizedMachReloc,
-        libcall: ir::LibCall,
-    ) {
-        let addr = jitlink::libcall(libcall);
-        jitlink::write_relocation(code, reloc, addr);
-    }
-
     /// Applies all relocations to the given buffer.
     fn apply_relocations(
         &mut self,
         code: &mut [u8],
-        mapping: &PrimaryMap<UserExternalNameRef, UserExternalName>,
-        relocs: &[FinalizedMachReloc],
+        mapping: &PrimaryMap<ir::UserExternalNameRef, ir::UserExternalName>,
+        relocs: &[codegen::FinalizedMachReloc],
     ) {
         for reloc in relocs {
-            let FinalizedRelocTarget::ExternalName(ext_name) = &reloc.target else {
+            let codegen::FinalizedRelocTarget::ExternalName(ext_name) = &reloc.target else {
                 unreachable!()
             };
 
@@ -258,7 +246,8 @@ impl Codegen {
                     self.apply_user_relocation(code, reloc, name.clone());
                 }
                 ir::ExternalName::LibCall(libcall) => {
-                    self.apply_libcall_relocation(code, reloc, *libcall)
+                    let addr = jitlink::libcall(*libcall);
+                    jitlink::write_relocation(code, reloc, addr);
                 }
                 _ => unimplemented!("external reloc name: {ext_name:?}"),
             }
@@ -283,9 +272,9 @@ struct Translated {
 
 #[derive(Clone, Serialize, Deserialize)]
 struct Artifact {
-    user_named_funcs: PrimaryMap<UserExternalNameRef, UserExternalName>,
-    relocs: Vec<FinalizedMachReloc>,
-    unwind: Option<UnwindInfo>,
+    user_named_funcs: PrimaryMap<ir::UserExternalNameRef, ir::UserExternalName>,
+    relocs: Vec<codegen::FinalizedMachReloc>,
+    unwind: Option<codegen::isa::unwind::UnwindInfo>,
     disasm: Option<String>,
     #[serde(with = "serde_bytes")]
     code: Vec<u8>,
@@ -383,11 +372,11 @@ impl Jit {
 
     /// Creates a new [`Jit`] instance with the host's ISA.
     pub fn new(settings: Settings, hooks: Hooks) -> Self {
-        Self::with_isa(
-            native::builder().expect("unsupported machine"),
-            settings,
-            hooks,
-        )
+        let isa_builder = native::builder().unwrap_or_else(|msg| {
+            panic!("host machine is not supported: {}", msg);
+        });
+
+        Self::with_isa(isa_builder, settings, hooks)
     }
 
     /// Translates a sequence of instructions into a cranelift function.

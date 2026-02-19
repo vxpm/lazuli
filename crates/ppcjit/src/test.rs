@@ -1,3 +1,4 @@
+use cranelift::codegen::isa;
 use cranelift::prelude::Configurable;
 
 use crate::block::Meta;
@@ -57,8 +58,7 @@ macro_rules! ppc {
 }
 
 fn compile_sequence(sequence: Sequence) -> (Artifact, Meta) {
-    let mut isa =
-        cranelift_codegen::isa::lookup_by_name("x86_64").expect("tests should compile for x86_64");
+    let mut isa = isa::lookup_by_name("x86_64").expect("tests should compile for x86_64");
 
     isa.enable("has_sse3").unwrap();
     isa.enable("has_ssse3").unwrap();

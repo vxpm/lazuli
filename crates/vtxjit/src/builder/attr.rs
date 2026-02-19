@@ -117,7 +117,7 @@ fn vec_int(
             .insert(ir::ConstantData::from(shuffle_const.as_bytes()));
 
         let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-        let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+        let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
 
         parser.bd.ins().bitcast(
             ir::types::I32X4,
@@ -166,7 +166,7 @@ fn vec_int(
             .insert(ir::ConstantData::from(shuffle_const.as_bytes()));
 
         let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-        let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+        let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
 
         parser.bd.ins().bitcast(
             ir::types::I32X4,
@@ -238,7 +238,7 @@ fn vec_float(parser: &mut ParserBuilder, ptr: ir::Value, triplet: bool) -> [ir::
         .insert(ir::ConstantData::from(shuffle_const.as_bytes()));
 
     let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-    let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+    let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
 
     // 03. convert to F32X4
     let vector = parser.bd.ins().bitcast(
@@ -279,7 +279,7 @@ fn rgba4444(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
         .insert(ir::ConstantData::from(SHUFFLE_CONST.as_bytes()));
 
     let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-    let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+    let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
     let vector = parser.bd.ins().bitcast(
         ir::types::I32X4,
         ir::MemFlags::new().with_endianness(ir::Endianness::Little),
@@ -342,7 +342,7 @@ fn rgb6666(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
         .insert(ir::ConstantData::from(SHUFFLE_CONST.as_bytes()));
 
     let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-    let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+    let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
     let vector = parser.bd.ins().bitcast(
         ir::types::I32X4,
         ir::MemFlags::new().with_endianness(ir::Endianness::Little),
@@ -403,7 +403,7 @@ fn rgba8888(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
         .insert(ir::ConstantData::from(SHUFFLE_CONST.as_bytes()));
 
     let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-    let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+    let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
 
     let vector = parser.bd.ins().bitcast(
         ir::types::I32X4,
@@ -442,7 +442,7 @@ fn rgb565(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
         .insert(ir::ConstantData::from(SHUFFLE_CONST.as_bytes()));
 
     let shuffle_mask = parser.bd.ins().vconst(ir::types::I8X16, shuffle_const);
-    let shuffled = parser.bd.ins().x86_pshufb(bytes, shuffle_mask);
+    let shuffled = parser.bd.ins().swizzle(bytes, shuffle_mask);
 
     let vector = parser.bd.ins().bitcast(
         ir::types::I32X4,

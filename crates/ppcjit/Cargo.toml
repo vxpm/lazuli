@@ -18,7 +18,6 @@ jitalloc.workspace = true
 jitlink.workspace = true
 
 bitos.workspace = true
-cranelift-codegen.workspace = true
 cranelift.workspace = true
 easyerr.workspace = true
 rustc-hash.workspace = true

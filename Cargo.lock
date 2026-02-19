@@ -3869,7 +3869,6 @@ version = "0.1.0"
 dependencies = [
  "bitos",
  "cranelift",
- "cranelift-codegen",
  "easyerr",
  "fjall",
  "gekko",
@@ -5113,6 +5112,7 @@ dependencies = [
  "cranelift",
  "insta",
  "jitalloc",
+ "jitlink",
  "lazuli",
  "rustc-hash 2.1.1",
  "seq-macro",
