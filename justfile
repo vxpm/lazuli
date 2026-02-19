@@ -7,6 +7,6 @@ export RUSTDOCFLAGS := "-Zunstable-options --show-type-layout --generate-link-to
 list:
     @just --list
 
-# Opens the documentation of the crate 
+# Opens the documentation of the crates
 doc:
     cargo doc --open

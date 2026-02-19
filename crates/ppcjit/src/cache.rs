@@ -1,7 +1,7 @@
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
-use cranelift_codegen::isa::TargetIsa;
+use cranelift::codegen::isa::TargetIsa;
 use fjall::{Database, KeyspaceCreateOptions};
 use zerocopy::IntoBytes;
 

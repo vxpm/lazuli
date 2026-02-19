@@ -2531,6 +2531,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jitlink"
+version = "0.1.0"
+dependencies = [
+ "cranelift-codegen",
+ "libc",
+]
+
+[[package]]
 name = "jni"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3861,12 +3869,12 @@ version = "0.1.0"
 dependencies = [
  "bitos",
  "cranelift",
- "cranelift-codegen",
  "easyerr",
  "fjall",
  "gekko",
  "insta",
  "jitalloc",
+ "jitlink",
  "powerpc-asm",
  "rmp-serde",
  "rustc-hash 2.1.1",
@@ -5104,6 +5112,7 @@ dependencies = [
  "cranelift",
  "insta",
  "jitalloc",
+ "jitlink",
  "lazuli",
  "rustc-hash 2.1.1",
  "seq-macro",

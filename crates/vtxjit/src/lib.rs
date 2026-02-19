@@ -8,9 +8,9 @@ use std::collections::hash_map::Entry;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
+use cranelift::codegen::isa::TargetIsa;
+use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
-use cranelift::prelude::Configurable;
-use cranelift::prelude::isa::TargetIsa;
 use cranelift::{frontend, native};
 use jitalloc::{Allocator, ReadExec};
 use lazuli::modules::vertex::{Ctx, VertexModule};
@@ -105,6 +105,22 @@ impl Jit {
         }
     }
 
+    fn apply_relocations(&mut self, code: &mut [u8], relocs: &[codegen::FinalizedMachReloc]) {
+        for reloc in relocs {
+            let codegen::FinalizedRelocTarget::ExternalName(ext_name) = &reloc.target else {
+                unreachable!()
+            };
+
+            match ext_name {
+                ir::ExternalName::LibCall(libcall) => {
+                    let addr = jitlink::libcall(*libcall);
+                    jitlink::write_relocation(code, reloc, addr);
+                }
+                _ => unimplemented!("external reloc name: {ext_name:?}"),
+            }
+        }
+    }
+
     /// Compiles and returns a parser.
     fn compile(
         &mut self,
@@ -128,8 +144,12 @@ impl Jit {
             .unwrap();
 
         let compiled = code_ctx.take_compiled_code().unwrap();
-        let alloc = self.allocator.allocate(64, compiled.code_buffer());
+        let relocs = compiled.buffer.relocs().to_owned();
+        let mut code = compiled.code_buffer().to_owned();
 
+        self.apply_relocations(&mut code, &relocs);
+
+        let alloc = self.allocator.allocate(64, &code);
         let disasm = compiled.vcode;
         let meta = Meta { clir, disasm };
 
