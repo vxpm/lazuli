@@ -41,12 +41,12 @@ extern "C" fn fma_f64(a: f64, b: f64, c: f64) -> f64 {
 }
 
 #[cfg(target_arch = "x86_64")]
-#[repr(C)]
+#[repr(transparent)]
 struct Vector128(core::arch::x86_64::__m128i);
 
 // TODO: ensure this works, needed for MacOS support
 #[cfg(target_arch = "aarch64")]
-#[repr(C)]
+#[repr(transparent)]
 struct Vector128(core::arch::aarch64::int64x2_t);
 
 #[expect(
@@ -63,7 +63,7 @@ extern "C" fn x86_pshufb(a: Vector128, b: Vector128) -> Vector128 {
         result[i] = std::hint::select_unpredictable(index & 0x80 == 0, a[index as usize & 0xF], 0);
     }
 
-    Vector128(unsafe { std::mem::transmute(result) })
+    unsafe { std::mem::transmute(result) }
 }
 
 pub fn get(libcall: ir::LibCall) -> usize {
