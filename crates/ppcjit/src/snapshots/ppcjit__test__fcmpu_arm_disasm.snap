@@ -1,0 +1,67 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: disasm
+---
+  stp fp, lr, [sp, #-16]!
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  mov fp, sp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
+  sub sp, sp, #16
+  unwind StackAlloc { size: 16 }
+block0:
+  ldr w5, [x4, #680]
+  mov x6, x4
+  lsr w4, w5, #13
+  tbnz x4, #0, label2 ; b label1
+block2:
+  mov x0, x6
+  ldr q23, [x0, #152]
+  ldr q24, [x0, #168]
+  ldr w7, [x0, #652]
+  ldr w9, [x0, #648]
+  ldr w8, [x0]
+  and w10, w9, #268435455
+  fcmp d23, d24
+  cset x9, mi
+  uxtb w9, w9
+  fcmp d23, d24
+  cset x11, gt
+  uxtb w11, w11
+  lsl w12, w11, #30
+  orr w13, w12, w9, LSL 31
+  fcmp d23, d24
+  cset x12, eq
+  uxtb w12, w12
+  orr w14, w13, w12, LSL 29
+  fcmp d23, d24
+  cset x13, vs
+  uxtb w13, w13
+  orr w14, w14, w13, LSL 28
+  orr w14, w10, w14
+  str w14, [x0, #648]
+  add w14, w8, #4
+  str w14, [x0]
+  and w14, w7, #4294840319
+  lsl w15, w11, #14
+  orr w15, w15, w9, LSL 15
+  orr w15, w15, w12, LSL 13
+  orr w13, w15, w13, LSL 12
+  orr w13, w14, w13
+  str w13, [x0, #652]
+  ldr w14, [x2]
+  add w14, w14, #1
+  str w14, [x2]
+  ldr w15, [x2, #4]
+  add w15, w15, #2
+  str w15, [x2, #4]
+  add sp, sp, #16
+  ldp fp, lr, [sp], #16
+  ret
+block1:
+  movz w1, #2048
+  load_ext_name_far x5, User(userextname0)+0
+  mov x0, x6
+  blr x5
+  add sp, sp, #16
+  ldp fp, lr, [sp], #16
+  ret

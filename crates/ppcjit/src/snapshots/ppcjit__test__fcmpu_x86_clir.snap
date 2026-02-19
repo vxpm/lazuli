@@ -1,0 +1,111 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: clir
+---
+function u0:0(i64, i64, i64, i64) tail {
+    ss0 = explicit_slot 8, align = 8
+    sig0 = (i64, i64, i64, i64) tail
+    sig1 = (i64, i64, i64) -> i8 system_v
+    sig2 = (i64, i32, i64) system_v
+    sig3 = (i64, i32, i64) -> i8 system_v
+    sig4 = (i64, i32, i64) -> i8 system_v
+    sig5 = (i64, i32, i64) -> i8 system_v
+    sig6 = (i64, i32, i64) -> i8 system_v
+    sig7 = (i64, i32, i8) -> i8 system_v
+    sig8 = (i64, i32, i16) -> i8 system_v
+    sig9 = (i64, i32, i32) -> i8 system_v
+    sig10 = (i64, i32, i64) -> i8 system_v
+    sig11 = (i64, i32, i32, i64) -> i8 system_v
+    sig12 = (i64, i32, i32, f64) -> i8 system_v
+    sig13 = (i64, i32) system_v
+    sig14 = (i64) system_v
+    sig15 = (i64, i16) system_v
+    fn0 = u1:0 sig15
+    fn1 = u0:2 sig1
+    fn2 = u0:3 sig2
+    fn3 = u0:4 sig3
+    fn4 = u0:5 sig4
+    fn5 = u0:6 sig5
+    fn6 = u0:7 sig6
+    fn7 = u0:8 sig7
+    fn8 = u0:9 sig8
+    fn9 = u0:10 sig9
+    fn10 = u0:11 sig10
+    fn11 = u0:12 sig11
+    fn12 = u0:13 sig12
+    fn13 = u0:14 sig13
+    fn14 = u0:15 sig14
+    fn15 = u0:16 sig14
+    fn16 = u0:17 sig14
+    fn17 = u0:18 sig14
+    fn18 = u0:19 sig14
+    fn19 = u0:20 sig14
+    fn20 = u0:21 sig14
+    fn21 = u0:22 sig14
+    fn22 = u0:23 sig14
+
+                                block0(v0: i64, v1: i64, v2: i64, v3: i64):
+@0000                               v4 = load.i32 notrap aligned v2+680
+@0000                               v5 = iconst.i32 13
+@0000                               v6 = ushr v4, v5  ; v5 = 13
+@0000                               v7 = band_imm v6, 1
+@0000                               v8 = ireduce.i8 v7
+@0000                               brif v8, block2, block1
+
+                                block1 cold:
+@0000                               v9 = iconst.i16 2048
+@0000                               call fn0(v2, v9)  ; v9 = 2048
+@0000                               return
+
+                                block2:
+@0000                               v10 = load.f64x2 notrap aligned v2+152
+@0000                               v11 = load.f64x2 notrap aligned v2+168
+@0000                               v12 = extractlane v10, 0
+@0000                               v13 = extractlane v11, 0
+@0000                               v14 = fcmp lt v12, v13
+@0000                               v15 = fcmp gt v12, v13
+@0000                               v16 = fcmp eq v12, v13
+@0000                               v17 = fcmp uno v12, v13
+@0000                               v18 = load.i32 notrap aligned v2+652
+@0000                               v19 = uextend.i32 v14
+@0000                               v20 = uextend.i32 v15
+@0000                               v21 = uextend.i32 v16
+@0000                               v22 = uextend.i32 v17
+@0000                               v23 = ishl_imm v19, 15
+@0000                               v24 = ishl_imm v20, 14
+@0000                               v25 = ishl_imm v21, 13
+@0000                               v26 = ishl_imm v22, 12
+@0000                               v27 = bor v23, v24
+@0000                               v28 = bor v27, v25
+@0000                               v29 = bor v28, v26
+@0000                               v30 = iconst.i32 0x0001_f000
+@0000                               v31 = band_not v18, v30  ; v30 = 0x0001_f000
+@0000                               v32 = bor v31, v29
+@0000                               v33 = load.i32 notrap aligned v2+648
+@0000                               v34 = uextend.i32 v14
+@0000                               v35 = uextend.i32 v15
+@0000                               v36 = uextend.i32 v16
+@0000                               v37 = uextend.i32 v17
+@0000                               v38 = ishl_imm v34, 31
+@0000                               v39 = ishl_imm v35, 30
+@0000                               v40 = ishl_imm v36, 29
+@0000                               v41 = ishl_imm v37, 28
+@0000                               v42 = bor v38, v39
+@0000                               v43 = bor v42, v40
+@0000                               v44 = bor v43, v41
+@0000                               v45 = iconst.i32 -268435456
+@0000                               v46 = band_not v33, v45  ; v45 = -268435456
+@0000                               v47 = bor v46, v44
+@0000                               v48 = load.i32 notrap aligned v2
+@0000                               v49 = iadd_imm v48, 4
+                                    store notrap aligned v47, v2+648
+                                    store notrap aligned v49, v2
+                                    store notrap aligned v32, v2+652
+                                    v50 = load.i32 notrap aligned v0
+                                    v51 = iadd_imm v50, 1
+                                    store notrap aligned v51, v0
+                                    v52 = load.i32 notrap aligned v0+4
+                                    v53 = iadd_imm v52, 2
+                                    store notrap aligned v53, v0+4
+                                    return
+}

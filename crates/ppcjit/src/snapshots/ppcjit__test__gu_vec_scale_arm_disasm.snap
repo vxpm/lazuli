@@ -1,0 +1,500 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: disasm
+---
+  stp fp, lr, [sp, #-16]!
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  mov fp, sp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 80 }
+  stp x27, x28, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 64, reg: p27i }
+  unwind SaveReg { clobber_offset: 72, reg: p28i }
+  stp x25, x26, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 48, reg: p25i }
+  unwind SaveReg { clobber_offset: 56, reg: p26i }
+  stp x23, x24, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 32, reg: p23i }
+  unwind SaveReg { clobber_offset: 40, reg: p24i }
+  stp x21, x22, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 16, reg: p21i }
+  unwind SaveReg { clobber_offset: 24, reg: p22i }
+  stp x19, x20, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 0, reg: p19i }
+  unwind SaveReg { clobber_offset: 8, reg: p20i }
+  sub sp, sp, #80
+  unwind StackAlloc { size: 80 }
+block0:
+  mov x19, x3
+  mov x25, x2
+  ldr w15, [x4, #680]
+  mov x28, x4
+  lsr w15, w15, #13
+  tbnz x15, #0, label2 ; b label1
+block2:
+  mov x0, x28
+  ldr w27, [x0, #20]
+  ldr w2, [x0, #872]
+  mov x21, x2
+  mov x3, sp
+  mov x24, x3
+  load_ext_name_far x4, User(userextname11)+0
+  mov x0, x19
+  mov x1, x27
+  blr x4
+  uxtb w2, w0
+  cbnz x2, label4 ; b label3
+block4:
+  mov x23, x25
+  ldr d24, [sp]
+  str q24, [sp, #56]
+  add w22, w27, w0, UXTB
+  load_ext_name_far x8, User(userextname11)+0
+  mov x2, x21
+  mov x0, x19
+  mov x1, x22
+  mov x3, x24
+  blr x8
+  uxtb w8, w0
+  cbnz x8, label6 ; b label5
+block6:
+  ldr d28, [sp]
+  mov x0, x28
+  str q28, [sp, #40]
+  ldr w26, [x0]
+  ldr w2, [x0, #872]
+  add w1, w27, #8
+  load_ext_name_far x12, User(userextname11)+0
+  mov x3, x24
+  mov x0, x19
+  blr x12
+  uxtb w12, w0
+  cbnz x12, label8 ; b label7
+block8:
+  ldr q24, [sp, #56]
+  ldr q28, [sp, #40]
+  ldr d4, [sp]
+  mov x0, x28
+  str q4, [sp, #24]
+  ldr q4, [x0, #152]
+  ldr w24, [x0, #652]
+  ldr w25, [x0, #24]
+  ldr w2, [x0, #872]
+  mov x20, x2
+  fmov d3, d24
+  mov v3.d[1], v3.d[1], v28.d[0]
+  movz x3, #256
+  movk x3, x3, #770, LSL #16
+  movk x3, x3, #1284, LSL #32
+  movk x3, x3, #1798, LSL #48
+  dup v16.2d, x3
+  tbl v4.16b, { v4.16b }, v16.16b
+  fmul v1.2d, v3.2d, v4.2d
+  str q4, [sp, #8]
+  str q1, [sp, #40]
+  str q3, [sp, #56]
+  load_ext_name_far x4, User(userextname12)+0
+  mov x0, x19
+  mov x1, x25
+  ldr q0, [sp, #40]
+  blr x4
+  uxtb w4, w0
+  cbnz x4, label10 ; b label9
+block10:
+  ldr q4, [sp, #40]
+  add w21, w25, w0, UXTB
+  mov d0, v4.d[1]
+  load_ext_name_far x3, User(userextname12)+0
+  mov x2, x20
+  mov x0, x19
+  mov x1, x21
+  blr x3
+  uxtb w3, w0
+  cbnz x3, label12 ; b label11
+block12:
+  mov x0, x28
+  ldr q4, [sp, #24]
+  ldr w2, [x0, #872]
+  mov x27, x2
+  add w22, w25, #8
+  fmov d6, d4
+  fmov d16, #1
+  mov v6.d[1], v6.d[1], v16.d[0]
+  ldr q4, [sp, #8]
+  fmul v16.2d, v6.2d, v4.2d
+  str q16, [sp, #8]
+  str q6, [sp, #24]
+  load_ext_name_far x3, User(userextname12)+0
+  mov x0, x19
+  mov x1, x22
+  ldr q0, [sp, #8]
+  blr x3
+  uxtb w1, w0
+  cbnz x1, label14 ; b label13
+block14:
+  ldr q16, [sp, #8]
+  add w20, w22, w0, UXTB
+  mov d0, v16.d[1]
+  load_ext_name_far x3, User(userextname12)+0
+  mov x0, x19
+  mov x2, x27
+  mov x1, x20
+  blr x3
+  uxtb w3, w0
+  cbnz x3, label16 ; b label15
+block16:
+  ldr q6, [sp, #24]
+  ldr q16, [sp, #8]
+  add w4, w26, #24
+  mov x0, x28
+  str w4, [x0]
+  ldr q3, [sp, #56]
+  str q3, [x0, #168]
+  and w6, w24, #4294840319
+  movi v30.2s, #0
+  ldr q4, [sp, #40]
+  fcmp d4, d30
+  cset x7, mi
+  uxtb w7, w7
+  fcmp d4, d30
+  cset x8, gt
+  uxtb w8, w8
+  lsl w8, w8, #14
+  orr w8, w8, w7, LSL 15
+  fcmp d4, d30
+  cset x9, eq
+  uxtb w9, w9
+  orr w9, w8, w9, LSL 13
+  fcmp d4, d30
+  cset x10, vs
+  uxtb w10, w10
+  orr w10, w9, w10, LSL 12
+  orr w10, w6, w10
+  and w10, w10, #4294840319
+  fcmp d16, d30
+  cset x11, mi
+  uxtb w11, w11
+  fcmp d16, d30
+  cset x12, gt
+  uxtb w12, w12
+  lsl w12, w12, #14
+  orr w12, w12, w11, LSL 15
+  fcmp d16, d30
+  cset x13, eq
+  uxtb w13, w13
+  orr w13, w12, w13, LSL 13
+  fcmp d16, d30
+  cset x14, vs
+  uxtb w14, w14
+  orr w14, w13, w14, LSL 12
+  orr w14, w10, w14
+  str w14, [x0, #652]
+  str q16, [x0, #200]
+  str q6, [x0, #184]
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block1:
+  movz w1, #2048
+  load_ext_name_far x2, User(userextname0)+0
+  mov x0, x28
+  blr x2
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block3:
+  mov x0, x28
+  str w27, [x0, #864]
+  movz w1, #768
+  load_ext_name_far x4, User(userextname0)+0
+  blr x4
+  mov x23, x25
+  ldr w5, [x23]
+  add w5, w5, #1
+  str w5, [x23]
+  ldr w6, [x23, #4]
+  add w6, w6, #2
+  str w6, [x23, #4]
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block5:
+  mov x0, x28
+  str w22, [x0, #864]
+  movz w1, #768
+  load_ext_name_far x10, User(userextname0)+0
+  blr x10
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block7:
+  add w13, w27, #8
+  mov x0, x28
+  str w13, [x0, #864]
+  ldr q24, [sp, #56]
+  fmov d29, d24
+  ldr q28, [sp, #40]
+  mov v29.d[1], v29.d[1], v28.d[0]
+  str q29, [x0, #168]
+  add w15, w26, #4
+  str w15, [x0]
+  movz w1, #768
+  load_ext_name_far x2, User(userextname0)+0
+  blr x2
+  ldr w1, [x23]
+  add w1, w1, #1
+  str w1, [x23]
+  ldr w2, [x23, #4]
+  add w2, w2, #2
+  str w2, [x23, #4]
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block9:
+  mov x0, x28
+  str w25, [x0, #864]
+  add w6, w26, #12
+  str w6, [x0]
+  ldr q3, [sp, #56]
+  str q3, [x0, #168]
+  and w8, w24, #4294840319
+  movi v16.2s, #0
+  ldr q4, [sp, #40]
+  fcmp d4, d16
+  cset x9, mi
+  uxtb w9, w9
+  fcmp d4, d16
+  cset x10, gt
+  uxtb w10, w10
+  lsl w10, w10, #14
+  orr w10, w10, w9, LSL 15
+  fcmp d4, d16
+  cset x11, eq
+  uxtb w11, w11
+  orr w11, w10, w11, LSL 13
+  fcmp d4, d16
+  cset x12, vs
+  uxtb w12, w12
+  orr w12, w11, w12, LSL 12
+  orr w12, w8, w12
+  str w12, [x0, #652]
+  str q4, [x0, #200]
+  ldr q4, [sp, #24]
+  fmov d20, d4
+  fmov d22, #1
+  mov v20.d[1], v20.d[1], v22.d[0]
+  str q20, [x0, #184]
+  movz w1, #768
+  load_ext_name_far x15, User(userextname0)+0
+  blr x15
+  ldr w0, [x23]
+  add w0, w0, #2
+  str w0, [x23]
+  ldr w1, [x23, #4]
+  add w1, w1, #4
+  str w1, [x23, #4]
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block11:
+  mov x0, x28
+  str w21, [x0, #864]
+  add w5, w26, #12
+  str w5, [x0]
+  ldr q3, [sp, #56]
+  str q3, [x0, #168]
+  and w7, w24, #4294840319
+  movi v31.2s, #0
+  ldr q4, [sp, #40]
+  fcmp d4, d31
+  cset x8, mi
+  uxtb w8, w8
+  fcmp d4, d31
+  cset x9, gt
+  uxtb w9, w9
+  lsl w9, w9, #14
+  orr w9, w9, w8, LSL 15
+  fcmp d4, d31
+  cset x10, eq
+  uxtb w10, w10
+  orr w10, w9, w10, LSL 13
+  fcmp d4, d31
+  cset x11, vs
+  uxtb w11, w11
+  orr w11, w10, w11, LSL 12
+  orr w11, w7, w11
+  str w11, [x0, #652]
+  str q4, [x0, #200]
+  ldr q4, [sp, #24]
+  fmov d3, d4
+  fmov d5, #1
+  mov v3.d[1], v3.d[1], v5.d[0]
+  str q3, [x0, #184]
+  movz w1, #768
+  load_ext_name_far x14, User(userextname0)+0
+  blr x14
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block13:
+  mov x0, x28
+  str w22, [x0, #864]
+  add w2, w26, #20
+  str w2, [x0]
+  ldr q3, [sp, #56]
+  str q3, [x0, #168]
+  and w4, w24, #4294840319
+  movi v20.2s, #0
+  ldr q4, [sp, #40]
+  fcmp d4, d20
+  cset x5, mi
+  uxtb w5, w5
+  fcmp d4, d20
+  cset x6, gt
+  uxtb w6, w6
+  lsl w6, w6, #14
+  orr w6, w6, w5, LSL 15
+  fcmp d4, d20
+  cset x7, eq
+  uxtb w7, w7
+  orr w7, w6, w7, LSL 13
+  fcmp d4, d20
+  cset x8, vs
+  uxtb w8, w8
+  orr w8, w7, w8, LSL 12
+  orr w8, w4, w8
+  and w8, w8, #4294840319
+  ldr q16, [sp, #8]
+  fcmp d16, d20
+  cset x9, mi
+  uxtb w9, w9
+  fcmp d16, d20
+  cset x10, gt
+  uxtb w10, w10
+  lsl w10, w10, #14
+  orr w10, w10, w9, LSL 15
+  fcmp d16, d20
+  cset x11, eq
+  uxtb w11, w11
+  orr w11, w10, w11, LSL 13
+  fcmp d16, d20
+  cset x12, vs
+  uxtb w12, w12
+  orr w12, w11, w12, LSL 12
+  orr w12, w8, w12
+  str w12, [x0, #652]
+  str q16, [x0, #200]
+  ldr q6, [sp, #24]
+  str q6, [x0, #184]
+  movz w1, #768
+  load_ext_name_far x15, User(userextname0)+0
+  blr x15
+  ldr w0, [x23]
+  add w0, w0, #2
+  str w0, [x23]
+  ldr w1, [x23, #4]
+  add w1, w1, #4
+  str w1, [x23, #4]
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block15:
+  mov x0, x28
+  str w20, [x0, #864]
+  add w5, w26, #20
+  str w5, [x0]
+  ldr q3, [sp, #56]
+  str q3, [x0, #168]
+  and w7, w24, #4294840319
+  movi v7.2s, #0
+  ldr q4, [sp, #40]
+  fcmp d4, d7
+  cset x8, mi
+  uxtb w8, w8
+  fcmp d4, d7
+  cset x9, gt
+  uxtb w9, w9
+  lsl w9, w9, #14
+  orr w9, w9, w8, LSL 15
+  fcmp d4, d7
+  cset x10, eq
+  uxtb w10, w10
+  orr w10, w9, w10, LSL 13
+  fcmp d4, d7
+  cset x11, vs
+  uxtb w11, w11
+  orr w11, w10, w11, LSL 12
+  orr w11, w7, w11
+  and w11, w11, #4294840319
+  ldr q16, [sp, #8]
+  fcmp d16, d7
+  cset x12, mi
+  uxtb w12, w12
+  fcmp d16, d7
+  cset x13, gt
+  uxtb w13, w13
+  lsl w13, w13, #14
+  orr w13, w13, w12, LSL 15
+  fcmp d16, d7
+  cset x14, eq
+  uxtb w14, w14
+  orr w14, w13, w14, LSL 13
+  fcmp d16, d7
+  cset x15, vs
+  uxtb w15, w15
+  orr w15, w14, w15, LSL 12
+  orr w15, w11, w15
+  str w15, [x0, #652]
+  str q16, [x0, #200]
+  ldr q6, [sp, #24]
+  str q6, [x0, #184]
+  movz w1, #768
+  load_ext_name_far x2, User(userextname0)+0
+  blr x2
+  add sp, sp, #80
+  ldp x19, x20, [sp], #16
+  ldp x21, x22, [sp], #16
+  ldp x23, x24, [sp], #16
+  ldp x25, x26, [sp], #16
+  ldp x27, x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
