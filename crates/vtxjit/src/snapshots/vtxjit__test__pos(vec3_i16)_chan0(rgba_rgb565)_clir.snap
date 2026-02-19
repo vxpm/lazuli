@@ -41,7 +41,7 @@ function u0:0(i64, i64, i64, i64, i64, i64, i32) system_v {
 @0009                               v32 = f32const 0x1.000000p0
 @0009                               v33 = load.i8x16 notrap readonly can_move v25
 @0009                               v34 = vconst.i8x16 const0
-@0009                               v35 = x86_pshufb v33, v34  ; v34 = const0
+@0009                               v35 = swizzle v33, v34  ; v34 = const0
 @0009                               v36 = bitcast.i32x4 little v35
 @0009                               v37 = sshr_imm v36, 16
 @0009                               v38 = fcvt_from_sint.f32x4 v37
@@ -56,7 +56,7 @@ function u0:0(i64, i64, i64, i64, i64, i64, i32) system_v {
 @0009                               v44 = iadd_imm.i64 v25, 6
 @000b                               v45 = load.i8x16 notrap readonly can_move v44
 @000b                               v46 = vconst.i8x16 const1
-@000b                               v47 = x86_pshufb v45, v46  ; v46 = const1
+@000b                               v47 = swizzle v45, v46  ; v46 = const1
 @000b                               v48 = bitcast.i32x4 little v47
 @000b                               v49 = vconst.i32x4 const2
 @000b                               v50 = vconst.i32x4 const3
