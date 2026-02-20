@@ -156,15 +156,18 @@ where
             region.protect(self.offset, K::PROTECTION);
         }
 
-        #[cfg(target_family = "windows")]
-        unsafe {
-            let process = GetCurrentProcess();
-            FlushInstructionCache(process, Some(alloc.0.as_ptr().cast()), data.len()).unwrap();
-        }
+        #[cfg(any(target_family = "windows", target_os = "macos"))]
+        if K::PROTECTION == Protection::ReadExec {
+            #[cfg(target_family = "windows")]
+            unsafe {
+                let process = GetCurrentProcess();
+                FlushInstructionCache(process, Some(alloc.0.as_ptr().cast()), data.len()).unwrap();
+            }
 
-        #[cfg(target_os = "macos")]
-        unsafe {
-            sys_icache_invalidate(alloc.0.as_ptr() as *mut std::ffi::c_void, data.len());
+            #[cfg(target_os = "macos")]
+            unsafe {
+                sys_icache_invalidate(alloc.0.as_ptr().cast(), data.len());
+            }
         }
 
         alloc
