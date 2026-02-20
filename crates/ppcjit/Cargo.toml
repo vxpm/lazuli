@@ -16,7 +16,7 @@ powerpc-asm = "0.4"
 [dependencies]
 gekko.workspace = true
 jitalloc.workspace = true
-jitlink.workspace = true
+jitclif.workspace = true
 
 bitos.workspace = true
 cranelift.workspace = true

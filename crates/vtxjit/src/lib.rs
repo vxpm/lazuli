@@ -113,8 +113,8 @@ impl Jit {
 
             match ext_name {
                 ir::ExternalName::LibCall(libcall) => {
-                    let addr = jitlink::libcall(*libcall);
-                    jitlink::write_relocation(code, reloc, addr);
+                    let addr = jitclif::libcall(*libcall);
+                    jitclif::write_relocation(code, reloc, addr);
                 }
                 _ => unimplemented!("external reloc name: {ext_name:?}"),
             }
