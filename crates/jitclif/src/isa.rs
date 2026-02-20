@@ -1,11 +1,11 @@
 use cranelift_codegen::isa;
 use cranelift_codegen::settings::Configurable;
 
-pub fn x86_v1() -> isa::Builder {
+pub fn x86_64_v1() -> isa::Builder {
     isa::lookup_by_name("x86_64").unwrap()
 }
 
-pub fn x86_v3() -> isa::Builder {
+pub fn x86_64_v3() -> isa::Builder {
     let mut isa = isa::lookup_by_name("x86_64").unwrap();
 
     isa.enable("has_sse3").unwrap();

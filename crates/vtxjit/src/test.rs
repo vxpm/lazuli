@@ -22,8 +22,8 @@ fn test_config(name: &str, config: Config) {
         insta::assert_snapshot!(format!("{isa_name}_{}_disasm", name), disasm);
     }
 
-    inner(name, config, jitclif::isa::x86_v1(), "x86_v1");
-    inner(name, config, jitclif::isa::x86_v3(), "x86_v3");
+    inner(name, config, jitclif::isa::x86_64_v1(), "x86_64_v1");
+    inner(name, config, jitclif::isa::x86_64_v3(), "x86_64_v3");
     inner(name, config, jitclif::isa::aarch64(), "aarch64");
 }
 

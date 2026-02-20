@@ -1,5 +1,4 @@
 use cranelift::codegen::isa;
-use cranelift::prelude::Configurable;
 
 use crate::block::Meta;
 use crate::hooks::Hooks;
@@ -84,8 +83,18 @@ fn test_sequence(name: &str, sequence: Sequence) {
         insta::assert_snapshot!(format!("{isa_name}_{}_disasm", name), disasm);
     }
 
-    inner(name, sequence.clone(), jitclif::isa::x86_v1(), "x86_v1");
-    inner(name, sequence.clone(), jitclif::isa::x86_v3(), "x86_v3");
+    inner(
+        name,
+        sequence.clone(),
+        jitclif::isa::x86_64_v1(),
+        "x86_64_v1",
+    );
+    inner(
+        name,
+        sequence.clone(),
+        jitclif::isa::x86_64_v3(),
+        "x86_64_v3",
+    );
     inner(name, sequence.clone(), jitclif::isa::aarch64(), "aarch64");
 }
 
