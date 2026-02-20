@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use cranelift::codegen::entity::PrimaryMap;
 use cranelift::codegen::ir::InstBuilder;
-use cranelift::codegen::isa::TargetIsa;
+use cranelift::codegen::isa::{CallConv, TargetIsa};
 use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
 use cranelift::{frontend, native};
@@ -206,11 +206,11 @@ impl Codegen {
             }
             NAMESPACE_INTERNALS => {
                 assert_eq!(name.index, INTERNAL_RAISE_EXCEPTION);
-                extern "sysv64-unwind" fn raise_exception(regs: &mut Cpu, exception: Exception) {
+                extern "C-unwind" fn raise_exception(regs: &mut Cpu, exception: Exception) {
                     regs.raise_exception(exception);
                 }
 
-                let addr = raise_exception as extern "sysv64-unwind" fn(_, _) as usize;
+                let addr = raise_exception as extern "C-unwind" fn(_, _) as usize;
                 jitlink::write_relocation(code, reloc, addr);
             }
             NAMESPACE_LINK_DATA => {

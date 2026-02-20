@@ -1,6 +1,6 @@
 use cranelift::codegen::ir;
-use cranelift::prelude::{InstBuilder};
-use cranelift_codegen::isa::CallConv;
+use cranelift::codegen::ir::InstBuilder;
+use cranelift::codegen::isa::CallConv;
 use gekko::disasm::Ins;
 use gekko::{Exception, Reg, SPR};
 

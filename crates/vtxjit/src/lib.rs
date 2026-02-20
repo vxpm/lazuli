@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
-use cranelift::codegen::isa::TargetIsa;
+use cranelift::codegen::isa::{CallConv, TargetIsa};
 use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
 use cranelift::{frontend, native};

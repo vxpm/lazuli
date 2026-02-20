@@ -1,5 +1,5 @@
 use cranelift::codegen::ir;
-use cranelift_codegen::isa::CallConv;
+use cranelift::codegen::isa::CallConv;
 use gekko::{Address, Cpu, QuantReg};
 use strum::FromRepr;
 
@@ -11,14 +11,12 @@ pub type Context = std::ffi::c_void;
 pub type GetRegistersHook = extern "C-unwind" fn(*mut Context) -> *mut Cpu;
 pub type GetFastmemHook = extern "C-unwind" fn(*mut Context) -> *mut FastmemLut;
 
-pub type FollowLinkHook =
-    extern "C-unwind" fn(*const Info, *mut Context, *mut LinkData) -> bool;
+pub type FollowLinkHook = extern "C-unwind" fn(*const Info, *mut Context, *mut LinkData) -> bool;
 pub type TryLinkHook = extern "C-unwind" fn(*mut Context, Address, *mut LinkData);
 
 pub type ReadHook<T> = extern "C-unwind" fn(*mut Context, Address, *mut T) -> bool;
 pub type WriteHook<T> = extern "C-unwind" fn(*mut Context, Address, T) -> bool;
-pub type ReadQuantizedHook =
-    extern "C-unwind" fn(*mut Context, Address, QuantReg, *mut f64) -> u8;
+pub type ReadQuantizedHook = extern "C-unwind" fn(*mut Context, Address, QuantReg, *mut f64) -> u8;
 pub type WriteQuantizedHook = extern "C-unwind" fn(*mut Context, Address, QuantReg, f64) -> u8;
 
 pub type InvalidateICache = extern "C-unwind" fn(*mut Context, Address);
@@ -190,7 +188,11 @@ impl Hooks {
     }
 
     /// Returns the function signature for a memory read hook.
-    pub(crate) fn read_sig(ptr_type: ir::Type, _read_type: ir::Type, call_conv: CallConv) -> ir::Signature {
+    pub(crate) fn read_sig(
+        ptr_type: ir::Type,
+        _read_type: ir::Type,
+        call_conv: CallConv,
+    ) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
@@ -203,7 +205,11 @@ impl Hooks {
     }
 
     /// Returns the function signature for a memory write hook.
-    pub(crate) fn write_sig(ptr_type: ir::Type, write_type: ir::Type, call_conv: CallConv) -> ir::Signature {
+    pub(crate) fn write_sig(
+        ptr_type: ir::Type,
+        write_type: ir::Type,
+        call_conv: CallConv,
+    ) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
