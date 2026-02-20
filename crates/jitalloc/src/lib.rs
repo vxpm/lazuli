@@ -9,6 +9,11 @@ use windows::Win32::System::{
     Diagnostics::Debug::FlushInstructionCache, Threading::GetCurrentProcess,
 };
 
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    unsafe fn sys_icache_invalidate(start: *mut std::ffi::c_void, len: usize);
+}
+
 use crate::region::Region;
 
 #[rustfmt::skip]
@@ -155,6 +160,11 @@ where
         unsafe {
             let process = GetCurrentProcess();
             FlushInstructionCache(process, Some(alloc.0.as_ptr().cast()), data.len()).unwrap();
+        }
+
+        #[cfg(target_os = "macos")]
+        unsafe {
+            sys_icache_invalidate(alloc.0.as_ptr() as *mut std::ffi::c_void, data.len());
         }
 
         alloc

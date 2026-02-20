@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use cranelift::codegen::entity::PrimaryMap;
 use cranelift::codegen::ir::InstBuilder;
-use cranelift::codegen::isa::TargetIsa;
+use cranelift::codegen::isa::{CallConv, TargetIsa};
 use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
 use cranelift::{frontend, native};
@@ -130,12 +130,12 @@ impl Codegen {
         }
     }
 
-    fn trampoline_signature(&self) -> ir::Signature {
+    fn trampoline_signature(&self, call_conv: CallConv) -> ir::Signature {
         let ptr = self.isa.pointer_type();
         ir::Signature {
             params: vec![ir::AbiParam::new(ptr); 3],
             returns: vec![],
-            call_conv: codegen::isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
@@ -206,11 +206,11 @@ impl Codegen {
             }
             NAMESPACE_INTERNALS => {
                 assert_eq!(name.index, INTERNAL_RAISE_EXCEPTION);
-                extern "sysv64-unwind" fn raise_exception(regs: &mut Cpu, exception: Exception) {
+                extern "C-unwind" fn raise_exception(regs: &mut Cpu, exception: Exception) {
                     regs.raise_exception(exception);
                 }
 
-                let addr = raise_exception as extern "sysv64-unwind" fn(_, _) as usize;
+                let addr = raise_exception as extern "C-unwind" fn(_, _) as usize;
                 jitlink::write_relocation(code, reloc, addr);
             }
             NAMESPACE_LINK_DATA => {
@@ -301,9 +301,10 @@ impl Jit {
         func_ctx: &mut frontend::FunctionBuilderContext,
     ) -> Trampoline {
         let block_sig = codegen.block_signature();
+        let default = codegen.isa.default_call_conv();
 
         let mut func = ir::Function::new();
-        func.signature = codegen.trampoline_signature();
+        func.signature = codegen.trampoline_signature(default);
 
         let mut builder = frontend::FunctionBuilder::new(&mut func, func_ctx);
         let entry_bb = builder.create_block();
@@ -316,9 +317,10 @@ impl Jit {
         let ctx_ptr = params[1];
         let block_ptr = params[2];
         let ptr_type = codegen.isa.pointer_type();
+        let default = codegen.isa.default_call_conv();
 
         // extract regs ptr
-        let get_regs_sig = builder.import_signature(Hooks::get_registers_sig(ptr_type));
+        let get_regs_sig = builder.import_signature(Hooks::get_registers_sig(ptr_type, default));
         let get_registers = builder
             .ins()
             .iconst(ptr_type, codegen.hooks.get_registers as usize as i64);
@@ -328,7 +330,7 @@ impl Jit {
         let regs_ptr = builder.inst_results(inst)[0];
 
         // extract fastmem ptr
-        let get_fmem_sig = builder.import_signature(Hooks::get_fastmem_sig(ptr_type));
+        let get_fmem_sig = builder.import_signature(Hooks::get_fastmem_sig(ptr_type, default));
         let get_fmem = builder
             .ins()
             .iconst(ptr_type, codegen.hooks.get_fastmem as usize as i64);

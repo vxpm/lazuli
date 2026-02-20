@@ -22,7 +22,7 @@ impl Config {
 }
 
 // ram, arrays, default matrices, data, vertices, matrix map, count
-pub type ParserFn = extern "sysv64" fn(
+pub type ParserFn = extern "C" fn(
     *const u8,
     *const Arrays,
     *const UnpackedDefaultMatrices,

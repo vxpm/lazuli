@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
-use cranelift::codegen::isa::TargetIsa;
+use cranelift::codegen::isa::{CallConv, TargetIsa};
 use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
 use cranelift::{frontend, native};
@@ -87,7 +87,7 @@ impl Jit {
         }
     }
 
-    fn parser_signature(&self) -> ir::Signature {
+    fn parser_signature(&self, call_conv: CallConv) -> ir::Signature {
         let ptr = self.isa.pointer_type();
         ir::Signature {
             // ram, arrays, default matrices, data, vertices, matrix map, count
@@ -101,7 +101,7 @@ impl Jit {
                 ir::AbiParam::new(ir::types::I32),
             ],
             returns: vec![],
-            call_conv: codegen::isa::CallConv::SystemV,
+            call_conv,
         }
     }
 
@@ -129,7 +129,7 @@ impl Jit {
         config: Config,
     ) -> VertexParser {
         let mut func = ir::Function::new();
-        func.signature = self.parser_signature();
+        func.signature = self.parser_signature(self.isa.default_call_conv());
 
         let func_builder = frontend::FunctionBuilder::new(&mut func, func_ctx);
         let builder = ParserBuilder::new(self, func_builder, config);

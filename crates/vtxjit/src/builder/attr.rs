@@ -309,7 +309,7 @@ fn rgba4444(parser: &mut ParserBuilder, ptr: ir::Value) -> ir::Value {
     let rgba = parser
         .bd
         .ins()
-        .x86_blendv(blend_mask, high_nibbles, low_nibbles);
+        .bitselect(blend_mask, high_nibbles, low_nibbles);
 
     // 04. convert to F32X4
     let vector = parser.bd.ins().fcvt_from_uint(ir::types::F32X4, rgba);

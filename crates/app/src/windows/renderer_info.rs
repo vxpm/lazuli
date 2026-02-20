@@ -5,10 +5,13 @@ use serde::{Deserialize, Serialize};
 use crate::State;
 use crate::windows::{AppWindow, Ctx};
 
+#[cfg(not(target_os = "macos"))]
 type RenderDoc = renderdoc::RenderDoc<renderdoc::V140>;
 
 #[derive(Serialize, Deserialize)]
 pub struct Window {
+
+    #[cfg(not(target_os = "macos"))]
     #[serde(skip)]
     renderdoc: Option<RenderDoc>,
     #[serde(skip)]
@@ -20,6 +23,7 @@ pub struct Window {
 impl Default for Window {
     fn default() -> Self {
         Self {
+            #[cfg(not(target_os = "macos"))]
             renderdoc: RenderDoc::new().ok(),
             capture: false,
             is_capturing: false,
@@ -80,6 +84,8 @@ impl AppWindow for Window {
             ));
 
             ui.heading("Renderdoc");
+
+            #[cfg(not(target_os = "macos"))]
             if let Some(renderdoc) = &mut self.renderdoc {
                 ui.horizontal(|ui| {
                     ui.checkbox(&mut self.capture, "Capture (Renderdoc)");

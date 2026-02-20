@@ -1,5 +1,6 @@
 use cranelift::codegen::ir;
-use cranelift::prelude::{InstBuilder, isa};
+use cranelift::codegen::ir::InstBuilder;
+use cranelift::codegen::isa::CallConv;
 use gekko::disasm::Ins;
 use gekko::{Exception, Reg, SPR};
 
@@ -18,14 +19,14 @@ const EXCEPTION_INFO: InstructionInfo = InstructionInfo {
     action: Action::Prologue,
 };
 
-pub fn raise_exception_sig(ptr_type: ir::Type) -> ir::Signature {
+pub fn raise_exception_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
     ir::Signature {
         params: vec![
             ir::AbiParam::new(ptr_type),       // registers
             ir::AbiParam::new(ir::types::I16), // exception
         ],
         returns: vec![],
-        call_conv: isa::CallConv::SystemV,
+        call_conv,
     }
 }
 
