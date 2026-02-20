@@ -1,22 +1,30 @@
+use cranelift::codegen::{self, isa};
+use cranelift::frontend::FunctionBuilderContext;
 use lazuli::system::gx::cmd::VertexDescriptor;
 use lazuli::system::gx::cmd::attributes::{
     AttributeMode, ColorDescriptor, ColorFormat, ColorKind, CoordsFormat, PositionDescriptor,
     PositionKind, VertexAttributeTable, VertexAttributeTableA,
 };
 
-use crate::JitVertexModule;
+use crate::Codegen;
 use crate::parser::Config;
 
 fn test_config(name: &str, config: Config) {
-    let mut jit = JitVertexModule::new();
-    let parser = jit
-        .compiler
-        .compile(&mut jit.code_ctx, &mut jit.func_ctx, config);
+    fn inner(name: &str, config: Config, isa: isa::Builder, isa_name: &str) {
+        let mut codegen = Codegen::with_isa(isa);
+        let mut code_ctx = codegen::Context::new();
+        let mut func_ctx = FunctionBuilderContext::new();
+        let parser = codegen.compile(&mut code_ctx, &mut func_ctx, config);
 
-    let clir = parser.meta().clir.clone().unwrap();
-    let disasm = parser.meta().disasm.clone().unwrap();
-    insta::assert_snapshot!(format!("{}_clir", name), clir);
-    insta::assert_snapshot!(format!("{}_disasm", name), disasm);
+        let clir = parser.meta().clir.clone().unwrap();
+        let disasm = parser.meta().disasm.clone().unwrap();
+        insta::assert_snapshot!(format!("{isa_name}_{}_clir", name), clir);
+        insta::assert_snapshot!(format!("{isa_name}_{}_disasm", name), disasm);
+    }
+
+    inner(name, config, jitclif::isa::x86_64_v1(), "x86_64_v1");
+    inner(name, config, jitclif::isa::x86_64_v3(), "x86_64_v3");
+    inner(name, config, jitclif::isa::aarch64(), "aarch64");
 }
 
 #[test]

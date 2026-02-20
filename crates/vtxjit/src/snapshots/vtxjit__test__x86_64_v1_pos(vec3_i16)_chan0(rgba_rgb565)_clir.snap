@@ -1,0 +1,82 @@
+---
+source: crates/vtxjit/src/test.rs
+expression: clir
+---
+function u0:0(i64, i64, i64, i64, i64, i64, i32) system_v {
+    const0 = 0xffffffff0405ffff0203ffff0001ffff
+    const1 = 0xffff0100ffff0100ffff0100ffff0100
+    const2 = 0x00000000000000010000004000000800
+    const3 = 0x000000000000001f0000003f0000001f
+    const4 = 0x000000003d0421083c8208213d042108
+
+                                block0(v0: i64, v1: i64, v2: i64, v3: i64, v4: i64, v5: i64, v6: i32):
+                                    v7 = load.i8 notrap readonly can_move v2
+                                    v8 = load.i64 notrap readonly can_move v2+1
+                                    v9 = iconst.i64 0
+                                    v10 = scalar_to_vector.i64x2 v9  ; v9 = 0
+                                    v11 = uextend.i64 v7
+                                    v12 = iconst.i64 1
+                                    v13 = ishl v12, v11  ; v12 = 1
+                                    v14 = scalar_to_vector.i64x2 v13
+                                    v15 = bor v10, v14
+                                    v16 = uextend.i64 v7
+                                    v17 = band_imm v16, 31
+                                    v18 = iadd_imm v17, 64
+                                    v19 = iconst.i64 1
+                                    v20 = ishl v19, v18  ; v19 = 1
+                                    v21 = iconst.i64 0
+                                    v22 = splat.i64x2 v21  ; v21 = 0
+                                    v23 = insertlane v22, v20, 1
+                                    v24 = bor v15, v23
+                                    v30 = iconst.i32 0
+                                    jump block1(v3, v4, v24, v30)  ; v30 = 0
+
+                                block1(v25: i64, v26: i64, v27: i64x2, v28: i32):
+                                    v31 = icmp ult v28, v6
+                                    brif v31, block2, block3(v27)
+
+                                block2:
+@0000                               store.i8 notrap can_move v7, v26+128
+@0000                               store.i64 notrap can_move v8, v26+96
+@0009                               v32 = f32const 0x1.000000p0
+@0009                               v33 = load.i8x16 notrap readonly can_move v25
+@0009                               v34 = vconst.i8x16 const0
+@0009                               v35 = swizzle v33, v34  ; v34 = const0
+@0009                               v36 = bitcast.i32x4 little v35
+@0009                               v37 = sshr_imm v36, 16
+@0009                               v38 = fcvt_from_sint.f32x4 v37
+@0009                               v39 = splat.f32x4 v32  ; v32 = 0x1.000000p0
+@0009                               v40 = fmul v38, v39
+@0009                               v41 = extractlane v40, 0
+@0009                               v42 = extractlane v40, 1
+@0009                               v43 = extractlane v40, 2
+@0009                               store notrap can_move v41, v26+104
+@0009                               store notrap can_move v42, v26+108
+@0009                               store notrap can_move v43, v26+112
+@0009                               v44 = iadd_imm.i64 v25, 6
+@000b                               v45 = load.i8x16 notrap readonly can_move v44
+@000b                               v46 = vconst.i8x16 const1
+@000b                               v47 = swizzle v45, v46  ; v46 = const1
+@000b                               v48 = bitcast.i32x4 little v47
+@000b                               v49 = vconst.i32x4 const2
+@000b                               v50 = vconst.i32x4 const3
+@000b                               v51 = imul v48, v49  ; v49 = const2
+@000b                               v52 = ushr_imm v51, 11
+@000b                               v53 = band v52, v50  ; v50 = const3
+@000b                               v54 = fcvt_from_uint.f32x4 v53
+@000b                               v55 = vconst.f32x4 const4
+@000b                               v56 = fmul v54, v55  ; v55 = const4
+@000b                               v57 = f32const 0x1.000000p0
+@000b                               v58 = insertlane v56, v57, 3  ; v57 = 0x1.000000p0
+@000b                               store notrap can_move v58, v26+64
+@000b                               v59 = iadd_imm v44, 2
+                                    v60 = iadd_imm.i64 v26, 132
+                                    v61 = iadd_imm.i32 v28, 1
+                                    jump block1(v59, v60, v27, v61)
+
+                                block3(v29: i64x2) cold:
+                                    v62 = load.i64x2 notrap can_move v5
+                                    v63 = bor v62, v29
+                                    store notrap can_move v63, v5
+                                    return
+}

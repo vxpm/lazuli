@@ -14,7 +14,7 @@ insta.workspace = true
 [dependencies]
 util.workspace = true
 jitalloc.workspace = true
-jitlink.workspace = true
+jitclif.workspace = true
 lazuli.workspace = true
 
 rustc-hash.workspace = true

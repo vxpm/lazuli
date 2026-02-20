@@ -1,0 +1,121 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: disasm
+---
+  stp fp, lr, [sp, #-16]!
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  mov fp, sp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
+  sub sp, sp, #16
+  unwind StackAlloc { size: 16 }
+block0:
+  ldr w15, [x4, #680]
+  lsr w15, w15, #13
+  tbnz x15, #0, label2 ; b label1
+block2:
+  mov x0, x4
+  ldr q18, [x0, #136]
+  ldr q19, [x0, #152]
+  ldr w3, [x0, #652]
+  ldr w4, [x0]
+  ldr q20, [x0, #168]
+  ldr q21, [x0, #184]
+  ldr q24, [x0, #200]
+  add w4, w4, #16
+  str w4, [x0]
+  fadd v23.2d, v18.2d, v19.2d
+  fadd v22.2d, v23.2d, v20.2d
+  fadd v21.2d, v22.2d, v21.2d
+  fadd v19.2d, v21.2d, v24.2d
+  str q19, [x0, #136]
+  and w4, w3, #4294840319
+  movi v20.2s, #0
+  fcmp d23, d20
+  cset x5, mi
+  uxtb w5, w5
+  fcmp d23, d20
+  cset x6, gt
+  uxtb w6, w6
+  lsl w6, w6, #14
+  orr w6, w6, w5, LSL 15
+  fcmp d23, d20
+  cset x7, eq
+  uxtb w7, w7
+  orr w7, w6, w7, LSL 13
+  fcmp d23, d20
+  cset x8, vs
+  uxtb w8, w8
+  orr w8, w7, w8, LSL 12
+  orr w8, w4, w8
+  and w8, w8, #4294840319
+  fcmp d22, d20
+  cset x9, mi
+  uxtb w9, w9
+  fcmp d22, d20
+  cset x10, gt
+  uxtb w10, w10
+  lsl w10, w10, #14
+  orr w10, w10, w9, LSL 15
+  fcmp d22, d20
+  cset x11, eq
+  uxtb w11, w11
+  orr w11, w10, w11, LSL 13
+  fcmp d22, d20
+  cset x12, vs
+  uxtb w12, w12
+  orr w12, w11, w12, LSL 12
+  orr w12, w8, w12
+  and w12, w12, #4294840319
+  fcmp d21, d20
+  cset x13, mi
+  uxtb w13, w13
+  fcmp d21, d20
+  cset x14, gt
+  uxtb w14, w14
+  lsl w14, w14, #14
+  orr w14, w14, w13, LSL 15
+  fcmp d21, d20
+  cset x15, eq
+  uxtb w15, w15
+  orr w15, w14, w15, LSL 13
+  fcmp d21, d20
+  cset x1, vs
+  uxtb w1, w1
+  orr w1, w15, w1, LSL 12
+  orr w1, w12, w1
+  and w1, w1, #4294840319
+  fcmp d19, d20
+  cset x3, mi
+  uxtb w3, w3
+  fcmp d19, d20
+  cset x4, gt
+  uxtb w4, w4
+  lsl w4, w4, #14
+  orr w3, w4, w3, LSL 15
+  fcmp d19, d20
+  cset x4, eq
+  uxtb w4, w4
+  orr w3, w3, w4, LSL 13
+  fcmp d19, d20
+  cset x4, vs
+  uxtb w4, w4
+  orr w4, w3, w4, LSL 12
+  orr w4, w1, w4
+  str w4, [x0, #652]
+  ldr w5, [x2]
+  add w5, w5, #4
+  str w5, [x2]
+  ldr w6, [x2, #4]
+  add w6, w6, #8
+  str w6, [x2, #4]
+  add sp, sp, #16
+  ldp fp, lr, [sp], #16
+  ret
+block1:
+  movz w1, #2048
+  load_ext_name_far x2, User(userextname0)+0
+  mov x0, x4
+  blr x2
+  add sp, sp, #16
+  ldp fp, lr, [sp], #16
+  ret

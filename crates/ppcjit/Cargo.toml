@@ -10,12 +10,13 @@ workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+cranelift-codegen = { workspace = true, features = ["x86", "arm64"] }
 powerpc-asm = "0.4"
 
 [dependencies]
 gekko.workspace = true
 jitalloc.workspace = true
-jitlink.workspace = true
+jitclif.workspace = true
 
 bitos.workspace = true
 cranelift.workspace = true

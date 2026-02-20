@@ -11,6 +11,7 @@ use std::sync::Arc;
 use cranelift::codegen::isa::{CallConv, TargetIsa};
 use cranelift::codegen::settings::Configurable;
 use cranelift::codegen::{self, ir};
+use cranelift::prelude::isa;
 use cranelift::{frontend, native};
 use jitalloc::{Allocator, ReadExec};
 use lazuli::modules::vertex::{Ctx, VertexModule};
@@ -39,13 +40,13 @@ impl UnpackedDefaultMatrices {
     }
 }
 
-struct Jit {
+struct Codegen {
     isa: Arc<dyn TargetIsa>,
     allocator: Allocator<ReadExec>,
 }
 
-impl Jit {
-    fn new() -> Self {
+impl Codegen {
+    fn with_isa(isa: isa::Builder) -> Self {
         let verifier = if cfg!(debug_assertions) {
             "true"
         } else {
@@ -56,7 +57,7 @@ impl Jit {
         codegen.set("preserve_frame_pointers", "true").unwrap();
         codegen.set("use_colocated_libcalls", "false").unwrap();
         codegen.set("stack_switch_model", "basic").unwrap();
-        codegen.set("unwind_info", "true").unwrap();
+        codegen.set("unwind_info", "false").unwrap();
         codegen.set("is_pic", "false").unwrap();
 
         // affect runtime performance
@@ -73,18 +74,20 @@ impl Jit {
             .set("enable_table_access_spectre_mitigation", "false")
             .unwrap();
 
-        let isa_builder = native::builder().unwrap_or_else(|msg| {
-            panic!("host machine is not supported: {}", msg);
-        });
+        let isa = isa.finish(codegen::settings::Flags::new(codegen)).unwrap();
 
-        let isa = isa_builder
-            .finish(codegen::settings::Flags::new(codegen))
-            .unwrap();
-
-        Jit {
+        Codegen {
             isa,
             allocator: Allocator::new(),
         }
+    }
+
+    fn new() -> Self {
+        let isa = native::builder().unwrap_or_else(|msg| {
+            panic!("host machine is not supported: {}", msg);
+        });
+
+        Self::with_isa(isa)
     }
 
     fn parser_signature(&self, call_conv: CallConv) -> ir::Signature {
@@ -113,8 +116,8 @@ impl Jit {
 
             match ext_name {
                 ir::ExternalName::LibCall(libcall) => {
-                    let addr = jitlink::libcall(*libcall);
-                    jitlink::write_relocation(code, reloc, addr);
+                    let addr = jitclif::libcall(*libcall);
+                    jitclif::write_relocation(code, reloc, addr);
                 }
                 _ => unimplemented!("external reloc name: {ext_name:?}"),
             }
@@ -158,7 +161,7 @@ impl Jit {
 }
 
 pub struct JitVertexModule {
-    compiler: Jit,
+    codegen: Codegen,
     code_ctx: codegen::Context,
     func_ctx: frontend::FunctionBuilderContext,
     parsers: FxHashMap<Config, VertexParser>,
@@ -169,7 +172,7 @@ unsafe impl Send for JitVertexModule {}
 impl JitVertexModule {
     pub fn new() -> Self {
         Self {
-            compiler: Jit::new(),
+            codegen: Codegen::new(),
             code_ctx: codegen::Context::new(),
             func_ctx: frontend::FunctionBuilderContext::new(),
             parsers: FxHashMap::default(),
@@ -197,7 +200,7 @@ impl VertexModule for JitVertexModule {
             Entry::Occupied(o) => o.into_mut(),
             Entry::Vacant(v) => {
                 let parser = self
-                    .compiler
+                    .codegen
                     .compile(&mut self.code_ctx, &mut self.func_ctx, config);
 
                 v.insert(parser)

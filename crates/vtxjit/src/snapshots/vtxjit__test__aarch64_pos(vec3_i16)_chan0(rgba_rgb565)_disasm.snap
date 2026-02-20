@@ -1,0 +1,67 @@
+---
+source: crates/vtxjit/src/test.rs
+expression: disasm
+---
+  stp fp, lr, [sp, #-16]!
+  mov fp, sp
+block0:
+  movz w8, #0
+  b label1
+block1:
+  subs wzr, w8, w6
+  b.lo label3 ; b label2
+block3:
+  ldrb w9, [x2]
+  strb w9, [x4, #128]
+  ldur x10, [x2, #1]
+  str x10, [x4, #96]
+  ldr q19, [x3]
+  ldr q20, [const(3)]
+  tbl v19.16b, { v19.16b }, v20.16b
+  sshr v19.4s, v19.4s, #16
+  scvtf v19.4s, v19.4s
+  fmov v20.4s, #1
+  fmul v19.4s, v19.4s, v20.4s
+  str s19, [x4, #104]
+  mov s20, v19.s[1]
+  str s20, [x4, #108]
+  mov s21, v19.s[2]
+  str s21, [x4, #112]
+  ldr q22, [x3, #6]
+  mvni v23.4s, #254, MSL #8
+  tbl v22.16b, { v22.16b }, v23.16b
+  ldr q23, [const(2)]
+  mul v22.4s, v22.4s, v23.4s
+  ushr v22.4s, v22.4s, #11
+  ldr q23, [const(1)]
+  and v22.16b, v22.16b, v23.16b
+  ucvtf v22.4s, v22.4s
+  ldr q23, [const(0)]
+  fmul v20.4s, v22.4s, v23.4s
+  fmov s22, #1
+  mov v20.s[3], v20.s[3], v22.s[0]
+  str q20, [x4, #64]
+  add x3, x3, #8
+  add x4, x4, #132
+  add w8, w8, #1
+  b label1
+block2:
+  ldr q7, [x5]
+  movz x7, #0
+  fmov d16, x7
+  movz x7, #1
+  ldrb w8, [x2]
+  lsl x9, x7, x8
+  fmov d17, x9
+  orr v16.16b, v16.16b, v17.16b
+  movi v2.16b, #0
+  uxtb w8, w8
+  and x8, x8, #31
+  add x8, x8, #64
+  lsl x7, x7, x8
+  mov v2.d[1], v2.d[1], x7
+  orr v16.16b, v16.16b, v2.16b
+  orr v7.16b, v7.16b, v16.16b
+  str q7, [x5]
+  ldp fp, lr, [sp], #16
+  ret

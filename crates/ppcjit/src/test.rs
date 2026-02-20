@@ -1,5 +1,4 @@
 use cranelift::codegen::isa;
-use cranelift::prelude::Configurable;
 
 use crate::block::Meta;
 use crate::hooks::Hooks;
@@ -57,21 +56,7 @@ macro_rules! ppc {
     };
 }
 
-fn compile_sequence(sequence: Sequence) -> (Artifact, Meta) {
-    let mut isa = isa::lookup_by_name("x86_64").expect("tests should compile for x86_64");
-
-    isa.enable("has_sse3").unwrap();
-    isa.enable("has_ssse3").unwrap();
-    isa.enable("has_sse41").unwrap();
-    isa.enable("has_sse42").unwrap();
-    isa.enable("has_fma").unwrap();
-    isa.enable("has_lzcnt").unwrap();
-    isa.enable("has_popcnt").unwrap();
-    isa.enable("has_bmi1").unwrap();
-    isa.enable("has_bmi2").unwrap();
-    isa.enable("has_avx").unwrap();
-    isa.enable("has_avx2").unwrap();
-
+fn compile_sequence(isa: isa::Builder, sequence: Sequence) -> (Artifact, Meta) {
     let mut jit = Jit::with_isa(
         isa,
         Settings {
@@ -90,11 +75,27 @@ fn compile_sequence(sequence: Sequence) -> (Artifact, Meta) {
 }
 
 fn test_sequence(name: &str, sequence: Sequence) {
-    let (artifact, meta) = compile_sequence(sequence);
-    let clir = meta.clir.unwrap();
-    let disasm = artifact.disasm.unwrap();
-    insta::assert_snapshot!(format!("{}_clir", name), clir);
-    insta::assert_snapshot!(format!("{}_disasm", name), disasm);
+    fn inner(name: &str, sequence: Sequence, isa: isa::Builder, isa_name: &str) {
+        let (artifact, meta) = compile_sequence(isa, sequence.clone());
+        let clir = meta.clir.unwrap();
+        let disasm = artifact.disasm.unwrap();
+        insta::assert_snapshot!(format!("{isa_name}_{}_clir", name), clir);
+        insta::assert_snapshot!(format!("{isa_name}_{}_disasm", name), disasm);
+    }
+
+    inner(
+        name,
+        sequence.clone(),
+        jitclif::isa::x86_64_v1(),
+        "x86_64_v1",
+    );
+    inner(
+        name,
+        sequence.clone(),
+        jitclif::isa::x86_64_v3(),
+        "x86_64_v3",
+    );
+    inner(name, sequence.clone(), jitclif::isa::aarch64(), "aarch64");
 }
 
 #[test]

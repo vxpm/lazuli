@@ -7,7 +7,7 @@ members = [
     "crates/color",
     "crates/gxtex",
     "crates/jitalloc",
-    "crates/jitlink",
+    "crates/jitclif",
     "crates/lazuli",
     "crates/ppcjit",
     "crates/dspint",
@@ -29,7 +29,7 @@ default-members = [
     "crates/color",
     "crates/gxtex",
     "crates/jitalloc",
-    "crates/jitlink",
+    "crates/jitclif",
     "crates/lazuli",
     "crates/ppcjit",
     "crates/dspint",
@@ -130,7 +130,7 @@ gekko = { path = "./crates/gekko" }
 color = { path = "./crates/color" }
 gxtex = { path = "./crates/gxtex" }
 jitalloc = { path = "./crates/jitalloc" }
-jitlink = { path = "./crates/jitlink" }
+jitclif = { path = "./crates/jitclif" }
 lazuli = { path = "./crates/lazuli" }
 ppcjit = { path = "./crates/ppcjit" }
 dspint = { path = "./crates/dspint" }

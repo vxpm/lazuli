@@ -202,7 +202,7 @@ impl Codegen {
                     HookKind::DecChanged => self.hooks.dec_changed as usize,
                 };
 
-                jitlink::write_relocation(code, reloc, addr);
+                jitclif::write_relocation(code, reloc, addr);
             }
             NAMESPACE_INTERNALS => {
                 assert_eq!(name.index, INTERNAL_RAISE_EXCEPTION);
@@ -211,7 +211,7 @@ impl Codegen {
                 }
 
                 let addr = raise_exception as extern "C-unwind" fn(_, _) as usize;
-                jitlink::write_relocation(code, reloc, addr);
+                jitclif::write_relocation(code, reloc, addr);
             }
             NAMESPACE_LINK_DATA => {
                 let link_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
@@ -222,7 +222,7 @@ impl Codegen {
                 }
 
                 let addr = unsafe { link_data.as_ptr().addr().get() };
-                jitlink::write_relocation(code, reloc, addr);
+                jitclif::write_relocation(code, reloc, addr);
             }
             _ => unreachable!(),
         }
@@ -246,8 +246,8 @@ impl Codegen {
                     self.apply_user_relocation(code, reloc, name.clone());
                 }
                 ir::ExternalName::LibCall(libcall) => {
-                    let addr = jitlink::libcall(*libcall);
-                    jitlink::write_relocation(code, reloc, addr);
+                    let addr = jitclif::libcall(*libcall);
+                    jitclif::write_relocation(code, reloc, addr);
                 }
                 _ => unimplemented!("external reloc name: {ext_name:?}"),
             }

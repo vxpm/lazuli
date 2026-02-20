@@ -1,0 +1,86 @@
+---
+source: crates/ppcjit/src/test.rs
+expression: disasm
+---
+  pushq %rbp
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  movq %rsp, %rbp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 16 }
+  subq $0x20, %rsp
+  movq %r14, 0x10(%rsp)
+  unwind SaveReg { clobber_offset: 0, reg: p14i }
+  movq %r15, 0x18(%rsp)
+  unwind SaveReg { clobber_offset: 8, reg: p15i }
+block0:
+  movq %rdi, %r15
+  movl 0x2a8(%rdx), %ecx
+  shrl $0xd, %ecx
+  testb $0x1, %cl
+  jnz     label2; j label1
+block2:
+  movq %rdx, %rdi
+  movupd 0x98(%rdi), %xmm4
+  movupd 0xa8(%rdi), %xmm5
+  movl 0x28c(%rdi), %edx
+  movl 0x288(%rdi), %r9d
+  movl (%rdi), %r11d
+  andl $0xfffffff, %r9d
+  ucomisd %xmm4, %xmm5
+  seta %sil
+  movzbl %sil, %eax
+  movq %rax, %r8
+  shll $0x1f, %r8d
+  ucomisd %xmm5, %xmm4
+  seta %cl
+  movzbl %cl, %ecx
+  movq %rcx, %r10
+  shll $0x1e, %r10d
+  orl %r10d, %r8d
+  ucomisd %xmm5, %xmm4
+  setnp %r10b
+  sete %sil
+  andl %esi, %r10d
+  movzbl %r10b, %r10d
+  movq %r10, %rsi
+  shll $0x1d, %esi
+  orl %esi, %r8d
+  ucomisd %xmm5, %xmm4
+  setp %sil
+  movzbl %sil, %esi
+  movq %rsi, %r14
+  shll $0x1c, %r14d
+  orl %r14d, %r8d
+  orl %r8d, %r9d
+  movl %r9d, 0x288(%rdi)
+  leal 4(%r11), %r8d
+  movl %r8d, (%rdi)
+  andl $0xfffe0fff, %edx
+  shll $0xf, %eax
+  shll $0xe, %ecx
+  orl %ecx, %eax
+  shll $0xd, %r10d
+  orl %r10d, %eax
+  shll $0xc, %esi
+  orl %esi, %eax
+  orl %eax, %edx
+  movl %edx, 0x28c(%rdi)
+  movq %r15, %rdi
+  addl $0x1, (%rdi)
+  addl $0x2, 4(%rdi)
+  movq 0x10(%rsp), %r14
+  movq 0x18(%rsp), %r15
+  addq $0x20, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block1:
+  movl $0x800, %esi
+  load_ext_name userextname0+0, %r9
+  movq %rdx, %rdi
+  call    *%r9
+  movq 0x10(%rsp), %r14
+  movq 0x18(%rsp), %r15
+  addq $0x20, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq

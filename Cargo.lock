@@ -2531,7 +2531,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "jitlink"
+name = "jitclif"
 version = "0.1.0"
 dependencies = [
  "cranelift-codegen",
@@ -3869,12 +3869,13 @@ version = "0.1.0"
 dependencies = [
  "bitos",
  "cranelift",
+ "cranelift-codegen",
  "easyerr",
  "fjall",
  "gekko",
  "insta",
  "jitalloc",
- "jitlink",
+ "jitclif",
  "powerpc-asm",
  "rmp-serde",
  "rustc-hash 2.1.1",
@@ -5112,7 +5113,7 @@ dependencies = [
  "cranelift",
  "insta",
  "jitalloc",
- "jitlink",
+ "jitclif",
  "lazuli",
  "rustc-hash 2.1.1",
  "seq-macro",
