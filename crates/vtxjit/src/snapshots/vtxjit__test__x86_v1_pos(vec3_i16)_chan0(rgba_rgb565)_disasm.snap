@@ -1,0 +1,115 @@
+---
+source: crates/vtxjit/src/test.rs
+expression: disasm
+---
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $0x40, %rsp
+  movq %rbx, 0x10(%rsp)
+  movq %r12, 0x18(%rsp)
+  movq %r13, 0x20(%rsp)
+  movq %r14, 0x28(%rsp)
+  movq %r15, 0x30(%rsp)
+block0:
+  movq %r9, <offset:1>+(%rsp)
+  movq <offset:0>+-0x10(%rbp), %rbx
+  uninit  %r15
+  xorl %r15d, %r15d
+  jmp     label1
+block1:
+  cmpl %ebx, %r15d
+  jb      label3; j label2
+block3:
+  movq %rdx, %r12
+  movzbq (%r12), %rsi
+  movq %r8, %r14
+  movb %sil, 0x80(%r14)
+  movq 1(%r12), %rdi
+  movq %rdi, 0x60(%r14)
+  movq %rcx, %r13
+  movdqu (%r13), %xmm0
+  movdqu (%rip), %xmm1
+  paddusb (%rip), %xmm1
+  load_ext_name %X86Pshufb+0, %rcx
+  call    *%rcx
+  psrad $0x10, %xmm0
+  cvtdq2ps %xmm0, %xmm1
+  movups (%rip), %xmm3
+  mulps %xmm3, %xmm1
+  movss %xmm1, 0x68(%r14)
+  pshufd $0x1, %xmm1, %xmm4
+  movss %xmm4, 0x6c(%r14)
+  pshufd $0x2, %xmm1, %xmm5
+  movss %xmm5, 0x70(%r14)
+  movdqu 6(%r13), %xmm0
+  movdqu (%rip), %xmm1
+  paddusb (%rip), %xmm1
+  load_ext_name %X86Pshufb+0, %r9
+  call    *%r9
+  movdqu (%rip), %xmm6
+  pshufd $0x31, %xmm0, %xmm5
+  pshufd $0x31, %xmm6, %xmm2
+  pmuludq %xmm6, %xmm0
+  pshufd $0x8, %xmm0, %xmm4
+  pmuludq %xmm2, %xmm5
+  pshufd $0x8, %xmm5, %xmm2
+  punpckldq %xmm2, %xmm4
+  psrld $0xb, %xmm4
+  movdqu (%rip), %xmm6
+  pand %xmm6, %xmm4
+  movdqa %xmm4, %xmm0
+  pslld $0x10, %xmm0
+  psrld $0x10, %xmm0
+  psubd %xmm0, %xmm4
+  cvtdq2ps %xmm0, %xmm5
+  psrld $0x1, %xmm4
+  cvtdq2ps %xmm4, %xmm7
+  addps %xmm7, %xmm7
+  addps %xmm5, %xmm7
+  movups (%rip), %xmm6
+  mulps %xmm6, %xmm7
+  movl $0x3f800000, %edx
+  movd %edx, %xmm4
+  shufps $0xe4, %xmm7, %xmm4
+  shufps $0x24, %xmm4, %xmm7
+  movups %xmm7, 0x40(%r14)
+  leaq 8(%r13), %r13
+  leaq 0x84(%r14), %r14
+  leal 1(%r15), %r15d
+  movq %r13, %rcx
+  movq %r12, %rdx
+  movq %r14, %r8
+  jmp     label1
+block2:
+  movq <offset:1>+(%rsp), %rdi
+  movdqu (%rdi), %xmm5
+  uninit  %r10
+  xorq %r10, %r10
+  movq %r10, %xmm1
+  movl $0x1, %r9d
+  movq %rdx, %r12
+  movzbq (%r12), %rcx
+  movq %r9, %r10
+  shlq %cl, %r10
+  movq %r10, %xmm7
+  por %xmm7, %xmm1
+  uninit  %xmm2
+  pxor %xmm2, %xmm2
+  movzbq %cl, %r10
+  andq $0x1f, %r10
+  leaq 0x40(%r10), %rcx
+  shlq %cl, %r9
+  movq %r9, %xmm6
+  punpcklqdq %xmm6, %xmm2
+  por %xmm2, %xmm1
+  por %xmm1, %xmm5
+  movdqu %xmm5, (%rdi)
+  movq 0x10(%rsp), %rbx
+  movq 0x18(%rsp), %r12
+  movq 0x20(%rsp), %r13
+  movq 0x28(%rsp), %r14
+  movq 0x30(%rsp), %r15
+  addq $0x40, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq

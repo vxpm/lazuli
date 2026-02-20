@@ -1,7 +1,11 @@
 mod libcalls;
 
+pub mod isa;
+
 use cranelift_codegen::FinalizedMachReloc;
 use cranelift_codegen::binemit::Reloc;
+
+#[rustfmt::skip]
 pub use libcalls::get as libcall;
 
 /// Writes a relocation in the given buffer.

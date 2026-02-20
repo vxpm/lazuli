@@ -75,32 +75,6 @@ fn compile_sequence(isa: isa::Builder, sequence: Sequence) -> (Artifact, Meta) {
     jit.build_artifact(sequence.0.into_iter()).unwrap()
 }
 
-fn x86_v1_isa() -> isa::Builder {
-    isa::lookup_by_name("x86_64").expect("tests should compile for x86_64")
-}
-
-fn x86_v3_isa() -> isa::Builder {
-    let mut isa = isa::lookup_by_name("x86_64").expect("tests should compile for x86_64");
-
-    isa.enable("has_sse3").unwrap();
-    isa.enable("has_ssse3").unwrap();
-    isa.enable("has_sse41").unwrap();
-    isa.enable("has_sse42").unwrap();
-    isa.enable("has_fma").unwrap();
-    isa.enable("has_lzcnt").unwrap();
-    isa.enable("has_popcnt").unwrap();
-    isa.enable("has_bmi1").unwrap();
-    isa.enable("has_bmi2").unwrap();
-    isa.enable("has_avx").unwrap();
-    isa.enable("has_avx2").unwrap();
-
-    isa
-}
-
-fn aarch64_isa() -> isa::Builder {
-    isa::lookup_by_name("aarch64").expect("tests should compile for aarch64")
-}
-
 fn test_sequence(name: &str, sequence: Sequence) {
     fn inner(name: &str, sequence: Sequence, isa: isa::Builder, isa_name: &str) {
         let (artifact, meta) = compile_sequence(isa, sequence.clone());
@@ -110,9 +84,9 @@ fn test_sequence(name: &str, sequence: Sequence) {
         insta::assert_snapshot!(format!("{isa_name}_{}_disasm", name), disasm);
     }
 
-    inner(name, sequence.clone(), x86_v1_isa(), "x86_v1");
-    inner(name, sequence.clone(), x86_v3_isa(), "x86_v3");
-    inner(name, sequence.clone(), aarch64_isa(), "aarch64");
+    inner(name, sequence.clone(), jitclif::isa::x86_v1(), "x86_v1");
+    inner(name, sequence.clone(), jitclif::isa::x86_v3(), "x86_v3");
+    inner(name, sequence.clone(), jitclif::isa::aarch64(), "aarch64");
 }
 
 #[test]

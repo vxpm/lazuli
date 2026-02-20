@@ -3,9 +3,7 @@ source: crates/vtxjit/src/test.rs
 expression: disasm
 ---
   pushq %rbp
-  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
   movq %rsp, %rbp
-  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
 block0:
   movq <offset:0>+-0x10(%rbp), %r10
   uninit  %rsi
