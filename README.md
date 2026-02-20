@@ -9,7 +9,7 @@
 <img src="./resources/screenshots/mparty.webp" width="23%"></img> 
 <img src="./resources/screenshots/wario.webp" width="23%"></img> 
 
-A work-in-progress GameCube emulator :)
+A work-in-progress GameCube emulator :) !
 
 - [Status](#status)
 - [Building](#building)
