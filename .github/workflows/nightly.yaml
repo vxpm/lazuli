@@ -53,41 +53,6 @@ jobs:
       - id: generate_tag
         run: echo "tag=nightly-$(date -u +%y%m%d)" >> "$GITHUB_OUTPUT"
 
-  build_macos:
-    name: Build nightly (macos-arm64)
-    runs-on: macos-latest
-    needs: [check_date, generate_name]
-    if: ${{ needs.check_date.outputs.should_run != 'false' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Install rust toolchain
-        run: rustup toolchain install
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2.7.7
-        with:
-          cache-on-failure: true
-      - name: Install just
-        uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      - name: Build ipl-hle
-        run: just ipl-hle build
-      - name: Build lazuli
-        run: cargo build --profile release-dist
-      - name: Sign Binary with JIT Entitlements (macOS Specific)
-        run: codesign -s - --entitlements resources/macos/entitlements.plist --force target/release-dist/app
-      - name: Strip debug symbols
-        run: strip ./target/release-dist/app
-      - name: Rename executable
-        run: mv ./target/release-dist/app ./target/release-dist/${{ needs.generate_name.outputs.name_macos }}
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ needs.generate_name.outputs.name_macos }}
-          path: ./target/release-dist/${{ needs.generate_name.outputs.name_macos }}
-
-
   build_linux:
     name: Build nightly (linux)
     runs-on: ubuntu-latest
