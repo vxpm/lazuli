@@ -40,14 +40,14 @@ fn sample_tex(stage: &TexEnvStage) -> wesl::syntax::Expression {
 
 fn get_color_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    match stage.refs.channel() {
-        tev::Channel::Channel0 => quote_expression! { in.chan0 },
-        tev::Channel::Channel1 => quote_expression! { in.chan1 },
-        tev::Channel::AlphaBump => quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) },
-        tev::Channel::AlphaBumpNormalized => {
+    match stage.refs.input() {
+        tev::Input::Channel0 => quote_expression! { in.chan0 },
+        tev::Input::Channel1 => quote_expression! { in.chan1 },
+        tev::Input::AlphaBump => quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) },
+        tev::Input::AlphaBumpNormalized => {
             quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) }
         }
-        tev::Channel::Zero => quote_expression! { vec4f(0f) },
+        tev::Input::Zero => quote_expression! { vec4f(0f) },
         _ => panic!("reserved color channel"),
     }
 }
@@ -446,18 +446,30 @@ pub fn get_alpha_comparison(settings: &AlphaFuncSettings) -> wesl::syntax::Expre
 pub fn get_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Statement {
     use wesl::syntax::*;
 
-    if settings.depth_tex.mode.op() == tev::depth::Op::Disabled {
+    if matches!(
+        settings.depth_tex.mode.op(),
+        tev::depth::Op::Disabled | tev::depth::Op::Add
+    ) {
         return Statement::Void;
     }
 
     let bias = settings.depth_tex.bias;
     let sampled = self::sample_tex(settings.stages.last().unwrap());
-    let (depth_mid, depth_hi) = match settings.depth_tex.mode.format() {
-        tev::depth::Format::U8 => (quote_expression!(0), quote_expression!(0)),
-        tev::depth::Format::U16 => (quote_expression!(depth_tex_sample.y), quote_expression!(0)),
+    let (depth_mid, depth_hi, depth_max) = match settings.depth_tex.mode.format() {
+        tev::depth::Format::U8 => (
+            quote_expression!(0),
+            quote_expression!(0),
+            quote_expression!(255),
+        ),
+        tev::depth::Format::U16 => (
+            quote_expression!(depth_tex_sample.y),
+            quote_expression!(0),
+            quote_expression!(65535),
+        ),
         tev::depth::Format::U24 => (
             quote_expression!(depth_tex_sample.y),
             quote_expression!(depth_tex_sample.z),
+            quote_expression!(16777215),
         ),
         _ => panic!("reserved format"),
     };
@@ -466,7 +478,7 @@ pub fn get_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Statement {
         {
             let depth_tex_sample = base::vec4f_to_vec4u(#sampled);
             let depth_tex_value = pack4xU8(vec4u(depth_tex_sample.x, #depth_mid, #depth_hi, 0)) + #bias;
-            out.depth = clamp(f32(depth_tex_value) / f32(base::DEPTH_MAX), 0.0, 1.0);
+            out.depth = clamp(f32(depth_tex_value) / f32(#depth_max), 0.0, 1.0);
         }
     }
 }

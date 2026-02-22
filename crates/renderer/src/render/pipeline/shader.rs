@@ -25,8 +25,8 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
     };
 
     let has_frag_depth = match settings.texenv.depth_tex.mode.op() {
-        tev::depth::Op::Disabled => false,
-        tev::depth::Op::Add | tev::depth::Op::Replace => true,
+        tev::depth::Op::Disabled | tev::depth::Op::Add => false,
+        tev::depth::Op::Replace => true,
         _ => panic!("reserved depth tex mode"),
     };
 
@@ -50,7 +50,6 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
     wesl_quote::quote_module! {
         alias MtxIdx = u32;
 
-        const DEPTH_MAX: u32 = (1 << 24) - 1;
         const PLACEHOLDER_RGB: vec3f = vec3f(1.0, 0.0, 0.8627);
         const PLACEHOLDER_RGBA: vec4f = vec4f(1.0, 0.0, 0.8627, 0.5);
 

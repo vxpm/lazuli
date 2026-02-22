@@ -683,9 +683,7 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             write_masked!(sys.gpu.pix.control);
             sys.modules
                 .render
-                .exec(render::Action::SetFramebufferFormat(
-                    sys.gpu.pix.control.format(),
-                ));
+                .exec(render::Action::SetEfbFormat(sys.gpu.pix.control.format()));
         }
         Reg::PixelDone => {
             sys.gpu.pix.interrupt.set_finish(true);

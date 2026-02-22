@@ -1,10 +1,11 @@
 use std::collections::hash_map::Entry;
 
-use lazuli::modules::render::{ClutData, ClutId, ClutRef, Texture, TextureId};
+use lazuli::modules::render::{ClutData, ClutId, ClutRef, Sampler, Scaling, Texture, TextureId};
 use lazuli::system::gx::color::Rgba8;
-use lazuli::system::gx::tex::{ClutFormat, TextureData};
+use lazuli::system::gx::tex::{ClutFormat, TextureData, WrapMode};
 use rustc_hash::FxHashMap;
 
+use crate::render::{Renderer, TexSlotSettings};
 /// Configuration of a processed texture.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TextureRef {
@@ -31,6 +32,7 @@ type TmemHigh = Box<[u16; TMEM_HIGH_LEN]>;
 pub struct Cache {
     tmem: TmemHigh,
     families: FxHashMap<TextureId, Family>,
+    samplers: FxHashMap<Sampler, wgpu::Sampler>,
 }
 
 impl Default for Cache {
@@ -38,11 +40,53 @@ impl Default for Cache {
         Self {
             tmem: util::boxed_array(0),
             families: Default::default(),
+            samplers: Default::default(),
         }
     }
 }
 
 impl Cache {
+    fn create_sampler(device: &wgpu::Device, sampler: Sampler) -> wgpu::Sampler {
+        let address_mode = |wrap| match wrap {
+            WrapMode::Clamp => wgpu::AddressMode::ClampToEdge,
+            WrapMode::Repeat => wgpu::AddressMode::Repeat,
+            WrapMode::Mirror => wgpu::AddressMode::MirrorRepeat,
+            _ => panic!("reserved wrap mode"),
+        };
+
+        let mag_filter = if sampler.mode.mag_linear() {
+            wgpu::FilterMode::Linear
+        } else {
+            wgpu::FilterMode::Nearest
+        };
+
+        let min_filter = if sampler.mode.min_filter().is_linear() {
+            wgpu::FilterMode::Linear
+        } else {
+            wgpu::FilterMode::Nearest
+        };
+
+        let anisotropy_clamp = if sampler.mode.mag_linear() && sampler.mode.min_filter().is_linear()
+        {
+            16
+        } else {
+            1
+        };
+
+        device.create_sampler(&wgpu::SamplerDescriptor {
+            label: None,
+            address_mode_u: address_mode(sampler.mode.wrap_u()),
+            address_mode_v: address_mode(sampler.mode.wrap_v()),
+            mag_filter,
+            min_filter,
+            mipmap_filter: min_filter,
+            anisotropy_clamp,
+            lod_min_clamp: sampler.lods.min(),
+            lod_max_clamp: sampler.lods.max(),
+            ..Default::default()
+        })
+    }
+
     fn create_texture_data_indirect(
         indirect: &[u16],
         palette: &[u16],
@@ -167,7 +211,7 @@ impl Cache {
         }
     }
 
-    pub fn get(
+    pub fn get_texture(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -201,6 +245,16 @@ impl Cache {
         }
     }
 
+    pub fn get_sampler(&mut self, device: &wgpu::Device, sampler: Sampler) -> &wgpu::Sampler {
+        match self.samplers.entry(sampler) {
+            Entry::Occupied(o) => o.into_mut(),
+            Entry::Vacant(v) => {
+                let s = Self::create_sampler(device, sampler);
+                v.insert(s)
+            }
+        }
+    }
+
     pub fn insert_direct(&mut self, id: TextureId, tex: wgpu::TextureView) {
         self.families.insert(
             id,
@@ -209,5 +263,37 @@ impl Cache {
                 processed: Processed::Direct(Some(tex)),
             },
         );
+    }
+}
+
+impl Renderer {
+    pub fn load_texture(&mut self, id: TextureId, texture: Texture) {
+        self.texture_cache.update_raw(id, texture);
+    }
+
+    pub fn load_clut(&mut self, id: ClutId, clut: ClutData) {
+        self.texture_cache.update_clut(id, clut);
+    }
+
+    pub fn set_texture_slot(
+        &mut self,
+        slot: usize,
+        id: TextureId,
+        clut: ClutRef,
+        sampler: Sampler,
+        scaling: Scaling,
+    ) {
+        let settings = TexSlotSettings {
+            texture: TextureRef { id, clut },
+            sampler,
+            scaling,
+        };
+
+        if self.tex_slots[slot] == settings {
+            return;
+        }
+
+        self.flush(format_args!("texture slot changed"));
+        self.tex_slots[slot] = settings;
     }
 }

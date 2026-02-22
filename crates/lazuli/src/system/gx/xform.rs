@@ -222,7 +222,7 @@ pub enum DiffuseAttenuation {
 
 #[bitos(32)]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ChannelControl {
+pub struct Channel {
     #[bits(0)]
     pub material_from_vertex: bool,
     #[bits(1)]
@@ -292,8 +292,8 @@ impl ProjectionMat {
 pub struct Internal {
     pub ambient: [Abgr8; 2],
     pub material: [Abgr8; 2],
-    pub color_control: [ChannelControl; 2],
-    pub alpha_control: [ChannelControl; 2],
+    pub color_control: [Channel; 2],
+    pub alpha_control: [Channel; 2],
     pub viewport: Viewport,
     pub viewport_dirty: bool,
     pub default_matrices: DefaultMatrices,
@@ -441,25 +441,25 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
                 .exec(render::Action::SetMaterial(1, xf.material[1]));
         }
         Reg::ColorControl0 => {
-            xf.color_control[0] = ChannelControl::from_bits(value);
+            xf.color_control[0] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetColorChannel(0, xf.color_control[0]));
         }
         Reg::ColorControl1 => {
-            xf.color_control[1] = ChannelControl::from_bits(value);
+            xf.color_control[1] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetColorChannel(1, xf.color_control[1]));
         }
         Reg::AlphaControl0 => {
-            xf.alpha_control[0] = ChannelControl::from_bits(value);
+            xf.alpha_control[0] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetAlphaChannel(0, xf.alpha_control[0]));
         }
         Reg::AlphaControl1 => {
-            xf.alpha_control[1] = ChannelControl::from_bits(value);
+            xf.alpha_control[1] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetAlphaChannel(1, xf.alpha_control[1]));

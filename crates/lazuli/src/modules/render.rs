@@ -10,7 +10,7 @@ use crate::system::gx::pix::{
     BlendMode, BufferFormat, ColorCopyFormat, ConstantAlpha, CopyDims, CopySrc, DepthCopyFormat,
     DepthMode, Scissor,
 };
-use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
+use crate::system::gx::xform::{BaseTexGen, Channel, Light, ProjectionMat};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
 use crate::system::vi::Dimensions;
 
@@ -164,7 +164,7 @@ pub type Texels = Vec<u32>;
 
 pub enum Action {
     SetXfbDimensions(Dimensions),
-    SetFramebufferFormat(BufferFormat),
+    SetEfbFormat(BufferFormat),
     SetViewport(Viewport),
     SetScissor(Scissor),
     SetCullingMode(CullingMode),
@@ -179,8 +179,8 @@ pub enum Action {
     SetTexGenConfig(TexGenConfig),
     SetAmbient(u8, Abgr8),
     SetMaterial(u8, Abgr8),
-    SetColorChannel(u8, ChannelControl),
-    SetAlphaChannel(u8, ChannelControl),
+    SetColorChannel(u8, Channel),
+    SetAlphaChannel(u8, Channel),
     SetLight(u8, Light),
     LoadTexture {
         texture: Texture,

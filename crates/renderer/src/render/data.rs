@@ -1,6 +1,8 @@
 //! Data types used for CPU-GPU communication.
+
 use glam::{Mat4, Vec2, Vec3};
 use lazuli::system::gx::color::Rgba;
+use lazuli::system::gx::xform;
 use zerocopy::{Immutable, IntoBytes};
 
 pub type MatrixIdx = u32;
@@ -43,6 +45,16 @@ pub struct Light {
     pub _pad3: u32,
 }
 
+impl Light {
+    pub fn update(&mut self, light: xform::Light) {
+        self.color = light.color.into();
+        self.cos_attenuation = light.cos_attenuation;
+        self.dist_attenuation = light.dist_attenuation;
+        self.position = light.position;
+        self.direction = light.direction;
+    }
+}
+
 #[derive(Debug, Clone, Immutable, IntoBytes, Default)]
 #[repr(C)]
 pub struct Channel {
@@ -53,6 +65,21 @@ pub struct Channel {
     pub attenuation: u32,
     pub specular: u32,
     pub light_mask: [u32; 8],
+}
+
+impl Channel {
+    pub fn update(&mut self, control: xform::Channel) {
+        self.material_from_vertex = control.material_from_vertex() as u32;
+        self.ambient_from_vertex = control.ambient_from_vertex() as u32;
+        self.lighting_enabled = control.lighting_enabled() as u32;
+        self.diffuse_attenuation = control.diffuse_attenuation() as u32;
+        self.attenuation = control.attenuation() as u32;
+        self.specular = !control.not_specular() as u32;
+
+        let a = control.lights0to3();
+        let b = control.lights4to7();
+        self.light_mask = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]].map(|b| b as u32);
+    }
 }
 
 #[derive(Debug, Clone, Immutable, IntoBytes, Default)]
