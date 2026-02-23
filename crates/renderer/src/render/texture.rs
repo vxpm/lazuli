@@ -73,8 +73,15 @@ impl Cache {
             1
         };
 
+        let label = format!(
+            "Sampler {:?}x{:?} (Mag {:?}, Min {:?})",
+            sampler.mode.wrap_u(),
+            sampler.mode.wrap_v(),
+            mag_filter,
+            min_filter,
+        );
         device.create_sampler(&wgpu::SamplerDescriptor {
-            label: None,
+            label: Some(&label),
             address_mode_u: address_mode(sampler.mode.wrap_u()),
             address_mode_v: address_mode(sampler.mode.wrap_v()),
             mag_filter,
@@ -114,6 +121,7 @@ impl Cache {
         queue: &wgpu::Queue,
         tmem: &mut TmemHigh,
         raw: &Texture,
+        id: TextureId,
         clut: ClutRef,
     ) -> wgpu::TextureView {
         let owned_data;
@@ -138,8 +146,20 @@ impl Cache {
             }
         };
 
+        let label = if raw.format.is_direct() {
+            format!(
+                "Texture {:08X} [{:?}] ({}x{})",
+                id.0, raw.format, raw.width, raw.height
+            )
+        } else {
+            format!(
+                "Texture {:08X}:{:04X} [{:?}:{:?}] ({}x{})",
+                id.0, clut.id.0, raw.format, clut.fmt, raw.width, raw.height
+            )
+        };
+
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
+            label: Some(&label),
             dimension: wgpu::TextureDimension::D2,
             size: wgpu::Extent3d {
                 width: raw.width,
@@ -225,6 +245,7 @@ impl Cache {
                     queue,
                     &mut self.tmem,
                     family.raw.as_ref().unwrap(),
+                    tex.id,
                     tex.clut,
                 )
             }),
@@ -236,6 +257,7 @@ impl Cache {
                         queue,
                         &mut self.tmem,
                         family.raw.as_ref().unwrap(),
+                        tex.id,
                         tex.clut,
                     );
 

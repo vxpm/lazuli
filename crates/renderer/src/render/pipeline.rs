@@ -124,7 +124,7 @@ mod cache {
                 write_mask |= wgpu::ColorWrites::ALPHA;
             }
 
-            let label = format!("shader {}", id);
+            let label = format!("Shader {}", id);
             let shader = match cached_shaders.entry(settings.shader.clone()) {
                 Entry::Occupied(o) => o.into_mut(),
                 Entry::Vacant(v) => {
@@ -148,7 +148,7 @@ mod cache {
                 }
             };
 
-            let label = format!("render pipeline {}", id);
+            let label = format!("Pipeline {}", id);
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(&label),
                 layout: Some(layout),
