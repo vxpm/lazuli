@@ -265,7 +265,7 @@ impl Fog {
 
     pub fn value_b(&self) -> f32 {
         let mantissa = self.b0.magnitude().value() as f32 / (((1 << 23) - 1) as f32);
-        let exp = 2f32.powi(self.b1.shift().value() as i32);
+        let exp = 2f32.powi(self.b1.shift().value() as i32 - 1);
         mantissa * exp
     }
 
