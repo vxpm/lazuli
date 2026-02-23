@@ -3,9 +3,9 @@ pub mod alpha;
 pub mod color;
 pub mod depth;
 
-use ::color::Rgba16;
-use bitos::bitos;
-use bitos::integer::u3;
+use ::color::{Rgba8, Rgba16};
+use bitos::integer::{u3, u5, u11, u24};
+use bitos::{BitUtils, bitos};
 
 #[bitos(3)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,6 +173,91 @@ pub struct StageOps {
     pub alpha: alpha::Stage,
 }
 
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamA {
+    #[bits(0..11)]
+    pub mantissa: u11,
+    #[bits(11..19)]
+    pub exponent: u8,
+    #[bits(19)]
+    pub negative: bool,
+}
+
+impl FogParamA {
+    pub fn value(self) -> f32 {
+        let mut value = 0;
+        value.set_bits(23 - 11, 23, self.mantissa().value() as u32);
+        value.set_bits(23, 31, self.exponent() as u32);
+        value.set_bit(31, self.negative());
+
+        f32::from_bits(value)
+    }
+}
+
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamB0 {
+    #[bits(0..24)]
+    pub magnitude: u24,
+}
+
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamB1 {
+    #[bits(0..5)]
+    pub shift: u5,
+}
+
+#[bitos(3)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FogMode {
+    #[default]
+    None               = 0x0,
+    Reserved0          = 0x1,
+    Linear             = 0x2,
+    Reserved1          = 0x3,
+    Exponential        = 0x4,
+    ExponentialSquared = 0x5,
+    InverseExponential = 0x6,
+    InverseExponentialSquared = 0x7,
+}
+
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamC {
+    #[bits(0..11)]
+    pub mantissa: u11,
+    #[bits(11..19)]
+    pub exponent: u8,
+    #[bits(19)]
+    pub negative: bool,
+    #[bits(20)]
+    pub orthographic: bool,
+    #[bits(21..24)]
+    pub mode: FogMode,
+}
+
+impl FogParamC {
+    pub fn value(self) -> f32 {
+        let mut value = 0;
+        value.set_bits(23 - 11, 23, self.mantissa().value() as u32);
+        value.set_bits(23, 31, self.exponent() as u32);
+        value.set_bit(31, self.negative());
+
+        f32::from_bits(value)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Fog {
+    pub a: FogParamA,
+    pub b0: FogParamB0,
+    pub b1: FogParamB1,
+    pub c: FogParamC,
+    pub color: Rgba8,
+}
+
 #[derive(Debug, Default)]
 pub struct Interface {
     pub active_stages: u8,
@@ -183,5 +268,6 @@ pub struct Interface {
     pub constants: [Rgba16; 4],
     pub alpha_func: alpha::Function,
     pub depth_tex: depth::Texture,
+    pub fog: Fog,
     pub stages_dirty: bool,
 }

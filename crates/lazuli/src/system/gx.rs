@@ -370,6 +370,14 @@ impl Reg {
             Self::ScissorTopLeft | Self::ScissorBottomRight | Self::ScissorOffset
         )
     }
+
+    #[inline]
+    pub fn is_fog(&self) -> bool {
+        matches!(
+            self,
+            Self::TevFog0 | Self::TevFog1 | Self::TevFog2 | Self::TevFog3 | Self::TevFogColor
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -695,34 +703,34 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             sys.gpu.pix.interrupt.set_token(true);
             sys.scheduler.schedule_now(pi::check_interrupts);
         }
-        Reg::PixelCopySrc => write_masked!(sys.gpu.pix.copy_src),
-        Reg::PixelCopyDimensions => write_masked!(sys.gpu.pix.copy_dims),
+        Reg::PixelCopySrc => write_masked!(sys.gpu.pix.copy.src),
+        Reg::PixelCopyDimensions => write_masked!(sys.gpu.pix.copy.dims),
         Reg::PixelCopyDst => {
-            let mut value = sys.gpu.pix.copy_dst.value() >> 5;
+            let mut value = sys.gpu.pix.copy.dst.value() >> 5;
             write_masked!(value);
-            sys.gpu.pix.copy_dst = Address((value << 5).with_bits(26, 32, 0));
+            sys.gpu.pix.copy.dst = Address((value << 5).with_bits(26, 32, 0));
         }
-        Reg::PixelCopyDstStride => write_masked!(sys.gpu.pix.copy_stride),
+        Reg::PixelCopyDstStride => write_masked!(sys.gpu.pix.copy.stride),
         Reg::PixelCopyClearAr => {
             let mut value = 0
-                .with_bits(0, 8, sys.gpu.pix.clear_color.r as u32)
-                .with_bits(8, 16, sys.gpu.pix.clear_color.a as u32);
+                .with_bits(0, 8, sys.gpu.pix.copy.clear_color.r as u32)
+                .with_bits(8, 16, sys.gpu.pix.copy.clear_color.a as u32);
             write_masked!(value);
-            sys.gpu.pix.clear_color.r = value.bits(0, 8) as u8;
-            sys.gpu.pix.clear_color.a = value.bits(8, 16) as u8;
+            sys.gpu.pix.copy.clear_color.r = value.bits(0, 8) as u8;
+            sys.gpu.pix.copy.clear_color.a = value.bits(8, 16) as u8;
         }
         Reg::PixelCopyClearGb => {
             let mut value = 0
-                .with_bits(0, 8, sys.gpu.pix.clear_color.b as u32)
-                .with_bits(8, 16, sys.gpu.pix.clear_color.g as u32);
+                .with_bits(0, 8, sys.gpu.pix.copy.clear_color.b as u32)
+                .with_bits(8, 16, sys.gpu.pix.copy.clear_color.g as u32);
             write_masked!(value);
-            sys.gpu.pix.clear_color.b = value.bits(0, 8) as u8;
-            sys.gpu.pix.clear_color.g = value.bits(8, 16) as u8;
+            sys.gpu.pix.copy.clear_color.b = value.bits(0, 8) as u8;
+            sys.gpu.pix.copy.clear_color.g = value.bits(8, 16) as u8;
         }
         Reg::PixelCopyClearZ => {
-            write_masked!(sys.gpu.pix.clear_depth);
+            write_masked!(sys.gpu.pix.copy.clear_depth);
             sys.modules.render.exec(render::Action::SetClearDepth(
-                sys.gpu.pix.clear_depth as f32 / DEPTH_24_BIT_MAX as f32,
+                sys.gpu.pix.copy.clear_depth as f32 / DEPTH_24_BIT_MAX as f32,
             ));
         }
         Reg::PixelCopyCmd => {
@@ -937,6 +945,23 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             sys.gpu.env.constants[2].b = b;
             sys.gpu.env.constants[2].g = g;
         }
+
+        Reg::TevFog0 => write_masked!(sys.gpu.env.fog.a),
+        Reg::TevFog1 => write_masked!(sys.gpu.env.fog.b0),
+        Reg::TevFog2 => write_masked!(sys.gpu.env.fog.b1),
+        Reg::TevFog3 => write_masked!(sys.gpu.env.fog.c),
+        Reg::TevFogColor => {
+            let mut value = 0
+                .with_bits(0, 8, sys.gpu.pix.copy.clear_color.b as u32)
+                .with_bits(8, 16, sys.gpu.pix.copy.clear_color.g as u32)
+                .with_bits(16, 24, sys.gpu.pix.copy.clear_color.r as u32);
+            write_masked!(value);
+            sys.gpu.env.fog.color.b = value.bits(0, 8) as u8;
+            sys.gpu.env.fog.color.g = value.bits(8, 16) as u8;
+            sys.gpu.env.fog.color.r = value.bits(16, 24) as u8;
+            sys.gpu.env.fog.color.a = 255;
+        }
+
         Reg::TevAlphaFunc => {
             write_masked!(sys.gpu.env.alpha_func);
             sys.modules.render.exec(render::Action::SetAlphaFunction(
@@ -981,7 +1006,7 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
 
     if reg.is_pixel_clear() {
         sys.modules.render.exec(render::Action::SetClearColor(
-            sys.gpu.pix.clear_color.into(),
+            sys.gpu.pix.copy.clear_color.into(),
         ));
     }
 
@@ -989,6 +1014,12 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         sys.modules
             .render
             .exec(render::Action::SetScissor(sys.gpu.pix.scissor));
+    }
+
+    if reg.is_fog() {
+        dbg!(&sys.gpu.env.fog);
+        dbg!(sys.gpu.env.fog.a.value());
+        dbg!(sys.gpu.env.fog.c.value());
     }
 }
 
@@ -1103,8 +1134,8 @@ fn call(sys: &mut System, address: Address, length: u32) {
 
 fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     let args = render::CopyArgs {
-        src: sys.gpu.pix.copy_src,
-        dims: sys.gpu.pix.copy_dims,
+        src: sys.gpu.pix.copy.src,
+        dims: sys.gpu.pix.copy.dims,
         half: cmd.half(),
         clear: cmd.clear(),
     };
@@ -1112,8 +1143,8 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     let divisor = if args.half { 2 } else { 1 };
     let width = args.dims.width() as u32 / divisor;
     let height = args.dims.height() as u32 / divisor;
-    let dst = sys.gpu.pix.copy_dst;
-    let stride = sys.gpu.pix.copy_stride;
+    let dst = sys.gpu.pix.copy.dst;
+    let stride = sys.gpu.pix.copy.stride;
 
     if cmd.to_xfb() {
         let id = sys.gpu.xfb_copies.len() as u32;
