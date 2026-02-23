@@ -83,6 +83,15 @@ the game.
 
 For more CLI options, `--help` is your friend.
 
+## Running on macOS
+
+If you have built lazuli yourself, you are ready to go. But if you have grabbed the zip file from 
+the nightly releases, just extract the zip file to your desired folder and remove it from quarantine:
+
+```sh
+xattr -d com.apple.quarantine lazuli
+```
+
 ## Inputs
 
 Both gamepads and keyboard input are supported. When a gamepad is detected, it is automatically set

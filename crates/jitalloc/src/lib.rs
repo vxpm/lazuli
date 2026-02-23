@@ -170,6 +170,11 @@ where
             }
         }
 
+        #[cfg(target_os = "macos")]
+        unsafe {
+            sys_icache_invalidate(alloc.0.as_ptr() as *mut std::ffi::c_void, data.len());
+        }
+
         alloc
     }
 }
