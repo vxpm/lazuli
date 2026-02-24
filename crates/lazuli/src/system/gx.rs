@@ -253,23 +253,23 @@ pub enum Reg {
     TevRangeAdj3        = 0xEC,
     TevRangeAdj4        = 0xED,
 
-    TevFog0             = 0xEE,
-    TevFog1             = 0xEF,
-    TevFog2             = 0xF0,
-    TevFog3             = 0xF1,
+    TevFogA             = 0xEE,
+    TevFogB0            = 0xEF,
+    TevFogB1            = 0xF0,
+    TevFogC             = 0xF1,
     TevFogColor         = 0xF2,
 
     TevAlphaFunc        = 0xF3,
     TevDepthTexBias     = 0xF4,
     TevDepthTexMode     = 0xF5,
-    TevKSel0            = 0xF6,
-    TevKSel1            = 0xF7,
-    TevKSel2            = 0xF8,
-    TevKSel3            = 0xF9,
-    TevKSel4            = 0xFA,
-    TevKSel5            = 0xFB,
-    TevKSel6            = 0xFC,
-    TevKSel7            = 0xFD,
+    TevConstantSelect0  = 0xF6,
+    TevConstantSelect1  = 0xF7,
+    TevConstantSelect2  = 0xF8,
+    TevConstantSelect3  = 0xF9,
+    TevConstantSelect4  = 0xFA,
+    TevConstantSelect5  = 0xFB,
+    TevConstantSelect6  = 0xFC,
+    TevConstantSelect7  = 0xFD,
 
     WriteMask           = 0xFE,
 }
@@ -299,42 +299,26 @@ impl Reg {
     }
 
     #[inline]
-    pub fn is_tev(&self) -> bool {
+    pub fn is_tev_stage(&self) -> bool {
+        seq! {
+            N in 0..16 {
+                match self {
+                    #(
+                          Self::TevColor~N
+                        | Self::TevAlpha~N
+                        => true,
+                    )*
+                    _ => false
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn is_tev_constant(&self) -> bool {
         matches!(
             self,
-            Self::TevColor0
-                | Self::TevAlpha0
-                | Self::TevColor1
-                | Self::TevAlpha1
-                | Self::TevColor2
-                | Self::TevAlpha2
-                | Self::TevColor3
-                | Self::TevAlpha3
-                | Self::TevColor4
-                | Self::TevAlpha4
-                | Self::TevColor5
-                | Self::TevAlpha5
-                | Self::TevColor6
-                | Self::TevAlpha6
-                | Self::TevColor7
-                | Self::TevAlpha7
-                | Self::TevColor8
-                | Self::TevAlpha8
-                | Self::TevColor9
-                | Self::TevAlpha9
-                | Self::TevColor10
-                | Self::TevAlpha10
-                | Self::TevColor11
-                | Self::TevAlpha11
-                | Self::TevColor12
-                | Self::TevAlpha12
-                | Self::TevColor13
-                | Self::TevAlpha13
-                | Self::TevColor14
-                | Self::TevAlpha14
-                | Self::TevColor15
-                | Self::TevAlpha15
-                | Self::TevConstant3AR
+            Self::TevConstant3AR
                 | Self::TevConstant3GB
                 | Self::TevConstant0AR
                 | Self::TevConstant0GB
@@ -342,17 +326,24 @@ impl Reg {
                 | Self::TevConstant1GB
                 | Self::TevConstant2AR
                 | Self::TevConstant2GB
-                | Self::TevKSel0
-                | Self::TevKSel1
-                | Self::TevKSel2
-                | Self::TevKSel3
-                | Self::TevKSel4
-                | Self::TevKSel5
-                | Self::TevKSel6
-                | Self::TevKSel7
-                | Self::TevDepthTexBias
-                | Self::TevDepthTexMode
+                | Self::TevConstantSelect0
+                | Self::TevConstantSelect1
+                | Self::TevConstantSelect2
+                | Self::TevConstantSelect3
+                | Self::TevConstantSelect4
+                | Self::TevConstantSelect5
+                | Self::TevConstantSelect6
+                | Self::TevConstantSelect7
         )
+    }
+
+    pub fn is_tev_depth_tex(&self) -> bool {
+        matches!(self, Self::TevDepthTexBias | Self::TevDepthTexMode)
+    }
+
+    #[inline]
+    pub fn is_tev(&self) -> bool {
+        self.is_tev_stage() || self.is_tev_constant() || self.is_tev_depth_tex()
     }
 
     #[inline]
@@ -375,7 +366,7 @@ impl Reg {
     pub fn is_fog(&self) -> bool {
         matches!(
             self,
-            Self::TevFog0 | Self::TevFog1 | Self::TevFog2 | Self::TevFog3 | Self::TevFogColor
+            Self::TevFogA | Self::TevFogB0 | Self::TevFogB1 | Self::TevFogC | Self::TevFogColor
         )
     }
 }
@@ -418,6 +409,12 @@ pub struct GenMode {
     pub bumpmap_count: u3,
     #[bits(19)]
     pub z_freeze: bool,
+}
+
+impl GenMode {
+    pub fn active_stages(&self) -> u8 {
+        self.tev_stages_minus_one().value() + 1
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -581,7 +578,7 @@ pub fn update_texenv(sys: &mut System) {
         .env
         .stage_ops
         .iter()
-        .take(sys.gpu.env.active_stages as usize)
+        .take(sys.gpu.mode.active_stages() as usize)
         .cloned()
         .enumerate()
         .map(|(i, ops)| {
@@ -635,9 +632,11 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
     match reg {
         Reg::GenMode => {
             write_masked!(sys.gpu.mode);
-            let mode = &sys.gpu.mode;
-            sys.gpu.env.active_stages = mode.tev_stages_minus_one().value() + 1;
-            sys.gpu.env.active_channels = mode.color_channels_count().value();
+            sys.gpu.env.stages_dirty = true;
+            sys.gpu.xform.internal.stages_dirty = true;
+            sys.modules
+                .render
+                .exec(render::Action::SetCullingMode(sys.gpu.mode.culling_mode()));
         }
 
         Reg::ScissorTopLeft => write_masked!(sys.gpu.pix.scissor.top_left),
@@ -946,10 +945,10 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             sys.gpu.env.constants[2].g = g;
         }
 
-        Reg::TevFog0 => write_masked!(sys.gpu.env.fog.a),
-        Reg::TevFog1 => write_masked!(sys.gpu.env.fog.b0),
-        Reg::TevFog2 => write_masked!(sys.gpu.env.fog.b1),
-        Reg::TevFog3 => write_masked!(sys.gpu.env.fog.c),
+        Reg::TevFogA => write_masked!(sys.gpu.env.fog.a),
+        Reg::TevFogB0 => write_masked!(sys.gpu.env.fog.b0),
+        Reg::TevFogB1 => write_masked!(sys.gpu.env.fog.b1),
+        Reg::TevFogC => write_masked!(sys.gpu.env.fog.c),
         Reg::TevFogColor => {
             let mut value = 0
                 .with_bits(0, 8, sys.gpu.pix.copy.clear_color.b as u32)
@@ -972,28 +971,20 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         Reg::TevDepthTexBias => write_masked!(sys.gpu.env.depth_tex.bias),
         Reg::TevDepthTexMode => write_masked!(sys.gpu.env.depth_tex.mode),
 
-        Reg::TevKSel0 => write_masked!(sys.gpu.env.stage_consts[0]),
-        Reg::TevKSel1 => write_masked!(sys.gpu.env.stage_consts[1]),
-        Reg::TevKSel2 => write_masked!(sys.gpu.env.stage_consts[2]),
-        Reg::TevKSel3 => write_masked!(sys.gpu.env.stage_consts[3]),
-        Reg::TevKSel4 => write_masked!(sys.gpu.env.stage_consts[4]),
-        Reg::TevKSel5 => write_masked!(sys.gpu.env.stage_consts[5]),
-        Reg::TevKSel6 => write_masked!(sys.gpu.env.stage_consts[6]),
-        Reg::TevKSel7 => write_masked!(sys.gpu.env.stage_consts[7]),
+        Reg::TevConstantSelect0 => write_masked!(sys.gpu.env.stage_consts[0]),
+        Reg::TevConstantSelect1 => write_masked!(sys.gpu.env.stage_consts[1]),
+        Reg::TevConstantSelect2 => write_masked!(sys.gpu.env.stage_consts[2]),
+        Reg::TevConstantSelect3 => write_masked!(sys.gpu.env.stage_consts[3]),
+        Reg::TevConstantSelect4 => write_masked!(sys.gpu.env.stage_consts[4]),
+        Reg::TevConstantSelect5 => write_masked!(sys.gpu.env.stage_consts[5]),
+        Reg::TevConstantSelect6 => write_masked!(sys.gpu.env.stage_consts[6]),
+        Reg::TevConstantSelect7 => write_masked!(sys.gpu.env.stage_consts[7]),
         Reg::WriteMask => {
             sys.gpu.write_mask = value;
         }
         _ => {
             tracing::warn!("unimplemented write to internal GX register {reg:?}: 0x{value:06X}")
         }
-    }
-
-    if reg == Reg::GenMode {
-        sys.gpu.env.stages_dirty = true;
-        sys.gpu.xform.internal.stages_dirty = true;
-        sys.modules
-            .render
-            .exec(render::Action::SetCullingMode(sys.gpu.mode.culling_mode()));
     }
 
     if let Some(map) = reg.texmap() {

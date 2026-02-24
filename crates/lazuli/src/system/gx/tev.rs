@@ -276,8 +276,6 @@ impl Fog {
 
 #[derive(Debug, Default)]
 pub struct Interface {
-    pub active_stages: u8,
-    pub active_channels: u8,
     pub stage_ops: [StageOps; 16],
     pub stage_refs: [StageRefsPair; 8],
     pub stage_consts: [StageConstsPair; 8],
