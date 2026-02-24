@@ -9,7 +9,7 @@ use bitos::{BitUtils, bitos};
 
 #[bitos(3)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Input {
+pub enum InputChannel {
     Channel0            = 0x0,
     Channel1            = 0x1,
     Reserved0           = 0x2,
@@ -30,7 +30,7 @@ pub struct StageRefs {
     #[bits(6)]
     pub map_enable: bool,
     #[bits(7..10)]
-    pub input: Input,
+    pub input: InputChannel,
 }
 
 #[bitos(32)]

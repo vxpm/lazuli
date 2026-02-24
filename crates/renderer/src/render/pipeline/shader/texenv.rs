@@ -38,16 +38,16 @@ fn sample_tex(stage: &TexEnvStage) -> wesl::syntax::Expression {
     }
 }
 
-fn get_color_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
+fn get_input_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match stage.refs.input() {
-        tev::Input::Channel0 => quote_expression! { in.chan0 },
-        tev::Input::Channel1 => quote_expression! { in.chan1 },
-        tev::Input::AlphaBump => quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) },
-        tev::Input::AlphaBumpNormalized => {
+        tev::InputChannel::Channel0 => quote_expression! { in.chan0 },
+        tev::InputChannel::Channel1 => quote_expression! { in.chan1 },
+        tev::InputChannel::AlphaBump => quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) },
+        tev::InputChannel::AlphaBumpNormalized => {
             quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) }
         }
-        tev::Input::Zero => quote_expression! { vec4f(0f) },
+        tev::InputChannel::Zero => quote_expression! { vec4f(0f) },
         _ => panic!("reserved color channel"),
     }
 }
@@ -87,9 +87,9 @@ fn get_color_const(stage: &TexEnvStage) -> wesl::syntax::Expression {
     }
 }
 
-fn get_color_input(stage: &TexEnvStage, input: tev::color::InputSrc) -> wesl::syntax::Expression {
+fn get_color_input(stage: &TexEnvStage, src: tev::color::InputSrc) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    match input {
+    match src {
         tev::color::InputSrc::R3Color => quote_expression! { regs[R3].rgba },
         tev::color::InputSrc::R3Alpha => quote_expression! { regs[R3].aaaa },
         tev::color::InputSrc::R0Color => quote_expression! { regs[R0].rgba },
@@ -107,11 +107,11 @@ fn get_color_input(stage: &TexEnvStage, input: tev::color::InputSrc) -> wesl::sy
             quote_expression! { #tex.aaaa }
         }
         tev::color::InputSrc::ChanColor => {
-            let color = get_color_channel(stage);
+            let color = get_input_channel(stage);
             quote_expression! { #color.rgba }
         }
         tev::color::InputSrc::ChanAlpha => {
-            let color = get_color_channel(stage);
+            let color = get_input_channel(stage);
             quote_expression! { #color.aaaa }
         }
         tev::color::InputSrc::One => quote_expression! { vec4f(1f) },
@@ -285,26 +285,23 @@ fn get_alpha_const(stage: &TexEnvStage) -> wesl::syntax::Expression {
     }
 }
 
-fn get_alpha_input(stage: &TexEnvStage, input: tev::alpha::InputSrc) -> wesl::syntax::Expression {
+fn get_alpha_input(stage: &TexEnvStage, src: tev::alpha::InputSrc) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    match input {
-        tev::alpha::InputSrc::R3Alpha => quote_expression! { regs[R3].aaaa },
-        tev::alpha::InputSrc::R0Alpha => quote_expression! { regs[R0].aaaa },
-        tev::alpha::InputSrc::R1Alpha => quote_expression! { regs[R1].aaaa },
-        tev::alpha::InputSrc::R2Alpha => quote_expression! { regs[R2].aaaa },
+    match src {
+        tev::alpha::InputSrc::R3Alpha => quote_expression! { regs[R3].a },
+        tev::alpha::InputSrc::R0Alpha => quote_expression! { regs[R0].a },
+        tev::alpha::InputSrc::R1Alpha => quote_expression! { regs[R1].a },
+        tev::alpha::InputSrc::R2Alpha => quote_expression! { regs[R2].a },
         tev::alpha::InputSrc::TexAlpha => {
             let tex = sample_tex(stage);
-            quote_expression! { #tex.aaaa }
+            quote_expression! { #tex.a }
         }
         tev::alpha::InputSrc::ChanAlpha => {
-            let color = get_color_channel(stage);
-            quote_expression! { #color.aaaa }
+            let color = get_input_channel(stage);
+            quote_expression! { #color.a }
         }
-        tev::alpha::InputSrc::Constant => {
-            let constant = get_alpha_const(stage);
-            quote_expression! { vec4f(#constant) }
-        }
-        tev::alpha::InputSrc::Zero => quote_expression! { vec4f(0f) },
+        tev::alpha::InputSrc::Constant => get_alpha_const(stage),
+        tev::alpha::InputSrc::Zero => quote_expression! { 0f },
     }
 }
 
@@ -322,14 +319,14 @@ fn comparative_alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let output = stage.ops.alpha.output() as u32;
 
     let compare_target_a = get_compare_target(
-        quote_expression!(input_a),
-        quote_expression!(input_a_uint),
+        quote_expression!(vec4f(input_a)),
+        quote_expression!(vec4u(input_a_uint)),
         target,
         true,
     );
     let compare_target_b = get_compare_target(
-        quote_expression!(input_b),
-        quote_expression!(input_b_uint),
+        quote_expression!(vec4f(input_b)),
+        quote_expression!(vec4u(input_b_uint)),
         target,
         true,
     );
@@ -347,12 +344,12 @@ fn comparative_alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     wesl_quote::quote_statement! {
         {
             let input_a = #input_a;
-            let input_a_uint = base::vec4f_to_vec4u(#input_a);
+            let input_a_uint = u32(#input_a * 255.0);
             let input_b = #input_b;
-            let input_b_uint = base::vec4f_to_vec4u(#input_b);
+            let input_b_uint = u32(#input_b * 255.0);
 
-            let input_c = #input_c.a;
-            let input_d = #input_d.a;
+            let input_c = #input_c;
+            let input_d = #input_d;
 
             let alpha_compare = select(input_d, input_c, #comparison);
             let alpha_result = #clamped;
@@ -385,10 +382,10 @@ fn regular_alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
 
     wesl_quote::quote_statement! {
         {
-            let input_a = #input_a.a;
-            let input_b = #input_b.a;
-            let input_c = #input_c.a;
-            let input_d = #input_d.a;
+            let input_a = #input_a;
+            let input_b = #input_b;
+            let input_c = #input_c;
+            let input_d = #input_d;
             let sign = #sign;
             let bias = #bias;
             let scale = #scale;
@@ -411,7 +408,7 @@ pub fn alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     }
 }
 
-fn get_alpha_comparison_helper(
+fn get_alpha_comparison_component(
     compare: tev::alpha::Compare,
     idx: usize,
 ) -> wesl::syntax::Expression {
@@ -432,8 +429,8 @@ fn get_alpha_comparison_helper(
 
 pub fn get_alpha_comparison(settings: &AlphaFuncSettings) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    let a = get_alpha_comparison_helper(settings.comparison[0], 0);
-    let b = get_alpha_comparison_helper(settings.comparison[1], 1);
+    let a = get_alpha_comparison_component(settings.comparison[0], 0);
+    let b = get_alpha_comparison_component(settings.comparison[1], 1);
 
     match settings.logic {
         tev::alpha::CompareLogic::And => quote_expression! { (#a) && (#b) },
