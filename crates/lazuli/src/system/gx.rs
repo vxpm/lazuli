@@ -21,7 +21,6 @@ use zerocopy::IntoBytes;
 
 use crate::modules::{render, vertex};
 use crate::system::gx::cmd::VertexAttributeStream;
-use crate::system::gx::tev::FogMode;
 use crate::system::pi;
 use crate::{Primitive, System};
 
@@ -1017,11 +1016,10 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             .exec(render::Action::SetScissor(sys.gpu.pix.scissor));
     }
 
-    if reg.is_fog() && sys.gpu.env.fog.c.mode() != FogMode::None {
-        dbg!(&sys.gpu.env.fog);
-        let a = dbg!(sys.gpu.env.fog.value_a());
-        let b = dbg!(sys.gpu.env.fog.value_b());
-        let c = dbg!(sys.gpu.env.fog.value_c());
+    if reg.is_fog() {
+        sys.modules
+            .render
+            .exec(render::Action::SetFog(sys.gpu.env.fog));
     }
 }
 

@@ -479,6 +479,50 @@ pub fn get_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Statement {
             let depth_tex_sample = base::vec4f_to_vec4u(#sampled);
             let depth_tex_value = pack4xU8(vec4u(depth_tex_sample.x, #depth_mid, #depth_hi, 0)) + #bias;
             out.depth = clamp(f32(depth_tex_value) / f32(#depth_max), 0.0, 1.0);
+            frag_depth = out.depth;
+        }
+    }
+}
+
+pub fn get_fog(settings: &TexEnvSettings) -> wesl::syntax::Statement {
+    use wesl::syntax::*;
+
+    if settings.fog.mode == tev::FogMode::None {
+        return Statement::Void;
+    }
+
+    let distance = if settings.fog.orthographic {
+        quote_statement! {
+            distance = clamp(config.fog.a * frag_depth - config.fog.c, 0.0, 1.0);
+        }
+    } else {
+        quote_statement! {
+            {
+                let depth_max = f32((1 << 24) - 1);
+                let depth = u32(frag_depth * depth_max);
+                let a = config.fog.a * depth_max;
+                let denom = f32(config.fog.b_mag - (depth >> config.fog.b_shift));
+                distance = clamp(a / denom - config.fog.c, 0.0, 1.0);
+            }
+        }
+    };
+
+    let adjust = match settings.fog.mode {
+        tev::FogMode::None => unreachable!(),
+        tev::FogMode::Linear => Statement::Void,
+        tev::FogMode::Exponential => todo!(),
+        tev::FogMode::ExponentialSquared => todo!(),
+        tev::FogMode::InverseExponential => todo!(),
+        tev::FogMode::InverseExponentialSquared => todo!(),
+        _ => panic!("reserved fog mode"),
+    };
+
+    quote_statement! {
+        {
+            var distance: f32;
+            @#distance {}
+            @#adjust {}
+            out.color = mix(out.color, config.fog.color, distance);
         }
     }
 }

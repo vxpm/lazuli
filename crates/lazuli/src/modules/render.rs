@@ -10,6 +10,7 @@ use crate::system::gx::pix::{
     BlendMode, BufferFormat, ColorCopyFormat, ConstantAlpha, CopyDims, CopySrc, DepthCopyFormat,
     DepthMode, Scissor,
 };
+use crate::system::gx::tev::Fog;
 use crate::system::gx::xform::{BaseTexGen, Channel, Light, ProjectionMat};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
 use crate::system::vi::Dimensions;
@@ -182,6 +183,7 @@ pub enum Action {
     SetColorChannel(u8, Channel),
     SetAlphaChannel(u8, Channel),
     SetLight(u8, Light),
+    SetFog(Fog),
     LoadTexture {
         texture: Texture,
         id: TextureId,

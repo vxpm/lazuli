@@ -1,4 +1,5 @@
 use lazuli::modules::render::TexEnvStage;
+use lazuli::system::gx::tev::FogMode;
 use lazuli::system::gx::xform::BaseTexGen;
 use lazuli::system::gx::{CullingMode, tev};
 
@@ -136,10 +137,17 @@ impl AlphaFuncSettings {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct FogSettings {
+    pub mode: FogMode,
+    pub orthographic: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TexEnvSettings {
     pub stages: Vec<TexEnvStage>,
     pub alpha_func: AlphaFuncSettings,
     pub depth_tex: tev::depth::Texture,
+    pub fog: FogSettings,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

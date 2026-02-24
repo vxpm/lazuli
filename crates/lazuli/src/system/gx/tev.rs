@@ -210,7 +210,7 @@ pub struct FogParamB1 {
 }
 
 #[bitos(3)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 pub enum FogMode {
     #[default]
     None               = 0x0,
@@ -249,7 +249,7 @@ impl FogParamC {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Fog {
     pub a: FogParamA,
     pub b0: FogParamB0,

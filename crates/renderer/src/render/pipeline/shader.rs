@@ -79,6 +79,14 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
             light_mask: array<u32, 8>,
         }
 
+        struct FogParams {
+            color: vec4f,
+            a: f32,
+            b_mag: u32,
+            b_shift: u32,
+            c: f32,
+        }
+
         struct Config {
             ambient: array<vec4f, 2>,
             material: array<vec4f, 2>,
@@ -91,6 +99,7 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
             constant_alpha: u32,
             alpha_refs: array<u32, 2>,
             _pad0: u32,
+            fog: FogParams,
         }
 
         // An input vertex
@@ -524,6 +533,7 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
 
     let alpha_comparison = texenv::get_alpha_comparison(&texenv.alpha_func);
     let depth_texture = texenv::get_depth_texture(texenv);
+    let fog = texenv::get_fog(texenv);
 
     wesl_quote::quote_declaration! {
         @fragment
@@ -565,7 +575,9 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
                 out.color = out.blend;
             }
 
+            var frag_depth = in.clip.z;
             @#depth_texture {}
+            @#fog {}
 
             return out;
         }

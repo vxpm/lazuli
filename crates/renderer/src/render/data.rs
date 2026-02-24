@@ -2,7 +2,7 @@
 
 use glam::{Mat4, Vec2, Vec3};
 use lazuli::system::gx::color::Rgba;
-use lazuli::system::gx::xform;
+use lazuli::system::gx::{tev, xform};
 use zerocopy::{Immutable, IntoBytes};
 
 pub type MatrixIdx = u32;
@@ -68,17 +68,37 @@ pub struct Channel {
 }
 
 impl Channel {
-    pub fn update(&mut self, control: xform::Channel) {
-        self.material_from_vertex = control.material_from_vertex() as u32;
-        self.ambient_from_vertex = control.ambient_from_vertex() as u32;
-        self.lighting_enabled = control.lighting_enabled() as u32;
-        self.diffuse_attenuation = control.diffuse_attenuation() as u32;
-        self.attenuation = control.attenuation() as u32;
-        self.specular = !control.not_specular() as u32;
+    pub fn update(&mut self, channel: xform::Channel) {
+        self.material_from_vertex = channel.material_from_vertex() as u32;
+        self.ambient_from_vertex = channel.ambient_from_vertex() as u32;
+        self.lighting_enabled = channel.lighting_enabled() as u32;
+        self.diffuse_attenuation = channel.diffuse_attenuation() as u32;
+        self.attenuation = channel.attenuation() as u32;
+        self.specular = !channel.not_specular() as u32;
 
-        let a = control.lights0to3();
-        let b = control.lights4to7();
+        let a = channel.lights0to3();
+        let b = channel.lights4to7();
         self.light_mask = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]].map(|b| b as u32);
+    }
+}
+
+#[derive(Debug, Clone, Immutable, IntoBytes, Default)]
+#[repr(C)]
+pub struct FogParams {
+    pub color: Rgba,
+    pub a: f32,
+    pub b_mag: u32,
+    pub b_shift: u32,
+    pub c: f32,
+}
+
+impl FogParams {
+    pub fn update(&mut self, fog: tev::Fog) {
+        self.color = fog.color.into();
+        self.a = fog.value_a();
+        self.b_mag = fog.b0.magnitude().value();
+        self.b_shift = fog.b1.shift().value() as u32;
+        self.c = fog.value_c();
     }
 }
 
@@ -96,4 +116,5 @@ pub struct Config {
     pub constant_alpha: u32,
     pub alpha_refs: [u32; 2],
     pub _pad0: u32,
+    pub fog: FogParams,
 }

@@ -10,6 +10,7 @@ use glam::{Mat4, Vec2};
 use lazuli::modules::render::{Action, Sampler, Scaling, Viewport};
 use lazuli::system::gx::color::Rgba;
 use lazuli::system::gx::pix::{ConstantAlpha, Scissor};
+use lazuli::system::gx::tev::Fog;
 use lazuli::system::gx::xform::{Channel, Light};
 use lazuli::system::gx::{EFB_HEIGHT, EFB_WIDTH, MatrixId, Topology, Vertex, VertexStream};
 use rustc_hash::FxBuildHasher;
@@ -239,6 +240,7 @@ impl Renderer {
             Action::SetColorChannel(idx, control) => self.set_color_channel(idx, control),
             Action::SetAlphaChannel(idx, control) => self.set_alpha_channel(idx, control),
             Action::SetLight(idx, light) => self.set_light(idx, light),
+            Action::SetFog(fog) => self.set_fog(fog),
             Action::CopyColor {
                 args,
                 format,
@@ -383,6 +385,13 @@ impl Renderer {
 
     fn set_light(&mut self, idx: u8, light: Light) {
         self.current_config.lights[idx as usize].update(light);
+        self.current_config_dirty = true;
+    }
+
+    fn set_fog(&mut self, fog: Fog) {
+        self.pipeline_settings.shader.texenv.fog.mode = fog.c.mode();
+        self.pipeline_settings.shader.texenv.fog.orthographic = fog.c.orthographic();
+        self.current_config.fog.update(fog);
         self.current_config_dirty = true;
     }
 
