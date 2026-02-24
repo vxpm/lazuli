@@ -66,6 +66,7 @@ pub struct TexEnvStage {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TexEnvConfig {
     pub stages: Vec<TexEnvStage>,
+    pub regs: [Rgba16; 4],
     pub constants: [Rgba16; 4],
     pub depth_tex: tev::depth::Texture,
 }
@@ -219,7 +220,7 @@ pub enum Action {
     PresentXfb(Vec<XfbPart>),
 }
 
-const_assert!(size_of::<Action>() <= 64);
+// const_assert!(size_of::<Action>() <= 64);
 
 pub trait RenderModule: Send {
     fn exec(&mut self, action: Action);

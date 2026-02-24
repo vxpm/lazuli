@@ -320,6 +320,7 @@ impl Renderer {
             .stages
             .clone_from(&config.stages);
         self.pipeline_settings.shader.texenv.depth_tex = config.depth_tex;
+        self.current_config.regs = config.regs.map(Rgba::from);
         self.current_config.consts = config.constants.map(Rgba::from);
         self.current_config_dirty = true;
     }

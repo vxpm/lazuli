@@ -63,26 +63,26 @@ fn get_color_const(stage: &TexEnvStage) -> wesl::syntax::Expression {
         tev::Constant::ThreeEights => quote_expression! { vec4f(3f / 8f) },
         tev::Constant::TwoEights => quote_expression! { vec4f(2f / 8f) },
         tev::Constant::OneEight => quote_expression! { vec4f(1f / 8f) },
-        tev::Constant::Const0 => quote_expression! { consts[R0] },
-        tev::Constant::Const1 => quote_expression! { consts[R1] },
-        tev::Constant::Const2 => quote_expression! { consts[R2] },
-        tev::Constant::Const3 => quote_expression! { consts[R3] },
-        tev::Constant::Const0R => quote_expression! { consts[R0].rrrr },
-        tev::Constant::Const1R => quote_expression! { consts[R1].rrrr },
-        tev::Constant::Const2R => quote_expression! { consts[R2].rrrr },
-        tev::Constant::Const3R => quote_expression! { consts[R3].rrrr },
-        tev::Constant::Const0G => quote_expression! { consts[R0].gggg },
-        tev::Constant::Const1G => quote_expression! { consts[R1].gggg },
-        tev::Constant::Const2G => quote_expression! { consts[R2].gggg },
-        tev::Constant::Const3G => quote_expression! { consts[R3].gggg },
-        tev::Constant::Const0B => quote_expression! { consts[R0].bbbb },
-        tev::Constant::Const1B => quote_expression! { consts[R1].bbbb },
-        tev::Constant::Const2B => quote_expression! { consts[R2].bbbb },
-        tev::Constant::Const3B => quote_expression! { consts[R3].bbbb },
-        tev::Constant::Const0A => quote_expression! { consts[R0].aaaa },
-        tev::Constant::Const1A => quote_expression! { consts[R1].aaaa },
-        tev::Constant::Const2A => quote_expression! { consts[R2].aaaa },
-        tev::Constant::Const3A => quote_expression! { consts[R3].aaaa },
+        tev::Constant::Const0 => quote_expression! { consts[0] },
+        tev::Constant::Const1 => quote_expression! { consts[1] },
+        tev::Constant::Const2 => quote_expression! { consts[2] },
+        tev::Constant::Const3 => quote_expression! { consts[3] },
+        tev::Constant::Const0R => quote_expression! { consts[0].rrrr },
+        tev::Constant::Const1R => quote_expression! { consts[1].rrrr },
+        tev::Constant::Const2R => quote_expression! { consts[2].rrrr },
+        tev::Constant::Const3R => quote_expression! { consts[3].rrrr },
+        tev::Constant::Const0G => quote_expression! { consts[0].gggg },
+        tev::Constant::Const1G => quote_expression! { consts[1].gggg },
+        tev::Constant::Const2G => quote_expression! { consts[2].gggg },
+        tev::Constant::Const3G => quote_expression! { consts[3].gggg },
+        tev::Constant::Const0B => quote_expression! { consts[0].bbbb },
+        tev::Constant::Const1B => quote_expression! { consts[1].bbbb },
+        tev::Constant::Const2B => quote_expression! { consts[2].bbbb },
+        tev::Constant::Const3B => quote_expression! { consts[3].bbbb },
+        tev::Constant::Const0A => quote_expression! { consts[0].aaaa },
+        tev::Constant::Const1A => quote_expression! { consts[1].aaaa },
+        tev::Constant::Const2A => quote_expression! { consts[2].aaaa },
+        tev::Constant::Const3A => quote_expression! { consts[3].aaaa },
         _ => panic!("reserved color constant"),
     }
 }
@@ -90,14 +90,14 @@ fn get_color_const(stage: &TexEnvStage) -> wesl::syntax::Expression {
 fn get_color_input(stage: &TexEnvStage, src: tev::color::InputSrc) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match src {
-        tev::color::InputSrc::R3Color => quote_expression! { regs[R3].rgba },
-        tev::color::InputSrc::R3Alpha => quote_expression! { regs[R3].aaaa },
-        tev::color::InputSrc::R0Color => quote_expression! { regs[R0].rgba },
-        tev::color::InputSrc::R0Alpha => quote_expression! { regs[R0].aaaa },
-        tev::color::InputSrc::R1Color => quote_expression! { regs[R1].rgba },
-        tev::color::InputSrc::R1Alpha => quote_expression! { regs[R1].aaaa },
-        tev::color::InputSrc::R2Color => quote_expression! { regs[R2].rgba },
-        tev::color::InputSrc::R2Alpha => quote_expression! { regs[R2].aaaa },
+        tev::color::InputSrc::R3Color => quote_expression! { regs[3].rgba },
+        tev::color::InputSrc::R3Alpha => quote_expression! { regs[3].aaaa },
+        tev::color::InputSrc::R0Color => quote_expression! { regs[0].rgba },
+        tev::color::InputSrc::R0Alpha => quote_expression! { regs[0].aaaa },
+        tev::color::InputSrc::R1Color => quote_expression! { regs[1].rgba },
+        tev::color::InputSrc::R1Alpha => quote_expression! { regs[1].aaaa },
+        tev::color::InputSrc::R2Color => quote_expression! { regs[2].rgba },
+        tev::color::InputSrc::R2Alpha => quote_expression! { regs[2].aaaa },
         tev::color::InputSrc::TexColor => {
             let tex = sample_tex(stage);
             quote_expression! { #tex.rgba }
@@ -158,7 +158,7 @@ fn comparative_color_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let target = stage.ops.color.compare_target();
     let op = stage.ops.color.compare_op();
     let clamp = stage.ops.color.clamp();
-    let output = stage.ops.color.output() as u32;
+    let output = stage.ops.color.output().index();
 
     let compare_target_a = get_compare_target(
         quote_expression!(input_a),
@@ -193,7 +193,7 @@ fn comparative_color_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
             let input_c = #input_c.rgb;
             let input_d = #input_d.rgb;
 
-            let color_compare = select(input_d, input_c, #comparison);
+            let color_compare = input_d + select(vec3f(0), input_c, #comparison);
             let color_result = #clamped;
 
             regs[#output] = vec4f(color_result, regs[#output].a);
@@ -214,7 +214,7 @@ fn regular_color_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let bias = stage.ops.color.bias().value();
     let scale = stage.ops.color.scale().value();
     let clamp = stage.ops.color.clamp();
-    let output = stage.ops.color.output() as u32;
+    let output = stage.ops.color.output().index();
 
     let clamped = if clamp {
         quote_expression! { color_add_mul }
@@ -261,26 +261,26 @@ fn get_alpha_const(stage: &TexEnvStage) -> wesl::syntax::Expression {
         tev::Constant::ThreeEights => quote_expression! { (3f / 8f) },
         tev::Constant::TwoEights => quote_expression! { (2f / 8f) },
         tev::Constant::OneEight => quote_expression! { (1f / 8f) },
-        tev::Constant::Const0 => quote_expression! { consts[R0].a },
-        tev::Constant::Const1 => quote_expression! { consts[R1].a },
-        tev::Constant::Const2 => quote_expression! { consts[R2].a },
-        tev::Constant::Const3 => quote_expression! { consts[R3].a },
-        tev::Constant::Const0R => quote_expression! { consts[R0].r },
-        tev::Constant::Const1R => quote_expression! { consts[R1].r },
-        tev::Constant::Const2R => quote_expression! { consts[R2].r },
-        tev::Constant::Const3R => quote_expression! { consts[R3].r },
-        tev::Constant::Const0G => quote_expression! { consts[R0].g },
-        tev::Constant::Const1G => quote_expression! { consts[R1].g },
-        tev::Constant::Const2G => quote_expression! { consts[R2].g },
-        tev::Constant::Const3G => quote_expression! { consts[R3].g },
-        tev::Constant::Const0B => quote_expression! { consts[R0].b },
-        tev::Constant::Const1B => quote_expression! { consts[R1].b },
-        tev::Constant::Const2B => quote_expression! { consts[R2].b },
-        tev::Constant::Const3B => quote_expression! { consts[R3].b },
-        tev::Constant::Const0A => quote_expression! { consts[R0].a },
-        tev::Constant::Const1A => quote_expression! { consts[R1].a },
-        tev::Constant::Const2A => quote_expression! { consts[R2].a },
-        tev::Constant::Const3A => quote_expression! { consts[R3].a },
+        tev::Constant::Const0 => quote_expression! { consts[0].a },
+        tev::Constant::Const1 => quote_expression! { consts[1].a },
+        tev::Constant::Const2 => quote_expression! { consts[2].a },
+        tev::Constant::Const3 => quote_expression! { consts[3].a },
+        tev::Constant::Const0R => quote_expression! { consts[0].r },
+        tev::Constant::Const1R => quote_expression! { consts[1].r },
+        tev::Constant::Const2R => quote_expression! { consts[2].r },
+        tev::Constant::Const3R => quote_expression! { consts[3].r },
+        tev::Constant::Const0G => quote_expression! { consts[0].g },
+        tev::Constant::Const1G => quote_expression! { consts[1].g },
+        tev::Constant::Const2G => quote_expression! { consts[2].g },
+        tev::Constant::Const3G => quote_expression! { consts[3].g },
+        tev::Constant::Const0B => quote_expression! { consts[0].b },
+        tev::Constant::Const1B => quote_expression! { consts[1].b },
+        tev::Constant::Const2B => quote_expression! { consts[2].b },
+        tev::Constant::Const3B => quote_expression! { consts[3].b },
+        tev::Constant::Const0A => quote_expression! { consts[0].a },
+        tev::Constant::Const1A => quote_expression! { consts[1].a },
+        tev::Constant::Const2A => quote_expression! { consts[2].a },
+        tev::Constant::Const3A => quote_expression! { consts[3].a },
         _ => panic!("reserved alpha constant"),
     }
 }
@@ -288,10 +288,10 @@ fn get_alpha_const(stage: &TexEnvStage) -> wesl::syntax::Expression {
 fn get_alpha_input(stage: &TexEnvStage, src: tev::alpha::InputSrc) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match src {
-        tev::alpha::InputSrc::R3Alpha => quote_expression! { regs[R3].a },
-        tev::alpha::InputSrc::R0Alpha => quote_expression! { regs[R0].a },
-        tev::alpha::InputSrc::R1Alpha => quote_expression! { regs[R1].a },
-        tev::alpha::InputSrc::R2Alpha => quote_expression! { regs[R2].a },
+        tev::alpha::InputSrc::R3Alpha => quote_expression! { regs[3].a },
+        tev::alpha::InputSrc::R0Alpha => quote_expression! { regs[0].a },
+        tev::alpha::InputSrc::R1Alpha => quote_expression! { regs[1].a },
+        tev::alpha::InputSrc::R2Alpha => quote_expression! { regs[2].a },
         tev::alpha::InputSrc::TexAlpha => {
             let tex = sample_tex(stage);
             quote_expression! { #tex.a }
@@ -316,7 +316,7 @@ fn comparative_alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let target = stage.ops.alpha.compare_target();
     let op = stage.ops.alpha.compare_op();
     let clamp = stage.ops.alpha.clamp();
-    let output = stage.ops.alpha.output() as u32;
+    let output = stage.ops.alpha.output().index();
 
     let compare_target_a = get_compare_target(
         quote_expression!(vec4f(input_a)),
@@ -351,7 +351,7 @@ fn comparative_alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
             let input_c = #input_c;
             let input_d = #input_d;
 
-            let alpha_compare = select(input_d, input_c, #comparison);
+            let alpha_compare = input_d + select(0, input_c, #comparison);
             let alpha_result = #clamped;
 
             regs[#output] = vec4f(regs[#output].rgb, alpha_result);
@@ -372,7 +372,7 @@ fn regular_alpha_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let bias = stage.ops.alpha.bias().value();
     let scale = stage.ops.alpha.scale().value();
     let clamp = stage.ops.alpha.clamp();
-    let output = stage.ops.alpha.output() as u32;
+    let output = stage.ops.alpha.output().index();
 
     let clamped = if clamp {
         quote_expression! { alpha_add_mul }
@@ -507,10 +507,27 @@ pub fn get_fog(settings: &TexEnvSettings) -> wesl::syntax::Statement {
     let adjust = match settings.fog.mode {
         tev::FogMode::None => unreachable!(),
         tev::FogMode::Linear => Statement::Void,
-        tev::FogMode::Exponential => todo!(),
-        tev::FogMode::ExponentialSquared => todo!(),
-        tev::FogMode::InverseExponential => todo!(),
-        tev::FogMode::InverseExponentialSquared => todo!(),
+        tev::FogMode::Exponential => quote_statement! {
+            distance = 1f - pow(2f, -8f * distance);
+        },
+        tev::FogMode::ExponentialSquared => quote_statement! {
+            {
+                let squared = pow(distance, 2f);
+                distance = 1f - pow(2f, -8f * squared);
+            }
+        },
+        tev::FogMode::InverseExponential => quote_statement! {
+            {
+                let inverse = (1f - distance);
+                distance = pow(2f, -8f * inverse);
+            }
+        },
+        tev::FogMode::InverseExponentialSquared => quote_statement! {
+            {
+                let inverse_squared = pow(1f - distance, 2f);
+                distance = pow(2f, -8f * inverse_squared);
+            }
+        },
         _ => panic!("reserved fog mode"),
     };
 

@@ -167,6 +167,17 @@ pub enum OutputDst {
     R2 = 0b11,
 }
 
+impl OutputDst {
+    pub fn index(self) -> u32 {
+        match self {
+            Self::R3 => 3,
+            Self::R0 => 0,
+            Self::R1 => 1,
+            Self::R2 => 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct StageOps {
     pub color: color::Stage,
@@ -279,7 +290,8 @@ pub struct Interface {
     pub stage_ops: [StageOps; 16],
     pub stage_refs: [StageRefsPair; 8],
     pub stage_consts: [StageConstsPair; 8],
-    pub constants: [Rgba16; 4],
+    pub regs: [Rgba16; 4],
+    pub consts: [Rgba16; 4],
     pub alpha_func: alpha::Function,
     pub depth_tex: depth::Texture,
     pub fog: Fog,

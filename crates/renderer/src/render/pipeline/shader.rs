@@ -93,6 +93,7 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
             lights: array<Light, 8>,
             color_channels: array<Channel, 2>,
             alpha_channels: array<Channel, 2>,
+            regs: array<vec4f, 4>,
             consts: array<vec4f, 4>,
             projection_mat: mat4x4f,
             post_transform_mat: array<mat4x4f, 8>,
@@ -538,22 +539,11 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
     wesl_quote::quote_declaration! {
         @fragment
         fn fs_main(in: base::VertexOutput) -> base::FragmentOutput {
-            const R0: u32 = 1;
-            const R1: u32 = 2;
-            const R2: u32 = 3;
-            const R3: u32 = 0;
-
             let config = base::configs[in.config_idx];
-            var last_color_output = R3;
-            var last_alpha_output = R3;
-            var regs: array<vec4f, 4>;
-            var consts: array<vec4f, 4>;
-
-            consts[R0] = config.consts[0];
-            consts[R1] = config.consts[1];
-            consts[R2] = config.consts[2];
-            consts[R3] = config.consts[3];
-            regs = consts;
+            var last_color_output = 3u;
+            var last_alpha_output = 3u;
+            var regs: array<vec4f, 4> = config.regs;
+            var consts: array<vec4f, 4> = config.consts;
 
             @#compute_stages {}
 
