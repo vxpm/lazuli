@@ -1,4 +1,4 @@
 [toolchain]
-channel = "nightly-2026-02-12"
+channel = "nightly-2026-02-24"
 profile = "default"
 components = ["rust-analyzer"]
