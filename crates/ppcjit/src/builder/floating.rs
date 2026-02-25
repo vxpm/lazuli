@@ -363,24 +363,36 @@ impl BlockBuilder<'_> {
     }
 
     pub fn ps_sel(&mut self, ins: Ins) -> InstructionInfo {
-        // self.check_floats();
-        //
-        // let zero = self.ir_value(0.0);
-        // let zero = self.bd.ins().splat(ir::types::F64X2, zero);
-        //
-        // let fpr_a = self.get(ins.fpr_a());
-        // let fpr_b = self.get(ins.fpr_b());
-        // let fpr_c = self.get(ins.fpr_c());
-        //
-        // let mask = self.bd.ins().fcmp(FloatCC::GreaterThanOrEqual, fpr_a, zero);
-        // let mask_inverse = self.bd.ins().fcmp(FloatCC::GreaterThanOrEqual, fpr_a, zero);
-        //
-        // let value = self.bd.ins().select(cond, fpr_c, fpr_b);
-        // self.set(ins.fpr_d(), value);
-        //
-        // if ins.field_rc() {
-        //     self.update_cr1_float();
-        // }
+        self.check_floats();
+
+        let zero = self.ir_value(0.0);
+        let zero = self.bd.ins().splat(ir::types::F64X2, zero);
+
+        let fpr_a = self.get(ins.fpr_a());
+        let fpr_b = self.get(ins.fpr_b());
+        let fpr_c = self.get(ins.fpr_c());
+
+        let fpr_b = self
+            .bd
+            .ins()
+            .bitcast(ir::types::I64X2, ir::MemFlags::new(), fpr_b);
+        let fpr_c = self
+            .bd
+            .ins()
+            .bitcast(ir::types::I64X2, ir::MemFlags::new(), fpr_c);
+
+        let cond = self.bd.ins().fcmp(FloatCC::GreaterThanOrEqual, fpr_a, zero);
+        let value = self.bd.ins().select(cond, fpr_c, fpr_b);
+        let value = self
+            .bd
+            .ins()
+            .bitcast(ir::types::F64X2, ir::MemFlags::new(), value);
+
+        self.set(ins.fpr_d(), value);
+
+        if ins.field_rc() {
+            self.update_cr1_float();
+        }
 
         FLOAT_INFO
     }
