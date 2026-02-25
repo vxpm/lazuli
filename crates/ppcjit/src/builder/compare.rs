@@ -119,14 +119,14 @@ impl BlockBuilder<'_> {
         CMP_INFO
     }
 
-    pub fn ps_cmpo0(&mut self, ins: Ins) -> InstructionInfo {
+    fn ps_cmp(&mut self, ins: Ins, lane: u8, _ordered: bool) {
         self.check_floats();
 
         let fpr_a = self.get(ins.fpr_a());
         let fpr_b = self.get(ins.fpr_b());
 
-        let lhs = self.bd.ins().extractlane(fpr_a, 0);
-        let rhs = self.bd.ins().extractlane(fpr_b, 0);
+        let lhs = self.bd.ins().extractlane(fpr_a, lane);
+        let rhs = self.bd.ins().extractlane(fpr_b, lane);
 
         let lt = self.bd.ins().fcmp(FloatCC::LessThan, lhs, rhs);
         let gt = self.bd.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
@@ -135,7 +135,25 @@ impl BlockBuilder<'_> {
 
         self.update_fprf(lt, gt, eq, un);
         self.update_cr(ins.field_crfd(), lt, gt, eq, un);
+    }
 
+    pub fn ps_cmpo0(&mut self, ins: Ins) -> InstructionInfo {
+        self.ps_cmp(ins, 0, true);
+        CMP_INFO
+    }
+
+    pub fn ps_cmpo1(&mut self, ins: Ins) -> InstructionInfo {
+        self.ps_cmp(ins, 1, true);
+        CMP_INFO
+    }
+
+    pub fn ps_cmpu0(&mut self, ins: Ins) -> InstructionInfo {
+        self.ps_cmp(ins, 0, false);
+        CMP_INFO
+    }
+
+    pub fn ps_cmpu1(&mut self, ins: Ins) -> InstructionInfo {
+        self.ps_cmp(ins, 1, false);
         CMP_INFO
     }
 }
