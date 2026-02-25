@@ -372,22 +372,22 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
         let fpr_c = self.get(ins.fpr_c());
 
-        let fpr_b = self
-            .bd
-            .ins()
-            .bitcast(ir::types::I64X2, ir::MemFlags::new(), fpr_b);
-        let fpr_c = self
-            .bd
-            .ins()
-            .bitcast(ir::types::I64X2, ir::MemFlags::new(), fpr_c);
+        let mask = self.bd.ins().fcmp(FloatCC::GreaterThanOrEqual, fpr_a, zero);
+        let mask_inverse = self.bd.ins().bnot(mask);
 
-        let cond = self.bd.ins().fcmp(FloatCC::GreaterThanOrEqual, fpr_a, zero);
-        let value = self.bd.ins().select(cond, fpr_c, fpr_b);
-        let value = self
+        let mask = self
             .bd
             .ins()
-            .bitcast(ir::types::F64X2, ir::MemFlags::new(), value);
+            .bitcast(ir::types::F64X2, ir::MemFlags::new(), mask);
+        let mask_inverse =
+            self.bd
+                .ins()
+                .bitcast(ir::types::F64X2, ir::MemFlags::new(), mask_inverse);
 
+        let select_c = self.bd.ins().band(fpr_c, mask);
+        let select_b = self.bd.ins().band(fpr_b, mask_inverse);
+
+        let value = self.bd.ins().bor(select_c, select_b);
         self.set(ins.fpr_d(), value);
 
         if ins.field_rc() {
