@@ -177,7 +177,7 @@ pub enum Action {
     SetConstantAlpha(ConstantAlpha),
     SetAlphaFunction(tev::alpha::Function),
     SetProjectionMatrix(ProjectionMat),
-    SetTexEnvConfig(TexEnvConfig),
+    SetTexEnvConfig(Box<TexEnvConfig>),
     SetTexGenConfig(TexGenConfig),
     SetAmbient(u8, Abgr8),
     SetMaterial(u8, Abgr8),
@@ -220,7 +220,7 @@ pub enum Action {
     PresentXfb(Vec<XfbPart>),
 }
 
-// const_assert!(size_of::<Action>() <= 64);
+const_assert!(size_of::<Action>() <= 64);
 
 pub trait RenderModule: Send {
     fn exec(&mut self, action: Action);

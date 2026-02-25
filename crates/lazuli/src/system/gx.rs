@@ -628,7 +628,7 @@ pub fn update_texenv(sys: &mut System) {
 
     sys.modules
         .render
-        .exec(render::Action::SetTexEnvConfig(config));
+        .exec(render::Action::SetTexEnvConfig(Box::new(config)));
 }
 
 pub fn set_register(sys: &mut System, reg: Reg, value: u32) {

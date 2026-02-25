@@ -312,7 +312,7 @@ fn logic_blend_approx(
 }
 
 impl Renderer {
-    pub fn set_texenv_config(&mut self, config: TexEnvConfig) {
+    pub fn set_texenv_config(&mut self, config: Box<TexEnvConfig>) {
         self.flush(format_args!("texenv changed"));
         self.pipeline_settings
             .shader
