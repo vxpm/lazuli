@@ -430,6 +430,11 @@ impl Renderer {
             return;
         }
 
+        if vertices.len() < 4 {
+            tracing::warn!("malformed quad list draw call");
+            return;
+        }
+
         self.flush_config();
         let matrices = self.create_matrix_indices(matrices);
         for vertices in vertices.iter().array_chunks::<4>() {
@@ -447,6 +452,11 @@ impl Renderer {
             return;
         }
 
+        if vertices.len() < 3 {
+            tracing::warn!("malformed triangle list draw call");
+            return;
+        }
+
         self.flush_config();
         let matrices = self.create_matrix_indices(matrices);
         for vertices in vertices.iter().array_chunks::<3>() {
@@ -460,6 +470,11 @@ impl Renderer {
         let vertices = stream.vertices();
 
         if vertices.is_empty() {
+            return;
+        }
+
+        if vertices.len() < 3 {
+            tracing::warn!("malformed triangle strip draw call");
             return;
         }
 
@@ -489,6 +504,11 @@ impl Renderer {
         let vertices = stream.vertices();
 
         if vertices.is_empty() {
+            return;
+        }
+
+        if vertices.len() < 3 {
+            tracing::warn!("malformed triangle fan draw call");
             return;
         }
 
