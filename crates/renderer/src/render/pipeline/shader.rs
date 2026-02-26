@@ -540,7 +540,7 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
         @#s15 {}
     });
 
-    let alpha_comparison = texenv::compute_alpha_comparison(&texenv.alpha_func);
+    let alpha_test = texenv::alpha::compute_test(&texenv.alpha_func);
     let depth_texture = texenv::compute_depth_texture(texenv);
     let fog = texenv::compute_fog(texenv);
 
@@ -561,7 +561,7 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
             let alpha_ref0 = f32(config.alpha_refs[0]) / 255.0;
             let alpha_ref1 = f32(config.alpha_refs[1]) / 255.0;
 
-            if !(#alpha_comparison) {
+            if !(#alpha_test) {
                 discard;
             }
 

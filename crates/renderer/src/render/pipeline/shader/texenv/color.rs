@@ -55,14 +55,14 @@ fn comparative_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let output = stage.ops.color.output().index();
 
     let compare_target_a = comparison_target(
+        target,
         quote_expression!(input_a),
         quote_expression!(input_a_components),
-        target,
     );
     let compare_target_b = comparison_target(
+        target,
         quote_expression!(input_b),
         quote_expression!(input_b_components),
-        target,
     );
     let comparison = match op {
         tev::ComparisonOp::GreaterThan => {
