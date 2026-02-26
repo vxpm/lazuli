@@ -55,9 +55,9 @@ fn input_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
     }
 }
 
-fn constant(stage: &TexEnvStage) -> wesl::syntax::Expression {
+fn constant(constant: tev::Constant) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    match stage.color_const {
+    match constant {
         tev::Constant::One => quote_expression! { vec4f(1f) },
         tev::Constant::SevenEights => quote_expression! { vec4f(7f / 8f) },
         tev::Constant::SixEights => quote_expression! { vec4f(6f / 8f) },

@@ -172,7 +172,7 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
         const #fragment_out_struct: u32 = 0;
 
         fn vec3f_to_vec3u(value: vec3f) -> vec3u {
-            return vec4u(
+            return vec3u(
                 u32(value.r * 255.0),
                 u32(value.g * 255.0),
                 u32(value.b * 255.0),

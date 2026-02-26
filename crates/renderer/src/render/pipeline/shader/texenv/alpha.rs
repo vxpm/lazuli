@@ -20,7 +20,7 @@ fn input(stage: &TexEnvStage, src: tev::alpha::InputSrc) -> wesl::syntax::Expres
             quote_expression! { #channel.a }
         }
         tev::alpha::InputSrc::Constant => {
-            let constant = constant(stage);
+            let constant = constant(stage.alpha_const);
             quote_expression! { #constant.a }
         }
         tev::alpha::InputSrc::Zero => quote_expression! { 0f },

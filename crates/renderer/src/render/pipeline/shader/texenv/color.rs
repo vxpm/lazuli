@@ -34,7 +34,7 @@ fn input(stage: &TexEnvStage, src: tev::color::InputSrc) -> wesl::syntax::Expres
         tev::color::InputSrc::One => quote_expression! { vec3f(1f) },
         tev::color::InputSrc::Half => quote_expression! { vec3f(0.5f) },
         tev::color::InputSrc::Constant => {
-            let constant = constant(stage);
+            let constant = constant(stage.color_const);
             quote_expression! { #constant.rgb }
         }
         tev::color::InputSrc::Zero => quote_expression! { vec3f(0f) },
