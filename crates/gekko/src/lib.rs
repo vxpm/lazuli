@@ -838,12 +838,9 @@ pub struct MemoryManagement {
 impl MemoryManagement {
     /// Default configuration for BATs used by the Dolphin OS.
     pub fn setup_default_bats(&mut self) {
-        let bat = |upper, lower| {
-            use zerocopy::big_endian::{U32, U64};
-            use zerocopy::transmute;
-
-            let data: U64 = transmute!([U32::new(upper), U32::new(lower)]);
-            Bat::from_bits(data.get())
+        let bat = |upper: u32, lower: u32| {
+            let data = zerocopy::transmute!([lower, upper]);
+            Bat::from_bits(data)
         };
 
         self.ibat[0] = bat(0x8000_1FFF, 0x0000_0002);
