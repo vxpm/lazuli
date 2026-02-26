@@ -56,9 +56,10 @@ impl GilrsInner {
             analog_sub_y: axis(Axis::RightStickY),
             analog_trigger_left: trigger(Button::LeftTrigger2),
             analog_trigger_right: trigger(Button::RightTrigger2),
-            trigger_z: gamepad.is_pressed(Button::Z),
-            trigger_right: gamepad.is_pressed(Button::RightTrigger),
-            trigger_left: gamepad.is_pressed(Button::LeftTrigger),
+            trigger_z: gamepad.is_pressed(Button::LeftTrigger)
+                || gamepad.is_pressed(Button::RightTrigger),
+            trigger_right: gamepad.is_pressed(Button::RightTrigger2),
+            trigger_left: gamepad.is_pressed(Button::LeftTrigger2),
             pad_left: gamepad.is_pressed(Button::DPadLeft),
             pad_right: gamepad.is_pressed(Button::DPadRight),
             pad_down: gamepad.is_pressed(Button::DPadDown),
