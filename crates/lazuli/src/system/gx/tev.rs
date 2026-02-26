@@ -135,12 +135,12 @@ impl Scale {
 
 #[bitos(1)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompareOp {
+pub enum ComparisonOp {
     GreaterThan = 0b0,
     Equal       = 0b1,
 }
 
-impl std::fmt::Display for CompareOp {
+impl std::fmt::Display for ComparisonOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GreaterThan => f.write_str(">"),
@@ -151,7 +151,7 @@ impl std::fmt::Display for CompareOp {
 
 #[bitos(2)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompareTarget {
+pub enum ComparisonTarget {
     R8        = 0b00,
     GR16      = 0b01,
     BGR16     = 0b10,

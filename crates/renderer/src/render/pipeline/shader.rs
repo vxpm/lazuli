@@ -171,6 +171,14 @@ fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
 
         const #fragment_out_struct: u32 = 0;
 
+        fn vec3f_to_vec3u(value: vec3f) -> vec3u {
+            return vec4u(
+                u32(value.r * 255.0),
+                u32(value.g * 255.0),
+                u32(value.b * 255.0),
+            );
+        }
+
         fn vec4f_to_vec4u(value: vec4f) -> vec4u {
             return vec4u(
                 u32(value.r * 255.0),
@@ -482,18 +490,18 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
 
     let mut stages = vec![];
     for stage in texenv.stages.iter() {
-        let color_compute = texenv::color_stage(stage);
-        let alpha_compute = texenv::alpha_stage(stage);
+        let color = texenv::color::stage(stage);
+        let alpha = texenv::alpha::stage(stage);
 
         stages.push(wesl_quote::quote_statement! {
             {
-                @#color_compute {}
-                @#alpha_compute {}
+                @#color {}
+                @#alpha {}
             }
         });
     }
 
-    stages.resize(16, wesl_quote::quote_statement!({}));
+    stages.resize(16, Statement::Void);
     let [
         s0,
         s1,
@@ -532,9 +540,9 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
         @#s15 {}
     });
 
-    let alpha_comparison = texenv::get_alpha_comparison(&texenv.alpha_func);
-    let depth_texture = texenv::get_depth_texture(texenv);
-    let fog = texenv::get_fog(texenv);
+    let alpha_comparison = texenv::compute_alpha_comparison(&texenv.alpha_func);
+    let depth_texture = texenv::compute_depth_texture(texenv);
+    let fog = texenv::compute_fog(texenv);
 
     wesl_quote::quote_declaration! {
         @fragment

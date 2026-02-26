@@ -1,7 +1,7 @@
 use bitos::bitos;
 use bitos::integer::u2;
 
-use crate::system::gx::tev::{Bias, CompareOp, CompareTarget, OutputDst, Scale};
+use crate::system::gx::tev::{Bias, ComparisonOp, ComparisonTarget, OutputDst, Scale};
 
 #[bitos(3)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,13 +51,13 @@ pub struct Stage {
     #[bits(18)]
     pub negate: bool,
     #[bits(18)]
-    pub compare_op: CompareOp,
+    pub compare_op: ComparisonOp,
     #[bits(19)]
     pub clamp: bool,
     #[bits(20..22)]
     pub scale: Scale,
     #[bits(20..22)]
-    pub compare_target: CompareTarget,
+    pub compare_target: ComparisonTarget,
     #[bits(22..24)]
     pub output: OutputDst,
 }
