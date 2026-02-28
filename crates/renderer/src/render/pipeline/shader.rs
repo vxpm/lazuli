@@ -9,15 +9,15 @@ use lazuli::system::gx::xform::BaseTexGen;
 use wesl::{VirtualResolver, Wesl};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AlphaCompareValue {
+enum AlphaComparisonValue {
     False,
     True,
     Unknown,
 }
 
-impl AlphaCompareValue {
-    pub fn new(alpha_compare: tev::alpha::Comparison) -> Self {
-        match alpha_compare {
+impl AlphaComparisonValue {
+    pub fn new(comparison: tev::alpha::Comparison) -> Self {
+        match comparison {
             tev::alpha::Comparison::Never => Self::False,
             tev::alpha::Comparison::Always => Self::True,
             _ => Self::Unknown,
@@ -25,7 +25,7 @@ impl AlphaCompareValue {
     }
 }
 
-impl std::ops::BitAnd for AlphaCompareValue {
+impl std::ops::BitAnd for AlphaComparisonValue {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
@@ -38,7 +38,7 @@ impl std::ops::BitAnd for AlphaCompareValue {
     }
 }
 
-impl std::ops::BitOr for AlphaCompareValue {
+impl std::ops::BitOr for AlphaComparisonValue {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
@@ -50,7 +50,7 @@ impl std::ops::BitOr for AlphaCompareValue {
     }
 }
 
-impl std::ops::BitXor for AlphaCompareValue {
+impl std::ops::BitXor for AlphaComparisonValue {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
@@ -64,7 +64,7 @@ impl std::ops::BitXor for AlphaCompareValue {
     }
 }
 
-impl std::ops::Not for AlphaCompareValue {
+impl std::ops::Not for AlphaComparisonValue {
     type Output = Self;
 
     fn not(self) -> Self::Output {
@@ -85,8 +85,8 @@ pub struct AlphaTestConfig {
 impl AlphaTestConfig {
     /// Returns whether this configuration is trivially passable (i.e. never discards).
     pub fn is_noop(&self) -> bool {
-        let lhs = AlphaCompareValue::new(self.comparison[0]);
-        let rhs = AlphaCompareValue::new(self.comparison[1]);
+        let lhs = AlphaComparisonValue::new(self.comparison[0]);
+        let rhs = AlphaComparisonValue::new(self.comparison[1]);
 
         let result = match self.logic {
             tev::alpha::ComparisonLogic::And => lhs & rhs,
@@ -95,7 +95,7 @@ impl AlphaTestConfig {
             tev::alpha::ComparisonLogic::Xnor => !(lhs ^ rhs),
         };
 
-        result == AlphaCompareValue::True
+        result == AlphaComparisonValue::True
     }
 }
 

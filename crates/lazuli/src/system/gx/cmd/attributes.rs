@@ -471,7 +471,7 @@ impl Attribute for PosMatrixIndex {
     type Descriptor = IndexDescriptor;
 
     fn get_mode(vcd: &VertexDescriptor) -> AttributeMode {
-        if vcd.pos_mat_index() {
+        if vcd.pos_mtx_index() {
             AttributeMode::Direct
         } else {
             AttributeMode::None
@@ -494,7 +494,7 @@ impl<const N: usize> Attribute for TexMatrixIndex<N> {
     type Descriptor = IndexDescriptor;
 
     fn get_mode(vcd: &VertexDescriptor) -> AttributeMode {
-        if vcd.tex_coord_mat_index_at(N).unwrap() {
+        if vcd.tex_coord_mtx_index_at(N).unwrap() {
             AttributeMode::Direct
         } else {
             AttributeMode::None
