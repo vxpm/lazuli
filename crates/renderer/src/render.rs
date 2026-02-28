@@ -268,7 +268,7 @@ impl Renderer {
         }
     }
 
-    fn insert_vertex(&mut self, vertex: &Vertex, matrices: &[(MatrixId, data::MatrixIdx)]) -> u32 {
+    fn insert_vertex(&mut self, vertex: &Vertex, matrices: &[(MatrixId, u32)]) -> u32 {
         let get_matrix = |idx| matrices.iter().find_map(|(i, m)| (*i == idx).then_some(*m));
         let vertex = data::Vertex {
             position: vertex.position,
@@ -276,8 +276,8 @@ impl Renderer {
             normal: vertex.normal,
             _pad0: 0,
 
-            position_mat: get_matrix(vertex.pos_norm_matrix).unwrap(),
-            normal_mat: get_matrix(vertex.pos_norm_matrix.normal()).unwrap(),
+            position_mtx_idx: get_matrix(vertex.pos_norm_matrix).unwrap(),
+            normal_mtx_idx: get_matrix(vertex.pos_norm_matrix.normal()).unwrap(),
             _pad1: 0,
             _pad2: 0,
 
@@ -285,7 +285,7 @@ impl Renderer {
             chan1: vertex.chan1,
 
             tex_coord: vertex.tex_coords,
-            tex_coord_mat: seq! {
+            tex_coord_mtx_idx: seq! {
                 N in 0..8 {
                     [#(get_matrix(vertex.tex_coords_matrix[N]).unwrap(),)*]
                 }
@@ -407,10 +407,7 @@ impl Renderer {
         }
     }
 
-    fn create_matrix_indices(
-        &mut self,
-        matrices: &[(MatrixId, Mat4)],
-    ) -> Vec<(MatrixId, data::MatrixIdx)> {
+    fn create_matrix_indices(&mut self, matrices: &[(MatrixId, Mat4)]) -> Vec<(MatrixId, u32)> {
         let mut indices = Vec::with_capacity(matrices.len());
 
         for (id, mat) in matrices.iter().copied() {

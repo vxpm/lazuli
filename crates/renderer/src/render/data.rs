@@ -5,8 +5,6 @@ use lazuli::system::gx::color::Rgba;
 use lazuli::system::gx::{tev, xform};
 use zerocopy::{Immutable, IntoBytes};
 
-pub type MatrixIdx = u32;
-
 #[derive(Debug, Clone, Immutable, IntoBytes, Default)]
 #[repr(C)]
 pub struct Vertex {
@@ -15,8 +13,8 @@ pub struct Vertex {
     pub normal: Vec3,
     pub _pad0: u32,
 
-    pub position_mat: MatrixIdx,
-    pub normal_mat: MatrixIdx,
+    pub position_mtx_idx: u32,
+    pub normal_mtx_idx: u32,
     pub _pad1: u32,
     pub _pad2: u32,
 
@@ -24,7 +22,7 @@ pub struct Vertex {
     pub chan1: Rgba,
 
     pub tex_coord: [Vec2; 8],
-    pub tex_coord_mat: [MatrixIdx; 8],
+    pub tex_coord_mtx_idx: [u32; 8],
 }
 
 #[derive(Debug, Clone, Immutable, IntoBytes, Default)]

@@ -80,9 +80,9 @@ fn comparative_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     wesl_quote::quote_statement! {
         {
             let input_a = #input_a;
-            let input_a_components = base::vec3f_to_vec3u(#input_a);
+            let input_a_components = render::vec3f_to_vec3u(#input_a);
             let input_b = #input_b;
-            let input_b_components = base::vec3f_to_vec3u(#input_b);
+            let input_b_components = render::vec3f_to_vec3u(#input_b);
 
             let input_c = #input_c;
             let input_d = #input_d;

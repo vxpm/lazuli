@@ -13,10 +13,10 @@ fn sample_tex(stage: &TexEnvStage) -> wesl::syntax::Expression {
     let map = stage.refs.map().value() as u32;
     let coord = stage.refs.coord().value() as u32;
 
-    let tex_ident = wesl::syntax::Ident::new(format!("base::texture{map}"));
-    let sampler_ident = wesl::syntax::Ident::new(format!("base::sampler{map}"));
+    let tex_ident = wesl::syntax::Ident::new(format!("render::texture{map}"));
+    let sampler_ident = wesl::syntax::Ident::new(format!("render::sampler{map}"));
     let coord_ident = wesl::syntax::Ident::new(format!("in.tex_coord{coord}"));
-    let pipeline_immediates_ident = wesl::syntax::Ident::new("base::pipeline_immediates".into());
+    let pipeline_immediates_ident = wesl::syntax::Ident::new("render::pipeline_immediates".into());
 
     let index = map / 2;
     let scaling_packed = quote_expression! { #pipeline_immediates_ident.scaling[#index] };
@@ -46,9 +46,9 @@ fn input_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
     match stage.refs.input() {
         tev::InputChannel::Channel0 => quote_expression! { in.chan0 },
         tev::InputChannel::Channel1 => quote_expression! { in.chan1 },
-        tev::InputChannel::AlphaBump => quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) },
+        tev::InputChannel::AlphaBump => quote_expression! { vec4f(render::PLACEHOLDER_RGB, 0f) },
         tev::InputChannel::AlphaBumpNormalized => {
-            quote_expression! { vec4f(base::PLACEHOLDER_RGB, 0f) }
+            quote_expression! { vec4f(render::PLACEHOLDER_RGB, 0f) }
         }
         tev::InputChannel::Zero => quote_expression! { vec4f(0f) },
         _ => panic!("reserved color channel"),
@@ -92,20 +92,20 @@ fn constant(constant: tev::Constant) -> wesl::syntax::Expression {
 
 fn comparison_target(
     target: tev::ComparisonTarget,
-    input_float: wesl::syntax::Expression,
-    input_uint: wesl::syntax::Expression,
+    input: wesl::syntax::Expression,
+    input_bytes: wesl::syntax::Expression,
 ) -> wesl::syntax::Expression {
     use wesl::syntax::*;
 
     match target {
-        tev::ComparisonTarget::R8 => quote_expression! { (#input_uint).r },
+        tev::ComparisonTarget::R8 => quote_expression! { (#input_bytes).r },
         tev::ComparisonTarget::GR16 => {
-            quote_expression! { pack4xU8(vec4u((#input_uint).r, (#input_uint).g, 0, 0)) }
+            quote_expression! { pack4xU8(vec4u((#input_bytes).r, (#input_bytes).g, 0, 0)) }
         }
         tev::ComparisonTarget::BGR16 => {
-            quote_expression! { pack4xU8(vec4u((#input_uint).r, (#input_uint).g, (#input_uint).b, 0)) }
+            quote_expression! { pack4xU8(vec4u((#input_bytes).r, (#input_bytes).g, (#input_bytes).b, 0)) }
         }
-        tev::ComparisonTarget::Component => input_float,
+        tev::ComparisonTarget::Component => input,
     }
 }
 
@@ -125,26 +125,26 @@ pub fn compute_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Stateme
         tev::depth::Format::U8 => (
             quote_expression!(0),
             quote_expression!(0),
-            quote_expression!(255),
+            quote_expression!(255.0),
         ),
         tev::depth::Format::U16 => (
             quote_expression!(depth_tex_sample.y),
             quote_expression!(0),
-            quote_expression!(65535),
+            quote_expression!(65535.0),
         ),
         tev::depth::Format::U24 => (
             quote_expression!(depth_tex_sample.y),
             quote_expression!(depth_tex_sample.z),
-            quote_expression!(16777215),
+            quote_expression!(16777215.0),
         ),
         _ => panic!("reserved format"),
     };
 
     quote_statement! {
         {
-            let depth_tex_sample = base::vec4f_to_vec4u(#sampled);
+            let depth_tex_sample = render::vec4f_to_vec4u(#sampled);
             let depth_tex_value = pack4xU8(vec4u(depth_tex_sample.x, #depth_mid, #depth_hi, 0)) + #bias;
-            out.depth = clamp(f32(depth_tex_value) / f32(#depth_max), 0.0, 1.0);
+            out.depth = clamp(f32(depth_tex_value) / #depth_max, 0.0, 1.0);
             frag_depth = out.depth;
         }
     }

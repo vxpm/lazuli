@@ -43,7 +43,7 @@ pub fn transform(kind: TexGenKind, input: wesl::syntax::Expression) -> wesl::syn
         // TODO: terrible stub (emboss)
         TexGenKind::Emboss => quote_expression! { (#input).xyz },
         TexGenKind::ColorDiffuse | TexGenKind::ColorSpecular => quote_expression! {
-            base::concat_texgen_color(#input)
+            render::concat_texgen_color(#input)
         },
     }
 }
