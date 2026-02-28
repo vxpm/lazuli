@@ -34,7 +34,7 @@ struct Allocators {
 }
 
 #[derive(Clone, Copy, PartialEq, Default)]
-struct TexSlotSettings {
+struct TexSlotConfig {
     texture: TextureRef,
     sampler: Sampler,
     scaling: Scaling,
@@ -65,11 +65,11 @@ pub struct Renderer {
     current_pass: wgpu::RenderPass<'static>,
 
     // components
-    pipeline_settings: pipeline::Settings,
+    pipeline_config: pipeline::Config,
     embedded_fb: framebuffer::Embedded,
     external_fb: framebuffer::External,
     allocators: Allocators,
-    tex_slots: [TexSlotSettings; 8],
+    tex_slots: [TexSlotConfig; 8],
     cleaner: Cleaner,
     converter: Converter,
     color_blitter: ColorBlitter,
@@ -167,7 +167,7 @@ impl Renderer {
             current_render_encoder: render_encoder,
             current_pass: pass,
 
-            pipeline_settings: Default::default(),
+            pipeline_config: Default::default(),
             embedded_fb,
             external_fb,
             allocators,
@@ -212,9 +212,9 @@ impl Renderer {
             Action::SetClearDepth(depth) => self.set_clear_depth(depth),
             Action::SetBlendMode(mode) => self.set_blend_mode(mode),
             Action::SetDepthMode(mode) => self.set_depth_mode(mode),
-            Action::SetAlphaFunction(func) => self.set_alpha_function(func),
+            Action::SetAlphaTest(test) => self.set_alpha_test(test),
             Action::SetConstantAlpha(mode) => self.set_constant_alpha_mode(mode),
-            Action::SetProjectionMatrix(mat) => self.set_projection_mat(mat.value()),
+            Action::SetProjectionMatrix(mtx) => self.set_projection_mtx(mtx.value()),
             Action::SetTexEnvConfig(config) => self.set_texenv_config(config),
             Action::SetTexGenConfig(config) => self.set_texgen_config(config),
             Action::LoadTexture { id, texture } => self.load_texture(id, texture),
@@ -389,14 +389,14 @@ impl Renderer {
     }
 
     fn set_fog(&mut self, fog: Fog) {
-        self.pipeline_settings.shader.texenv.fog.mode = fog.c.mode();
-        self.pipeline_settings.shader.texenv.fog.orthographic = fog.c.orthographic();
+        self.pipeline_config.shader.texenv.fog.mode = fog.c.mode();
+        self.pipeline_config.shader.texenv.fog.orthographic = fog.c.orthographic();
         self.current_config.fog.update(fog);
         self.current_config_dirty = true;
     }
 
-    fn set_projection_mat(&mut self, mat: Mat4) {
-        self.current_config.projection_mat = mat;
+    fn set_projection_mtx(&mut self, mtx: Mat4) {
+        self.current_config.projection_mtx = mtx;
         self.current_config_dirty = true;
     }
 
@@ -644,9 +644,7 @@ impl Renderer {
 
         self.apply_scissor_and_viewport();
 
-        let pipeline = self
-            .pipeline_cache
-            .get(&self.device, &self.pipeline_settings);
+        let pipeline = self.pipeline_cache.get(&self.device, &self.pipeline_config);
 
         self.current_pass.set_pipeline(pipeline);
         self.current_pass.set_push_constants(

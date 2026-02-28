@@ -259,7 +259,7 @@ pub enum Reg {
     TevFogC             = 0xF1,
     TevFogColor         = 0xF2,
 
-    TevAlphaFunc        = 0xF3,
+    TevAlphaTest        = 0xF3,
     TevDepthTexBias     = 0xF4,
     TevDepthTexMode     = 0xF5,
     TevConstSelect0     = 0xF6,
@@ -947,11 +947,11 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             sys.gpu.env.fog.color.a = 255;
         }
 
-        Reg::TevAlphaFunc => {
-            write_masked!(sys.gpu.env.alpha_func);
-            sys.modules.render.exec(render::Action::SetAlphaFunction(
-                sys.gpu.env.alpha_func.clone(),
-            ));
+        Reg::TevAlphaTest => {
+            write_masked!(sys.gpu.env.alpha_test);
+            sys.modules
+                .render
+                .exec(render::Action::SetAlphaTest(sys.gpu.env.alpha_test.clone()));
         }
 
         Reg::TevDepthTexBias => write_masked!(sys.gpu.env.depth_tex.bias),

@@ -3,11 +3,132 @@ mod texgen;
 
 use std::borrow::Cow;
 
-use lazuli::system::gx::tev;
+use lazuli::modules::render::TexEnvStage;
+use lazuli::system::gx::tev::{self, FogMode};
+use lazuli::system::gx::xform::BaseTexGen;
 use wesl::{VirtualResolver, Wesl};
 
-use crate::render::pipeline::ShaderSettings;
-use crate::render::pipeline::settings::{TexEnvSettings, TexGenSettings};
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AlphaCompareValue {
+    False,
+    True,
+    Unknown,
+}
+
+impl AlphaCompareValue {
+    pub fn new(alpha_compare: tev::alpha::Comparison) -> Self {
+        match alpha_compare {
+            tev::alpha::Comparison::Never => Self::False,
+            tev::alpha::Comparison::Always => Self::True,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::ops::BitAnd for AlphaCompareValue {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::True, Self::True) => Self::True,
+            (Self::False, _) => Self::False,
+            (_, Self::False) => Self::False,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::ops::BitOr for AlphaCompareValue {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::True, _) => Self::True,
+            (_, Self::True) => Self::True,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::ops::BitXor for AlphaCompareValue {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::True, Self::False) => Self::True,
+            (Self::False, Self::True) => Self::True,
+            (Self::True, Self::True) => Self::False,
+            (Self::False, Self::False) => Self::False,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::ops::Not for AlphaCompareValue {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::False => Self::True,
+            Self::True => Self::False,
+            Self::Unknown => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct AlphaTestConfig {
+    pub comparison: [tev::alpha::Comparison; 2],
+    pub logic: tev::alpha::ComparisonLogic,
+}
+
+impl AlphaTestConfig {
+    /// Returns whether this configuration is trivially passable (i.e. never discards).
+    pub fn is_noop(&self) -> bool {
+        let lhs = AlphaCompareValue::new(self.comparison[0]);
+        let rhs = AlphaCompareValue::new(self.comparison[1]);
+
+        let result = match self.logic {
+            tev::alpha::ComparisonLogic::And => lhs & rhs,
+            tev::alpha::ComparisonLogic::Or => lhs | rhs,
+            tev::alpha::ComparisonLogic::Xor => lhs ^ rhs,
+            tev::alpha::ComparisonLogic::Xnor => !(lhs ^ rhs),
+        };
+
+        result == AlphaCompareValue::True
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct FogConfig {
+    pub mode: FogMode,
+    pub orthographic: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexEnvConfig {
+    pub stages: Vec<TexEnvStage>,
+    pub alpha_test: AlphaTestConfig,
+    pub depth_tex: tev::depth::Texture,
+    pub fog: FogConfig,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexGenStageConfig {
+    pub base: BaseTexGen,
+    pub normalize: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexGenConfig {
+    pub stages: Vec<TexGenStageConfig>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
+pub struct Config {
+    pub texenv: TexEnvConfig,
+    pub texgen: TexGenConfig,
+}
 
 fn compute_channels() -> [wesl::syntax::GlobalDeclaration; 2] {
     use wesl::syntax::*;
@@ -186,7 +307,7 @@ fn compute_channels() -> [wesl::syntax::GlobalDeclaration; 2] {
     [color, alpha]
 }
 
-fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
+fn vertex_stage(texgen: &TexGenConfig) -> wesl::syntax::GlobalDeclaration {
     use wesl::syntax::*;
 
     let mut stages = vec![];
@@ -258,7 +379,7 @@ fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
 
             let vertex_local_pos = vec4f(vertex.position, 1.0);
             let vertex_world_pos = render::matrices[vertex.position_mtx_idx] * vertex_local_pos;
-            var vertex_view_pos = config.projection_mat * vertex_world_pos;
+            var vertex_view_pos = config.projection_mtx * vertex_world_pos;
 
             let vertex_local_norm = vec4f(vertex.normal, 0.0);
             let vertex_world_norm = normalize((render::matrices[vertex.normal_mtx_idx] * vertex_local_norm).xyz);
@@ -296,7 +417,7 @@ fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
     }
 }
 
-fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
+fn fragment_stage(texenv: &TexEnvConfig) -> wesl::syntax::GlobalDeclaration {
     use wesl::syntax::*;
 
     let mut stages = vec![];
@@ -351,7 +472,7 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
         @#s15 {}
     });
 
-    let alpha_test = texenv::alpha::compute_test(&texenv.alpha_func);
+    let alpha_test = texenv::alpha::compute_test(&texenv.alpha_test);
     let depth_texture = texenv::compute_depth_texture(texenv);
     let fog = texenv::compute_fog(texenv);
 
@@ -393,15 +514,16 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
     }
 }
 
-fn main_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
+fn main_module(config: &Config) -> wesl::syntax::TranslationUnit {
     use wesl::syntax::*;
 
     let extensions = wesl_quote::quote_directive!(enable dual_source_blending;);
     let [color_chan, alpha_chan] = compute_channels();
-    let vertex = vertex_stage(&settings.texgen);
-    let fragment = fragment_stage(&settings.texenv);
+    let vertex = vertex_stage(&config.texgen);
+    let fragment = fragment_stage(&config.texenv);
 
     let mut module = wesl_quote::quote_module! {
+        import package::common;
         import package::render;
 
         const #color_chan = 0;
@@ -415,12 +537,16 @@ fn main_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
     module
 }
 
-pub fn compile(settings: &ShaderSettings) -> String {
+pub fn compile(config: &Config) -> String {
     let mut resolver = VirtualResolver::new();
-    resolver.add_translation_unit("package::main".parse().unwrap(), main_module(settings));
+    resolver.add_translation_unit("package::main".parse().unwrap(), main_module(config));
     resolver.add_module(
         "package::render".parse().unwrap(),
         Cow::Borrowed(include_str!("../../../shaders/render.wesl")),
+    );
+    resolver.add_module(
+        "package::common".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/common.wesl")),
     );
 
     let mut wesl = Wesl::new("shaders").set_custom_resolver(resolver);
@@ -435,13 +561,13 @@ pub fn compile(settings: &ShaderSettings) -> String {
         ..Default::default()
     });
 
-    let needs_frag_depth = match settings.texenv.depth_tex.mode.op() {
+    let needs_frag_depth = match config.texenv.depth_tex.mode.op() {
         tev::depth::Op::Disabled | tev::depth::Op::Add => false,
         tev::depth::Op::Replace => true,
         _ => panic!("reserved depth tex mode"),
     };
 
-    wesl.set_feature("sample_shading", settings.texenv.alpha_func.is_noop());
+    wesl.set_feature("sample_shading", config.texenv.alpha_test.is_noop());
     wesl.set_feature("frag_depth", needs_frag_depth);
 
     let compiled = match wesl.compile(&"package::main".parse().unwrap()) {

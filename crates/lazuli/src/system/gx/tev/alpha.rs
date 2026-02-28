@@ -115,7 +115,7 @@ impl Stage {
 
 #[bitos(3)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum Compare {
+pub enum Comparison {
     #[default]
     Never          = 0x0,
     Less           = 0x1,
@@ -129,7 +129,7 @@ pub enum Compare {
 
 #[bitos(2)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum CompareLogic {
+pub enum ComparisonLogic {
     #[default]
     And  = 0b00,
     Or   = 0b01,
@@ -139,11 +139,11 @@ pub enum CompareLogic {
 
 #[bitos(32)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Function {
+pub struct Test {
     #[bits(0..16)]
     pub refs: [u8; 2],
     #[bits(16..22)]
-    pub comparison: [Compare; 2],
+    pub comparison: [Comparison; 2],
     #[bits(22..24)]
-    pub logic: CompareLogic,
+    pub logic: ComparisonLogic,
 }

@@ -1,4 +1,4 @@
-mod settings;
+mod config;
 mod shader;
 
 use lazuli::modules::render::{TexEnvConfig, TexGenConfig};
@@ -9,9 +9,10 @@ use lazuli::system::gx::pix::{
 use lazuli::system::gx::{CullingMode, tev};
 
 use crate::render::Renderer;
+use crate::render::pipeline::shader::{AlphaTestConfig, TexGenStageConfig};
 
 #[rustfmt::skip]
-pub use settings::*;
+pub use config::*;
 
 mod cache {
     use std::borrow::Cow;
@@ -20,14 +21,14 @@ mod cache {
     use lazuli::system::gx::CullingMode;
     use rustc_hash::FxHashMap;
 
-    use super::{Settings, ShaderSettings};
+    use super::{Config, shader};
 
     pub struct Cache {
         group0_layout: wgpu::BindGroupLayout,
         group1_layout: wgpu::BindGroupLayout,
         layout: wgpu::PipelineLayout,
-        cached_pipelines: FxHashMap<Settings, wgpu::RenderPipeline>,
-        cached_shaders: FxHashMap<ShaderSettings, wgpu::ShaderModule>,
+        cached_pipelines: FxHashMap<Config, wgpu::RenderPipeline>,
+        cached_shaders: FxHashMap<shader::Config, wgpu::ShaderModule>,
     }
 
     fn split_factor(factor: wgpu::BlendFactor) -> (wgpu::BlendFactor, wgpu::BlendFactor) {
@@ -56,17 +57,17 @@ mod cache {
 
     impl Cache {
         fn create_pipeline(
-            cached_shaders: &mut FxHashMap<ShaderSettings, wgpu::ShaderModule>,
+            cached_shaders: &mut FxHashMap<shader::Config, wgpu::ShaderModule>,
             device: &wgpu::Device,
             layout: &wgpu::PipelineLayout,
-            settings: &Settings,
+            config: &Config,
             id: u32,
         ) -> wgpu::RenderPipeline {
-            let depth_stencil = if settings.depth.enabled {
+            let depth_stencil = if config.depth.enabled {
                 wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: settings.depth.write,
-                    depth_compare: settings.depth.compare,
+                    depth_write_enabled: config.depth.write,
+                    depth_compare: config.depth.compare,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }
@@ -80,19 +81,19 @@ mod cache {
                 }
             };
 
-            let (color_src, alpha_src) = split_factor(settings.blend.src);
-            let (color_dst, alpha_dst) = split_factor(settings.blend.dst);
+            let (color_src, alpha_src) = split_factor(config.blend.src);
+            let (color_dst, alpha_dst) = split_factor(config.blend.dst);
 
-            let (color_blend, alpha_blend) = if settings.has_alpha {
+            let (color_blend, alpha_blend) = if config.has_alpha {
                 let color = wgpu::BlendComponent {
                     src_factor: color_src,
                     dst_factor: color_dst,
-                    operation: settings.blend.op,
+                    operation: config.blend.op,
                 };
                 let alpha = wgpu::BlendComponent {
                     src_factor: alpha_src,
                     dst_factor: alpha_dst,
-                    operation: settings.blend.op,
+                    operation: config.blend.op,
                 };
 
                 (color, alpha)
@@ -100,35 +101,35 @@ mod cache {
                 let color = wgpu::BlendComponent {
                     src_factor: remove_dst_alpha(color_src),
                     dst_factor: remove_dst_alpha(color_dst),
-                    operation: settings.blend.op,
+                    operation: config.blend.op,
                 };
                 let alpha = wgpu::BlendComponent {
                     src_factor: remove_dst_alpha(alpha_src),
                     dst_factor: remove_dst_alpha(alpha_dst),
-                    operation: settings.blend.op,
+                    operation: config.blend.op,
                 };
 
                 (color, alpha)
             };
 
-            let blend = settings.blend.enabled.then_some(wgpu::BlendState {
+            let blend = config.blend.enabled.then_some(wgpu::BlendState {
                 color: color_blend,
                 alpha: alpha_blend,
             });
 
             let mut write_mask = wgpu::ColorWrites::empty();
-            if settings.blend.color_write {
+            if config.blend.color_write {
                 write_mask |= wgpu::ColorWrites::COLOR;
             }
-            if settings.blend.alpha_write && settings.has_alpha {
+            if config.blend.alpha_write && config.has_alpha {
                 write_mask |= wgpu::ColorWrites::ALPHA;
             }
 
             let label = format!("Shader {}", id);
-            let shader = match cached_shaders.entry(settings.shader.clone()) {
+            let shader = match cached_shaders.entry(config.shader.clone()) {
                 Entry::Occupied(o) => o.into_mut(),
                 Entry::Vacant(v) => {
-                    let shader = super::shader::compile(&settings.shader);
+                    let shader = super::shader::compile(&config.shader);
                     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some(&label),
                         source: wgpu::ShaderSource::Wgsl(Cow::Owned(shader)),
@@ -138,7 +139,7 @@ mod cache {
                 }
             };
 
-            let cull_mode = match settings.culling {
+            let cull_mode = match config.culling {
                 CullingMode::None => None,
                 CullingMode::Back => Some(wgpu::Face::Back),
                 CullingMode::Front => Some(wgpu::Face::Front),
@@ -268,15 +269,15 @@ mod cache {
             &self.group1_layout
         }
 
-        pub fn get(&mut self, device: &wgpu::Device, settings: &Settings) -> &wgpu::RenderPipeline {
+        pub fn get(&mut self, device: &wgpu::Device, config: &Config) -> &wgpu::RenderPipeline {
             let len = self.cached_pipelines.len() as u32;
-            match self.cached_pipelines.entry(settings.clone()) {
+            match self.cached_pipelines.entry(config.clone()) {
                 Entry::Occupied(o) => o.into_mut(),
                 Entry::Vacant(v) => v.insert(Self::create_pipeline(
                     &mut self.cached_shaders,
                     device,
                     &self.layout,
-                    settings,
+                    config,
                     len,
                 )),
             }
@@ -314,12 +315,12 @@ fn logic_blend_approx(
 impl Renderer {
     pub fn set_texenv_config(&mut self, config: Box<TexEnvConfig>) {
         self.flush(format_args!("texenv changed"));
-        self.pipeline_settings
+        self.pipeline_config
             .shader
             .texenv
             .stages
             .clone_from(&config.stages);
-        self.pipeline_settings.shader.texenv.depth_tex = config.depth_tex;
+        self.pipeline_config.shader.texenv.depth_tex = config.depth_tex;
         self.current_config.regs = config.regs.map(Rgba::from);
         self.current_config.consts = config.constants.map(Rgba::from);
         self.current_config_dirty = true;
@@ -327,22 +328,22 @@ impl Renderer {
 
     pub fn set_texgen_config(&mut self, config: TexGenConfig) {
         self.flush(format_args!("texgen changed"));
-        self.pipeline_settings.shader.texgen.stages = config
+        self.pipeline_config.shader.texgen.stages = config
             .stages
             .iter()
-            .map(|s| TexGenStageSettings {
+            .map(|s| TexGenStageConfig {
                 base: s.base.clone(),
                 normalize: s.normalize,
             })
             .collect();
 
-        for (setting, value) in self
+        for (matrix, value) in self
             .current_config
-            .post_transform_mat
+            .post_transform_mtx
             .iter_mut()
             .zip(config.stages.iter().map(|s| s.post_matrix))
         {
-            *setting = value;
+            *matrix = value;
         }
 
         self.current_config_dirty = true;
@@ -383,7 +384,7 @@ impl Renderer {
             (src, dst, wgpu::BlendOperation::Add)
         };
 
-        let blend = BlendSettings {
+        let config = BlendConfig {
             enabled: mode.enable(),
             src,
             dst,
@@ -392,9 +393,9 @@ impl Renderer {
             alpha_write: mode.alpha_mask(),
         };
 
-        if self.pipeline_settings.blend != blend {
-            self.flush(format_args!("set blend settings to {blend:?}"));
-            self.pipeline_settings.blend = blend;
+        if self.pipeline_config.blend != config {
+            self.flush(format_args!("set blend config to {config:?}"));
+            self.pipeline_config.blend = config;
         }
     }
 
@@ -410,37 +411,37 @@ impl Renderer {
             CompareMode::Always => wgpu::CompareFunction::Always,
         };
 
-        let depth = DepthSettings {
+        let depth = DepthConfig {
             enabled: mode.enable(),
             write: mode.update(),
             compare,
         };
 
-        if self.pipeline_settings.depth != depth {
-            self.flush(format_args!("set depth settings to {depth:?}"));
-            self.pipeline_settings.depth = depth;
+        if self.pipeline_config.depth != depth {
+            self.flush(format_args!("set depth config to {depth:?}"));
+            self.pipeline_config.depth = depth;
         }
     }
 
-    pub fn set_alpha_function(&mut self, func: tev::alpha::Function) {
-        let settings = AlphaFuncSettings {
-            comparison: func.comparison(),
-            logic: func.logic(),
+    pub fn set_alpha_test(&mut self, test: tev::alpha::Test) {
+        let config = AlphaTestConfig {
+            comparison: test.comparison(),
+            logic: test.logic(),
         };
 
-        if self.pipeline_settings.shader.texenv.alpha_func != settings {
-            self.flush(format_args!("set alpha function to {func:?}"));
-            self.pipeline_settings.shader.texenv.alpha_func = settings;
+        if self.pipeline_config.shader.texenv.alpha_test != config {
+            self.flush(format_args!("set alpha test to {test:?}"));
+            self.pipeline_config.shader.texenv.alpha_test = config;
         }
 
-        self.current_config.alpha_refs = func.refs().map(|x| x as u32);
+        self.current_config.alpha_refs = test.refs().map(|x| x as u32);
         self.current_config_dirty = true;
     }
 
     pub fn set_culling_mode(&mut self, mode: CullingMode) {
-        if self.pipeline_settings.culling != mode {
+        if self.pipeline_config.culling != mode {
             self.flush(format_args!("changed culling mode to {mode:?}"));
-            self.pipeline_settings.culling = mode;
+            self.pipeline_config.culling = mode;
         }
     }
 }

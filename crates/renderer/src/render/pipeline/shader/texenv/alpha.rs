@@ -3,7 +3,7 @@ use lazuli::system::gx::tev;
 use wesl_quote::quote_expression;
 
 use super::{comparison_target, constant, input_channel, sample_tex};
-use crate::render::pipeline::AlphaFuncSettings;
+use crate::render::pipeline::shader::AlphaTestConfig;
 
 fn input(stage: &TexEnvStage, src: tev::alpha::InputSrc) -> wesl::syntax::Expression {
     use wesl::syntax::*;
@@ -131,31 +131,31 @@ pub fn stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     }
 }
 
-fn test_component(compare: tev::alpha::Compare, idx: usize) -> wesl::syntax::Expression {
+fn test_component(compare: tev::alpha::Comparison, idx: usize) -> wesl::syntax::Expression {
     use wesl::syntax::*;
 
     let alpha_ref = wesl::syntax::Ident::new(format!("alpha_ref{idx}"));
     match compare {
-        tev::alpha::Compare::Never => quote_expression! { false },
-        tev::alpha::Compare::Less => quote_expression! { alpha < #alpha_ref },
-        tev::alpha::Compare::Equal => quote_expression! { alpha == #alpha_ref },
-        tev::alpha::Compare::LessOrEqual => quote_expression! { alpha <= #alpha_ref },
-        tev::alpha::Compare::Greater => quote_expression! { alpha > #alpha_ref },
-        tev::alpha::Compare::NotEqual => quote_expression! { alpha != #alpha_ref },
-        tev::alpha::Compare::GreaterOrEqual => quote_expression! { alpha >= #alpha_ref },
-        tev::alpha::Compare::Always => quote_expression! { true },
+        tev::alpha::Comparison::Never => quote_expression! { false },
+        tev::alpha::Comparison::Less => quote_expression! { alpha < #alpha_ref },
+        tev::alpha::Comparison::Equal => quote_expression! { alpha == #alpha_ref },
+        tev::alpha::Comparison::LessOrEqual => quote_expression! { alpha <= #alpha_ref },
+        tev::alpha::Comparison::Greater => quote_expression! { alpha > #alpha_ref },
+        tev::alpha::Comparison::NotEqual => quote_expression! { alpha != #alpha_ref },
+        tev::alpha::Comparison::GreaterOrEqual => quote_expression! { alpha >= #alpha_ref },
+        tev::alpha::Comparison::Always => quote_expression! { true },
     }
 }
 
-pub fn compute_test(settings: &AlphaFuncSettings) -> wesl::syntax::Expression {
+pub fn compute_test(config: &AlphaTestConfig) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    let a = test_component(settings.comparison[0], 0);
-    let b = test_component(settings.comparison[1], 1);
+    let a = test_component(config.comparison[0], 0);
+    let b = test_component(config.comparison[1], 1);
 
-    match settings.logic {
-        tev::alpha::CompareLogic::And => quote_expression! { (#a) && (#b) },
-        tev::alpha::CompareLogic::Or => quote_expression! { (#a) || (#b) },
-        tev::alpha::CompareLogic::Xor => quote_expression! { (#a) != (#b) },
-        tev::alpha::CompareLogic::Xnor => quote_expression! { (#a) == (#b) },
+    match config.logic {
+        tev::alpha::ComparisonLogic::And => quote_expression! { (#a) && (#b) },
+        tev::alpha::ComparisonLogic::Or => quote_expression! { (#a) || (#b) },
+        tev::alpha::ComparisonLogic::Xor => quote_expression! { (#a) != (#b) },
+        tev::alpha::ComparisonLogic::Xnor => quote_expression! { (#a) == (#b) },
     }
 }

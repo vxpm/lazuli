@@ -22,10 +22,3 @@ fn vec4f_to_vec4u(value: vec4f) -> vec4u {
     );
 }
 
-fn concat_texgen_color(value: vec4f) -> vec3f {
-    let int = vec4f_to_vec4u(value);
-    let s = int.r;
-    // yagcd says to concat green and blue..?
-    let t = int.g;
-    return vec3f(f32(s) / 255, f32(t) / 255, 1.0);
-}

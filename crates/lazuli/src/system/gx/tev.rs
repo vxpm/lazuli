@@ -292,7 +292,7 @@ pub struct Interface {
     pub stage_consts: [StageConstsPair; 8],
     pub regs: [Rgba16; 4],
     pub consts: [Rgba16; 4],
-    pub alpha_func: alpha::Function,
+    pub alpha_test: alpha::Test,
     pub depth_tex: depth::Texture,
     pub fog: Fog,
     pub stages_dirty: bool,

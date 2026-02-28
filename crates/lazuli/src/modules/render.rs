@@ -11,7 +11,7 @@ use crate::system::gx::pix::{
     DepthMode, Scissor,
 };
 use crate::system::gx::tev::Fog;
-use crate::system::gx::xform::{BaseTexGen, Channel, Light, ProjectionMat};
+use crate::system::gx::xform::{BaseTexGen, Channel, Light, ProjectionMtx};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
 use crate::system::vi::Dimensions;
 
@@ -175,8 +175,8 @@ pub enum Action {
     SetDepthMode(DepthMode),
     SetBlendMode(BlendMode),
     SetConstantAlpha(ConstantAlpha),
-    SetAlphaFunction(tev::alpha::Function),
-    SetProjectionMatrix(ProjectionMat),
+    SetAlphaTest(tev::alpha::Test),
+    SetProjectionMatrix(ProjectionMtx),
     SetTexEnvConfig(Box<TexEnvConfig>),
     SetTexGenConfig(TexGenConfig),
     SetAmbient(u8, Abgr8),

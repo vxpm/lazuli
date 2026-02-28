@@ -73,5 +73,5 @@ pub fn post_transform(
     normalized: wesl::syntax::Expression,
 ) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    quote_expression! { (config.post_transform_mat[#stage_index] * vec4f(#normalized, 1.0)).xyz }
+    quote_expression! { (config.post_transform_mtx[#stage_index] * vec4f(#normalized, 1.0)).xyz }
 }

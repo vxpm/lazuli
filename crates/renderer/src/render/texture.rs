@@ -5,7 +5,7 @@ use lazuli::system::gx::color::Rgba8;
 use lazuli::system::gx::tex::{ClutFormat, TextureData, WrapMode};
 use rustc_hash::FxHashMap;
 
-use crate::render::{Renderer, TexSlotSettings};
+use crate::render::{Renderer, TexSlotConfig};
 /// Configuration of a processed texture.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TextureRef {
@@ -305,17 +305,17 @@ impl Renderer {
         sampler: Sampler,
         scaling: Scaling,
     ) {
-        let settings = TexSlotSettings {
+        let config = TexSlotConfig {
             texture: TextureRef { id, clut },
             sampler,
             scaling,
         };
 
-        if self.tex_slots[slot] == settings {
+        if self.tex_slots[slot] == config {
             return;
         }
 
         self.flush(format_args!("texture slot changed"));
-        self.tex_slots[slot] = settings;
+        self.tex_slots[slot] = config;
     }
 }

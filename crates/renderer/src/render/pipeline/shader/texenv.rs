@@ -5,7 +5,7 @@ use lazuli::modules::render::TexEnvStage;
 use lazuli::system::gx::tev;
 use wesl_quote::{quote_expression, quote_statement};
 
-use crate::render::pipeline::TexEnvSettings;
+use crate::render::pipeline::shader::TexEnvConfig;
 
 fn sample_tex(stage: &TexEnvStage) -> wesl::syntax::Expression {
     use wesl::syntax::*;
@@ -46,7 +46,7 @@ fn input_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
     match stage.refs.input() {
         tev::InputChannel::Channel0 => quote_expression! { in.chan0 },
         tev::InputChannel::Channel1 => quote_expression! { in.chan1 },
-        tev::InputChannel::AlphaBump => quote_expression! { vec4f(render::PLACEHOLDER_RGB, 0f) },
+        tev::InputChannel::AlphaBump => quote_expression! { vec4f(common::PLACEHOLDER_RGB, 0f) },
         tev::InputChannel::AlphaBumpNormalized => {
             quote_expression! { vec4f(render::PLACEHOLDER_RGB, 0f) }
         }
@@ -109,19 +109,19 @@ fn comparison_target(
     }
 }
 
-pub fn compute_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Statement {
+pub fn compute_depth_texture(config: &TexEnvConfig) -> wesl::syntax::Statement {
     use wesl::syntax::*;
 
     if matches!(
-        settings.depth_tex.mode.op(),
+        config.depth_tex.mode.op(),
         tev::depth::Op::Disabled | tev::depth::Op::Add
     ) {
         return Statement::Void;
     }
 
-    let bias = settings.depth_tex.bias;
-    let sampled = self::sample_tex(settings.stages.last().unwrap());
-    let (depth_mid, depth_hi, depth_max) = match settings.depth_tex.mode.format() {
+    let bias = config.depth_tex.bias;
+    let sampled = self::sample_tex(config.stages.last().unwrap());
+    let (depth_mid, depth_hi, depth_max) = match config.depth_tex.mode.format() {
         tev::depth::Format::U8 => (
             quote_expression!(0),
             quote_expression!(0),
@@ -142,7 +142,7 @@ pub fn compute_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Stateme
 
     quote_statement! {
         {
-            let depth_tex_sample = render::vec4f_to_vec4u(#sampled);
+            let depth_tex_sample = common::vec4f_to_vec4u(#sampled);
             let depth_tex_value = pack4xU8(vec4u(depth_tex_sample.x, #depth_mid, #depth_hi, 0)) + #bias;
             out.depth = clamp(f32(depth_tex_value) / #depth_max, 0.0, 1.0);
             frag_depth = out.depth;
@@ -150,14 +150,14 @@ pub fn compute_depth_texture(settings: &TexEnvSettings) -> wesl::syntax::Stateme
     }
 }
 
-pub fn compute_fog(settings: &TexEnvSettings) -> wesl::syntax::Statement {
+pub fn compute_fog(config: &TexEnvConfig) -> wesl::syntax::Statement {
     use wesl::syntax::*;
 
-    if settings.fog.mode == tev::FogMode::None {
+    if config.fog.mode == tev::FogMode::None {
         return Statement::Void;
     }
 
-    let distance = if settings.fog.orthographic {
+    let distance = if config.fog.orthographic {
         quote_statement! {
             distance = clamp(config.fog.a * frag_depth - config.fog.c, 0.0, 1.0);
         }
@@ -173,7 +173,7 @@ pub fn compute_fog(settings: &TexEnvSettings) -> wesl::syntax::Statement {
         }
     };
 
-    let adjust = match settings.fog.mode {
+    let adjust = match config.fog.mode {
         tev::FogMode::None => unreachable!(),
         tev::FogMode::Linear => Statement::Void,
         tev::FogMode::Exponential => quote_statement! {

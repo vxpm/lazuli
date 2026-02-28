@@ -1,3 +1,5 @@
+import package::common;
+
 struct Light {
     color: vec4f,
 
@@ -40,8 +42,8 @@ struct Config {
     alpha_channels: array<Channel, 2>,
     regs: array<vec4f, 4>,
     consts: array<vec4f, 4>,
-    projection_mat: mat4x4f,
-    post_transform_mat: array<mat4x4f, 8>,
+    projection_mtx: mat4x4f,
+    post_transform_mtx: array<mat4x4f, 8>,
     constant_alpha: u32,
     alpha_refs: array<u32, 2>,
     _pad0: u32,
@@ -141,25 +143,8 @@ struct FragmentOutput {
     @location(0) @blend_src(1) blend: vec4f,
 }
 
-fn vec3f_to_vec3u(value: vec3f) -> vec3u {
-    return vec3u(
-        u32(value.r * 255.0),
-        u32(value.g * 255.0),
-        u32(value.b * 255.0),
-    );
-}
-
-fn vec4f_to_vec4u(value: vec4f) -> vec4u {
-    return vec4u(
-        u32(value.r * 255.0),
-        u32(value.g * 255.0),
-        u32(value.b * 255.0),
-        u32(value.a * 255.0),
-    );
-}
-
 fn concat_texgen_color(value: vec4f) -> vec3f {
-    let int = vec4f_to_vec4u(value);
+    let int = common::vec4f_to_vec4u(value);
     let s = int.r;
     // yagcd says to concat green and blue..?
     let t = int.g;

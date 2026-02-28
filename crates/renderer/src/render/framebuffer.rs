@@ -258,9 +258,9 @@ impl Renderer {
 
         match format {
             pix::BufferFormat::RGB8Z24 | pix::BufferFormat::RGB565Z16 => {
-                self.pipeline_settings.has_alpha = false
+                self.pipeline_config.has_alpha = false
             }
-            pix::BufferFormat::RGBA6Z24 => self.pipeline_settings.has_alpha = true,
+            pix::BufferFormat::RGBA6Z24 => self.pipeline_config.has_alpha = true,
             _ => (),
         }
     }
@@ -481,15 +481,11 @@ impl Renderer {
 
     fn clear(&mut self, x: u32, y: u32, width: u32, height: u32) {
         let color = self
-            .pipeline_settings
+            .pipeline_config
             .blend
             .color_write
             .then_some(self.clear_color);
-        let depth = self
-            .pipeline_settings
-            .depth
-            .write
-            .then_some(self.clear_depth);
+        let depth = self.pipeline_config.depth.write.then_some(self.clear_depth);
 
         self.current_pass.set_scissor_rect(x, y, width, height);
         self.current_pass
