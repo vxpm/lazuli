@@ -541,12 +541,17 @@ pub fn compile(config: &Config) -> String {
     let mut resolver = VirtualResolver::new();
     resolver.add_translation_unit("package::main".parse().unwrap(), main_module(config));
     resolver.add_module(
+        "package::common".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/common.wesl")),
+    );
+
+    resolver.add_module(
         "package::render".parse().unwrap(),
         Cow::Borrowed(include_str!("../../../shaders/render.wesl")),
     );
     resolver.add_module(
-        "package::common".parse().unwrap(),
-        Cow::Borrowed(include_str!("../../../shaders/common.wesl")),
+        "package::render::fog".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/render/fog.wesl")),
     );
 
     let mut wesl = Wesl::new("shaders").set_custom_resolver(resolver);

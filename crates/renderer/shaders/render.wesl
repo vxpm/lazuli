@@ -1,4 +1,5 @@
 import package::common;
+import package::render::fog;
 
 struct Light {
     color: vec4f,
@@ -26,14 +27,6 @@ struct Channel {
     light_mask: array<u32, 8>,
 }
 
-struct FogParams {
-    color: vec4f,
-    a: f32,
-    b_mag: u32,
-    b_shift: u32,
-    c: f32,
-}
-
 struct Config {
     ambient: array<vec4f, 2>,
     material: array<vec4f, 2>,
@@ -47,7 +40,7 @@ struct Config {
     constant_alpha: u32,
     alpha_refs: array<u32, 2>,
     _pad0: u32,
-    fog: FogParams,
+    fog: fog::Params,
 }
 
 struct VertexInput {

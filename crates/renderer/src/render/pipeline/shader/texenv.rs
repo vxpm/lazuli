@@ -159,17 +159,11 @@ pub fn compute_fog(config: &TexEnvConfig) -> wesl::syntax::Statement {
 
     let distance = if config.fog.orthographic {
         quote_statement! {
-            distance = clamp(config.fog.a * frag_depth - config.fog.c, 0.0, 1.0);
+            distance = render::fog::orthographic_distance(config.fog, frag_depth);
         }
     } else {
         quote_statement! {
-            {
-                let depth_max = f32((1 << 24) - 1);
-                let depth = u32(frag_depth * depth_max);
-                let a = config.fog.a * depth_max;
-                let denom = f32(config.fog.b_mag - (depth >> config.fog.b_shift));
-                distance = clamp(a / denom - config.fog.c, 0.0, 1.0);
-            }
+            distance = render::fog::perspective_distance(config.fog, frag_depth);
         }
     };
 
@@ -177,25 +171,16 @@ pub fn compute_fog(config: &TexEnvConfig) -> wesl::syntax::Statement {
         tev::FogMode::None => unreachable!(),
         tev::FogMode::Linear => Statement::Void,
         tev::FogMode::Exponential => quote_statement! {
-            distance = 1f - pow(2f, -8f * distance);
+            distance = render::fog::exponential(distance);
         },
         tev::FogMode::ExponentialSquared => quote_statement! {
-            {
-                let squared = pow(distance, 2f);
-                distance = 1f - pow(2f, -8f * squared);
-            }
+            distance = render::fog::exponential_squared(distance);
         },
         tev::FogMode::InverseExponential => quote_statement! {
-            {
-                let inverse = (1f - distance);
-                distance = pow(2f, -8f * inverse);
-            }
+            distance = render::fog::inverse_exponential(distance);
         },
         tev::FogMode::InverseExponentialSquared => quote_statement! {
-            {
-                let inverse_squared = pow(1f - distance, 2f);
-                distance = pow(2f, -8f * inverse_squared);
-            }
+            distance = render::fog::inverse_exponential_squared(distance);
         },
         _ => panic!("reserved fog mode"),
     };
