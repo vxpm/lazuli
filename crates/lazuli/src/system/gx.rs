@@ -11,7 +11,7 @@ use std::sync::{LazyLock, Mutex};
 use bitos::integer::{UnsignedInt, u3, u4};
 use bitos::{BitUtils, TryBits, bitos};
 use bitvec::array::BitArray;
-use color::Rgba;
+use color::{Rgba, Rgba8};
 use gekko::Address;
 use glam::{Mat4, Vec2, Vec3};
 use ring_arena::{Handle, RingArena};
@@ -353,16 +353,13 @@ impl Reg {
     }
 
     #[inline]
-    pub fn is_tev_depth_tex(&self) -> bool {
+    pub fn is_depth_tex(&self) -> bool {
         matches!(self, Self::TevDepthTexBias | Self::TevDepthTexMode)
     }
 
     #[inline]
-    pub fn is_tev(&self) -> bool {
-        self.is_tev_stage()
-            || self.is_tev_refs()
-            || self.is_tev_constant()
-            || self.is_tev_depth_tex()
+    pub fn is_texenv(&self) -> bool {
+        self.is_tev_stage() || self.is_tev_refs() || self.is_tev_constant() || self.is_depth_tex()
     }
 
     #[inline]
@@ -621,14 +618,26 @@ pub fn update_texenv(sys: &mut System) {
 
     let config = render::TexEnvConfig {
         stages,
-        regs: sys.gpu.env.regs,
-        constants: sys.gpu.env.consts,
         depth_tex: sys.gpu.env.depth_tex,
+    };
+
+    let registers = render::TexEnvRegisters {
+        regs: sys.gpu.env.regs,
+        constants: sys.gpu.env.consts.map(|x| Rgba8 {
+            r: x.r as u8,
+            g: x.g as u8,
+            b: x.b as u8,
+            a: x.a as u8,
+        }),
     };
 
     sys.modules
         .render
-        .exec(render::Action::SetTexEnvConfig(Box::new(config)));
+        .exec(render::Action::SetTexEnvConfig(config));
+
+    sys.modules
+        .render
+        .exec(render::Action::SetTexEnvRegisters(registers));
 }
 
 pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
@@ -978,7 +987,7 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         sys.gpu.tex.maps[map as usize].dirty = true;
     }
 
-    if reg.is_tev() {
+    if reg.is_texenv() {
         sys.gpu.env.stages_dirty = true;
     }
 

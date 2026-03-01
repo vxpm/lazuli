@@ -1,7 +1,7 @@
 mod config;
 mod shader;
 
-use lazuli::modules::render::{TexEnvConfig, TexGenConfig};
+use lazuli::modules::render::{TexEnvConfig, TexEnvRegisters, TexGenConfig};
 use lazuli::system::gx::color::Rgba;
 use lazuli::system::gx::pix::{
     BlendLogicOp, BlendMode, CompareMode, DepthMode, DstBlendFactor, SrcBlendFactor,
@@ -313,7 +313,7 @@ fn logic_blend_approx(
 }
 
 impl Renderer {
-    pub fn set_texenv_config(&mut self, config: Box<TexEnvConfig>) {
+    pub fn set_texenv_config(&mut self, config: TexEnvConfig) {
         self.flush(format_args!("texenv changed"));
         self.pipeline_config
             .shader
@@ -321,8 +321,11 @@ impl Renderer {
             .stages
             .clone_from(&config.stages);
         self.pipeline_config.shader.texenv.depth_tex = config.depth_tex;
-        self.current_config.regs = config.regs.map(Rgba::from);
-        self.current_config.consts = config.constants.map(Rgba::from);
+    }
+
+    pub fn set_texenv_registers(&mut self, regs: TexEnvRegisters) {
+        self.current_config.regs = regs.regs.map(Rgba::from);
+        self.current_config.consts = regs.constants.map(Rgba::from);
         self.current_config_dirty = true;
     }
 

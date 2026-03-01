@@ -217,6 +217,7 @@ impl Renderer {
             Action::SetProjectionMatrix(mtx) => self.set_projection_mtx(mtx.value()),
             Action::SetTexEnvConfig(config) => self.set_texenv_config(config),
             Action::SetTexGenConfig(config) => self.set_texgen_config(config),
+            Action::SetTexEnvRegisters(regs) => self.set_texenv_registers(regs),
             Action::LoadTexture { id, texture } => self.load_texture(id, texture),
             Action::LoadClut { id, clut } => self.load_clut(id, clut),
             Action::SetTextureSlot {

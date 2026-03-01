@@ -1,6 +1,6 @@
 //! Renderer module interface.
 
-use color::{Abgr8, Rgba, Rgba16};
+use color::{Abgr8, Rgba, Rgba8, Rgba16};
 use glam::Mat4;
 use oneshot::Sender;
 use ordered_float::OrderedFloat;
@@ -66,8 +66,6 @@ pub struct TexEnvStage {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TexEnvConfig {
     pub stages: Vec<TexEnvStage>,
-    pub regs: [Rgba16; 4],
-    pub constants: [Rgba16; 4],
     pub depth_tex: tev::depth::Texture,
 }
 
@@ -99,6 +97,12 @@ impl std::hash::Hash for TexGenStage {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TexGenConfig {
     pub stages: Vec<TexGenStage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexEnvRegisters {
+    pub regs: [Rgba16; 4],
+    pub constants: [Rgba8; 4],
 }
 
 #[derive(Debug, Clone)]
@@ -177,8 +181,9 @@ pub enum Action {
     SetConstantAlpha(ConstantAlpha),
     SetAlphaTest(tev::alpha::Test),
     SetProjectionMatrix(ProjectionMtx),
-    SetTexEnvConfig(Box<TexEnvConfig>),
+    SetTexEnvConfig(TexEnvConfig),
     SetTexGenConfig(TexGenConfig),
+    SetTexEnvRegisters(TexEnvRegisters),
     SetAmbient(u8, Abgr8),
     SetMaterial(u8, Abgr8),
     SetColorChannel(u8, Channel),
