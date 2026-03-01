@@ -130,183 +130,6 @@ pub struct Config {
     pub texgen: TexGenConfig,
 }
 
-fn compute_channels() -> [wesl::syntax::GlobalDeclaration; 2] {
-    use wesl::syntax::*;
-    let color = wesl_quote::quote_declaration! {
-        fn compute_color_channel(vertex_pos: vec3f, vertex_normal: vec3f, vertex_color: vec3f, index: u32, config: render::Config) -> vec3f {
-            let channel = config.color_channels[index];
-
-            // get material color
-            var material = config.material[index].rgb;
-            if channel.material_from_vertex != 0 {
-                material = vertex_color;
-            }
-
-            // if no lighting, return
-            if channel.lighting_enabled == 0 {
-                return material;
-            }
-
-            // get ambient color
-            var ambient = config.ambient[index].rgb;
-            if channel.ambient_from_vertex != 0 {
-                ambient = vertex_color;
-            }
-
-            var light_func = ambient;
-            for (var light_idx = 0; light_idx < 8; light_idx += 1) {
-                if channel.light_mask[light_idx] == 0 {
-                    continue;
-                }
-
-                let light = config.lights[light_idx];
-
-                // compute diffuse attenuation
-                var diff_atten: f32;
-                switch channel.diffuse_attenuation {
-                    case 0: {
-                        diff_atten = 1.0;
-                    }
-                    case 1: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = dot_product / length(vertex_to_light);
-                    }
-                    case 2: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = max(dot_product / length(vertex_to_light), 0.0);
-                    }
-                    default: {}
-                }
-
-                // compute angle and distance attenuation
-                var atten: f32 = 1.0;
-                if channel.attenuation != 0 {
-                    if channel.specular == 0 {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let vertex_to_light_dir = normalize(vertex_to_light);
-
-                        let cos = max(dot(vertex_to_light_dir, light.direction), 0.0);
-                        let dist = length(vertex_to_light);
-
-                        let ang_atten = max(light.cos_atten.x + cos * light.cos_atten.y + cos * cos * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + dist * light.dist_atten.y + dist * dist * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    } else {
-                        let l = normalize(light.position);
-                        let h = light.direction;
-                        let norm_dot_l = dot(vertex_normal, l);
-
-                        var value = 0.0;
-                        if norm_dot_l > 0 {
-                            let norm_dot_h = dot(vertex_normal, h);
-                            value = max(norm_dot_h, 0.0);
-                        }
-
-                        let ang_atten = max(light.cos_atten.x + value * light.cos_atten.y + value * value * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + value * light.dist_atten.y + value * value * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    }
-                }
-
-                light_func += light.color.rgb * diff_atten * atten;
-            }
-
-            return material * clamp(light_func, vec3f(0.0), vec3f(1.0));
-        }
-    };
-
-    let alpha = wesl_quote::quote_declaration! {
-        fn compute_alpha_channel(vertex_pos: vec3f, vertex_normal: vec3f, vertex_alpha: f32, index: u32, config: render::Config) -> f32 {
-            let channel = config.alpha_channels[index];
-
-            // get material alpha
-            var material = config.material[index].a;
-            if channel.material_from_vertex != 0 {
-                material = vertex_alpha;
-            }
-
-            // if no lighting, return
-            if channel.lighting_enabled == 0 {
-                return material;
-            }
-
-            // get ambient alpha
-            var ambient = config.ambient[index].a;
-            if channel.ambient_from_vertex != 0 {
-                ambient = vertex_alpha;
-            }
-
-            var light_func = ambient;
-            for (var light_idx = 0; light_idx < 8; light_idx += 1) {
-                if channel.light_mask[light_idx] == 0 {
-                    continue;
-                }
-
-                let light = config.lights[light_idx];
-
-                // compute diffuse attenuation
-                var diff_atten: f32;
-                switch channel.diffuse_attenuation {
-                    case 0: {
-                        diff_atten = 1.0;
-                    }
-                    case 1: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = dot_product / length(vertex_to_light);
-                    }
-                    case 2: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = max(dot_product / length(vertex_to_light), 0.0);
-                    }
-                    default: {}
-                }
-
-                // compute angle and distance attenuation
-                var atten: f32 = 1.0;
-                if channel.attenuation != 0 {
-                    if channel.specular == 0 {
-                        let l = light.position - vertex_pos;
-                        let cos = max(dot(normalize(l), light.direction), 0.0);
-                        let dist = length(l);
-
-                        let ang_atten = max(light.cos_atten.x + cos * light.cos_atten.y + cos * cos * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + dist * light.dist_atten.y + dist * dist * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    } else {
-                        let l = normalize(light.position);
-                        let h = light.direction;
-                        let norm_dot_l = dot(vertex_normal, l);
-
-                        var value = 0.0;
-                        if norm_dot_l > 0 {
-                            let norm_dot_h = dot(vertex_normal, h);
-                            value = max(norm_dot_h, 0.0);
-                        }
-
-                        let ang_atten = max(light.cos_atten.x + value * light.cos_atten.y + value * value * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + value * light.dist_atten.y + value * value * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    }
-                }
-
-                light_func += light.color.a * diff_atten * atten;
-            }
-
-            return material * clamp(light_func, 0.0, 1.0);
-        }
-    };
-
-    [color, alpha]
-}
-
 fn vertex_stage(texgen: &TexGenConfig) -> wesl::syntax::GlobalDeclaration {
     use wesl::syntax::*;
 
@@ -392,12 +215,12 @@ fn vertex_stage(texgen: &TexGenConfig) -> wesl::syntax::GlobalDeclaration {
             out.clip.z += out.clip.w;
 
             out.chan0 = vec4f(
-                compute_color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.rgb, 0, config),
-                compute_alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.a, 0, config),
+                render::lighting::color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.rgb, 0, config),
+                render::lighting::alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.a, 0, config),
             );
             out.chan1 = vec4f(
-                compute_color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.rgb, 1, config),
-                compute_alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.a, 1, config),
+                render::lighting::color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.rgb, 1, config),
+                render::lighting::alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.a, 1, config),
             );
 
             var tex_coords: array<vec3f, 8>;
@@ -518,16 +341,12 @@ fn main_module(config: &Config) -> wesl::syntax::TranslationUnit {
     use wesl::syntax::*;
 
     let extensions = wesl_quote::quote_directive!(enable dual_source_blending;);
-    let [color_chan, alpha_chan] = compute_channels();
     let vertex = vertex_stage(&config.texgen);
     let fragment = fragment_stage(&config.texenv);
 
     let mut module = wesl_quote::quote_module! {
         import package::common;
         import package::render;
-
-        const #color_chan = 0;
-        const #alpha_chan = 0;
 
         const #vertex = 0;
         const #fragment = 0;
@@ -548,6 +367,10 @@ pub fn compile(config: &Config) -> String {
     resolver.add_module(
         "package::render".parse().unwrap(),
         Cow::Borrowed(include_str!("../../../shaders/render.wesl")),
+    );
+    resolver.add_module(
+        "package::render::lighting".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/render/lighting.wesl")),
     );
     resolver.add_module(
         "package::render::fog".parse().unwrap(),

@@ -1,3 +1,5 @@
+import package::common;
+
 alias Format = u32;
 
 const FMT_Z4: Format = 0x0;
@@ -9,8 +11,6 @@ const FMT_Z8M: Format = 0x9;
 const FMT_Z8L: Format = 0xA;
 const FMT_Z16A: Format = 0xB;
 const FMT_Z16B: Format = 0xC;
-
-const DEPTH_MAX: f32 = 16777215.0;
 
 @group(0) @binding(0) var depth_texture: texture_2d<f32>;
 @group(0) @binding(1) var color_texture: texture_storage_2d<rgba8unorm, write>;
@@ -24,7 +24,7 @@ fn render(@builtin(global_invocation_id) global_id: vec3u) {
     }
     
     let coords = global_id.xy;
-    let depth = u32(textureLoad(depth_texture, coords, 0).r * DEPTH_MAX);
+    let depth = u32(textureLoad(depth_texture, coords, 0).r * f32(common::DEPTH_MAX));
     
     // swizzle to bgra because r should be most significant byte, not least
     let bytes = unpack4xU8(depth).bgra;

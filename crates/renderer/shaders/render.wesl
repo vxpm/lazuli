@@ -21,8 +21,8 @@ struct Channel {
     material_from_vertex: u32,
     ambient_from_vertex: u32,
     lighting_enabled: u32,
-    diffuse_attenuation: u32,
-    attenuation: u32,
+    diffuse_atten: u32,
+    atten: u32,
     specular: u32,
     light_mask: array<u32, 8>,
 }
