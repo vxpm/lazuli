@@ -217,7 +217,7 @@ pub enum DiffuseAttenuation {
     One            = 0b00,
     Compute        = 0b01,
     ComputeClamped = 0b10,
-    Reserved0      = 0b011,
+    Reserved0      = 0b11,
 }
 
 #[bitos(32)]
@@ -232,9 +232,9 @@ pub struct Channel {
     #[bits(6)]
     pub ambient_from_vertex: bool,
     #[bits(7..9)]
-    pub diffuse_attenuation: DiffuseAttenuation,
+    pub diffuse_atten: DiffuseAttenuation,
     #[bits(9)]
-    pub attenuation: bool,
+    pub position_atten: bool,
     #[bits(10)]
     pub not_specular: bool,
     #[bits(11..15)]

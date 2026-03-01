@@ -1,18 +1,46 @@
 import package::common;
 import package::render;
 
+fn channel_material_from_vertex(channel: u32) -> bool {
+    return common::get_bit(channel, 0u);
+}
+
+fn channel_ambient_from_vertex(channel: u32) -> bool {
+    return common::get_bit(channel, 1u);
+}
+
+fn channel_lighting_enabled(channel: u32) -> bool {
+    return common::get_bit(channel, 2u);
+}
+
+fn channel_diffuse_atten(channel: u32) -> u32 {
+    return extractBits(channel, 3u, 2u);
+}
+
+fn channel_position_atten(channel: u32) -> bool {
+    return common::get_bit(channel, 5u);
+}
+
+fn channel_specular(channel: u32) -> bool {
+    return common::get_bit(channel, 6u);
+}
+
+fn channel_light_enabled(channel: u32, index: u32) -> bool {
+    return common::get_bit(channel, 7u + index);
+}
+
 // Computes the diffuse attenuation factor of a channel for a given light.
 fn diffuse_atten(mode: u32, light: render::Light, vertex_pos: vec3f, vertex_normal: vec3f) -> f32 {
     switch mode {
-        case 0, default: {
+        case 0u, default: {
             return 1f;
         }
-        case 1: {
+        case 1u: {
             let vertex_to_light = light.position - vertex_pos;
             let dot_product = dot(vertex_to_light, vertex_normal);
             return dot_product / length(vertex_to_light);
         }
-        case 2: {
+        case 2u: {
             let vertex_to_light = light.position - vertex_pos;
             let dot_product = dot(vertex_to_light, vertex_normal);
             return max(dot_product / length(vertex_to_light), 0f);
@@ -28,7 +56,7 @@ fn position_atten(specular: bool, light: render::Light, vertex_pos: vec3f, verte
         let norm_dot_l = dot(vertex_normal, l);
 
         var value = 0f;
-        if norm_dot_l > 0 {
+        if norm_dot_l > 0f {
             let norm_dot_h = dot(vertex_normal, h);
             value = max(norm_dot_h, 0f);
         }
@@ -56,34 +84,34 @@ fn color_channel(vertex_pos: vec3f, vertex_normal: vec3f, vertex_color: vec3f, i
 
     // get material color
     var material = config.material[index].rgb;
-    if channel.material_from_vertex != 0 {
+    if channel_material_from_vertex(channel) {
         material = vertex_color;
     }
 
     // if no lighting, return
-    if channel.lighting_enabled == 0 {
+    if !channel_lighting_enabled(channel) {
         return material;
     }
 
     // get ambient color
     var ambient = config.ambient[index].rgb;
-    if channel.ambient_from_vertex != 0 {
+    if channel_ambient_from_vertex(channel) {
         ambient = vertex_color;
     }
 
     // compute the light function
     var light_func = ambient;
-    for (var light_idx = 0; light_idx < 8; light_idx += 1) {
-        if channel.light_mask[light_idx] == 0 {
+    for (var light_idx = 0u; light_idx < 8u; light_idx += 1u) {
+        if !channel_light_enabled(channel, light_idx) {
             continue;
         }
 
         let light = config.lights[light_idx];
-        let diff_atten = diffuse_atten(channel.diffuse_atten, light, vertex_pos, vertex_normal);
+        let diff_atten = diffuse_atten(channel_diffuse_atten(channel), light, vertex_pos, vertex_normal);
 
         var pos_atten = 1f;
-        if channel.atten != 0 {
-            pos_atten = position_atten(channel.specular != 0, light, vertex_pos, vertex_normal);
+        if channel_position_atten(channel) {
+            pos_atten = position_atten(channel_specular(channel), light, vertex_pos, vertex_normal);
         }
 
         light_func += light.color.rgb * diff_atten * pos_atten;
@@ -97,34 +125,34 @@ fn alpha_channel(vertex_pos: vec3f, vertex_normal: vec3f, vertex_alpha: f32, ind
 
     // get material alpha
     var material = config.material[index].a;
-    if channel.material_from_vertex != 0 {
+    if channel_material_from_vertex(channel) {
         material = vertex_alpha;
     }
 
     // if no lighting, return
-    if channel.lighting_enabled == 0 {
+    if !channel_lighting_enabled(channel) {
         return material;
     }
 
     // get ambient alpha
     var ambient = config.ambient[index].a;
-    if channel.ambient_from_vertex != 0 {
+    if channel_ambient_from_vertex(channel) {
         ambient = vertex_alpha;
     }
 
     // compute the light function
     var light_func = ambient;
-    for (var light_idx = 0; light_idx < 8; light_idx += 1) {
-        if channel.light_mask[light_idx] == 0 {
+    for (var light_idx = 0u; light_idx < 8u; light_idx += 1u) {
+        if !channel_light_enabled(channel, light_idx) {
             continue;
         }
 
         let light = config.lights[light_idx];
-        let diff_atten = diffuse_atten(channel.diffuse_atten, light, vertex_pos, vertex_normal);
+        let diff_atten = diffuse_atten(channel_diffuse_atten(channel), light, vertex_pos, vertex_normal);
 
         var pos_atten: f32 = 1f;
-        if channel.atten != 0 {
-            pos_atten = position_atten(channel.specular != 0, light, vertex_pos, vertex_normal);
+        if channel_position_atten(channel) {
+            pos_atten = position_atten(channel_specular(channel), light, vertex_pos, vertex_normal);
         }
 
         light_func += light.color.a * diff_atten * pos_atten;

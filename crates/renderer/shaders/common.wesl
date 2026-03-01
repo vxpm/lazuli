@@ -24,3 +24,6 @@ fn vec4f_to_vec4u(value: vec4f) -> vec4u {
     );
 }
 
+fn get_bit(value: u32, index: u32) -> bool {
+    return (value & (1u << index)) != 0u;
+}

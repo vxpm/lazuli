@@ -15,6 +15,7 @@ wesl.workspace = true
 lazuli.workspace = true
 util.workspace = true
 
+bitos.workspace = true
 tracing.workspace = true
 wgpu.workspace = true
 zerocopy.workspace = true

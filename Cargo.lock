@@ -4173,6 +4173,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 name = "renderer"
 version = "0.1.0"
 dependencies = [
+ "bitos",
  "flume",
  "glam",
  "lazuli",

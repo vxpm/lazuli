@@ -1,7 +1,9 @@
 //! Data types used for CPU-GPU communication.
 
+use bitos::bitos;
 use glam::{Mat4, Vec2, Vec3};
 use lazuli::system::gx::color::Rgba;
+use lazuli::system::gx::xform::DiffuseAttenuation;
 use lazuli::system::gx::{tev, xform};
 use zerocopy::{Immutable, IntoBytes};
 
@@ -53,30 +55,37 @@ impl Light {
     }
 }
 
-#[derive(Debug, Clone, Immutable, IntoBytes, Default)]
-#[repr(C)]
+#[bitos(32)]
+#[derive(Debug, Clone, Default)]
 pub struct Channel {
-    pub material_from_vertex: u32,
-    pub ambient_from_vertex: u32,
-    pub lighting_enabled: u32,
-    pub diffuse_attenuation: u32,
-    pub attenuation: u32,
-    pub specular: u32,
-    pub light_mask: [u32; 8],
+    #[bits(0)]
+    pub material_from_vertex: bool,
+    #[bits(1)]
+    pub ambient_from_vertex: bool,
+    #[bits(2)]
+    pub lighting_enabled: bool,
+    #[bits(3..5)]
+    pub diffuse_atten: DiffuseAttenuation,
+    #[bits(5)]
+    pub position_atten: bool,
+    #[bits(6)]
+    pub specular: bool,
+    #[bits(7..15)]
+    pub light_mask: [bool; 8],
 }
 
 impl Channel {
     pub fn update(&mut self, channel: xform::Channel) {
-        self.material_from_vertex = channel.material_from_vertex() as u32;
-        self.ambient_from_vertex = channel.ambient_from_vertex() as u32;
-        self.lighting_enabled = channel.lighting_enabled() as u32;
-        self.diffuse_attenuation = channel.diffuse_attenuation() as u32;
-        self.attenuation = channel.attenuation() as u32;
-        self.specular = !channel.not_specular() as u32;
+        self.set_material_from_vertex(channel.material_from_vertex());
+        self.set_ambient_from_vertex(channel.ambient_from_vertex());
+        self.set_lighting_enabled(channel.lighting_enabled());
+        self.set_diffuse_atten(channel.diffuse_atten());
+        self.set_position_atten(channel.position_atten());
+        self.set_specular(!channel.not_specular());
 
         let a = channel.lights0to3();
         let b = channel.lights4to7();
-        self.light_mask = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]].map(|b| b as u32);
+        self.set_light_mask([a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]]);
     }
 }
 
