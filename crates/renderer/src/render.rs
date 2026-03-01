@@ -299,6 +299,13 @@ impl Renderer {
         idx as u32
     }
 
+    fn insert_matrix(&mut self, matrix: Mat4) -> u32 {
+        let idx = self.matrices.len();
+        self.matrices.push(matrix);
+
+        idx as u32
+    }
+
     fn apply_scissor_and_viewport(&mut self) {
         let (scissor_x, scissor_y) = self.scissor.top_left();
         let (scissor_width, scissor_height) = self.scissor.dimensions();
@@ -356,12 +363,12 @@ impl Renderer {
 
     fn set_constant_alpha_mode(&mut self, mode: ConstantAlpha) {
         self.debug(format!("set constant alpha mode to {mode:?}"));
-        self.current_config.constant_alpha = if mode.enabled() {
-            mode.value() as u32
-        } else {
-            u32::MAX
-        };
-        self.current_config_dirty = true;
+
+        self.pipeline_config.shader.texenv.constant_alpha = mode.enabled();
+        if mode.enabled() {
+            self.current_config.constant_alpha = mode.value() as u32;
+            self.current_config_dirty = true;
+        }
     }
 
     fn set_ambient(&mut self, idx: u8, color: Rgba) {
@@ -411,10 +418,9 @@ impl Renderer {
     fn create_matrix_indices(&mut self, matrices: &[(MatrixId, Mat4)]) -> Vec<(MatrixId, u32)> {
         let mut indices = Vec::with_capacity(matrices.len());
 
-        for (id, mat) in matrices.iter().copied() {
-            let idx = self.matrices.len();
-            self.matrices.push(mat);
-            indices.push((id, idx as u32));
+        for (id, mtx) in matrices.iter().copied() {
+            let idx = self.insert_matrix(mtx);
+            indices.push((id, idx));
         }
 
         indices

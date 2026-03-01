@@ -111,6 +111,7 @@ pub struct TexEnvConfig {
     pub alpha_test: AlphaTestConfig,
     pub depth_tex: tev::depth::Texture,
     pub fog: FogConfig,
+    pub constant_alpha: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -322,11 +323,12 @@ fn fragment_stage(texenv: &TexEnvConfig) -> wesl::syntax::GlobalDeclaration {
 
             var out: render::FragmentOutput;
             out.blend = vec4f(regs[last_color_output].rgb, regs[last_alpha_output].a);
-            if config.constant_alpha < 256 {
-                out.color = vec4f(regs[last_color_output].rgb, f32(config.constant_alpha) / 255.0);
-            } else {
-                out.color = out.blend;
-            }
+
+            @if(constant_alpha)
+            out.color = vec4f(regs[last_color_output].rgb, f32(config.constant_alpha) / 255.0);
+
+            @if(!constant_alpha)
+            out.color = out.blend;
 
             var frag_depth = in.clip.z;
             @#depth_texture {}
@@ -395,8 +397,9 @@ pub fn compile(config: &Config) -> String {
         _ => panic!("reserved depth tex mode"),
     };
 
-    wesl.set_feature("sample_shading", config.texenv.alpha_test.is_noop());
+    wesl.set_feature("sample_shading", !config.texenv.alpha_test.is_noop());
     wesl.set_feature("frag_depth", needs_frag_depth);
+    wesl.set_feature("constant_alpha", config.texenv.constant_alpha);
 
     let compiled = match wesl.compile(&"package::main".parse().unwrap()) {
         Ok(ok) => ok,
