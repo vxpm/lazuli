@@ -1,7 +1,9 @@
 use lazuli::system::gx::xform::{TexGenInputKind, TexGenKind, TexGenOutputKind, TexGenSource};
-use wesl_quote::quote_expression;
+use wesl_quote::{quote_expression, quote_statement};
 
-pub fn get_source(source: TexGenSource, kind: TexGenKind) -> wesl::syntax::Expression {
+use crate::render::pipeline::shader::TexGenStageConfig;
+
+fn source(source: TexGenSource, kind: TexGenKind) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match source {
         TexGenSource::Position => quote_expression! { vertex.position },
@@ -25,53 +27,64 @@ pub fn get_source(source: TexGenSource, kind: TexGenKind) -> wesl::syntax::Expre
     }
 }
 
-pub fn get_input(
-    format: TexGenInputKind,
-    source: wesl::syntax::Expression,
-) -> wesl::syntax::Expression {
+fn input(format: TexGenInputKind) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match format {
-        TexGenInputKind::AB11 => quote_expression! { vec4f(#source.xy, 1.0, 1.0) },
-        TexGenInputKind::ABC1 => quote_expression! { vec4f(#source, 1.0) },
+        TexGenInputKind::AB11 => quote_expression! { vec4f(source.xy, 1.0, 1.0) },
+        TexGenInputKind::ABC1 => quote_expression! { vec4f(source, 1.0) },
     }
 }
 
-pub fn transform(kind: TexGenKind, input: wesl::syntax::Expression) -> wesl::syntax::Expression {
+fn transform(kind: TexGenKind) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match kind {
-        TexGenKind::Transform => quote_expression! { (matrix * #input).xyz },
+        TexGenKind::Transform => quote_expression! { (matrix * input).xyz },
         // TODO: terrible stub (emboss)
-        TexGenKind::Emboss => quote_expression! { (#input).xyz },
+        TexGenKind::Emboss => quote_expression! { (input).xyz },
         TexGenKind::ColorDiffuse | TexGenKind::ColorSpecular => quote_expression! {
-            render::concat_texgen_color(#input)
+            render::concat_texgen_color(input)
         },
     }
 }
 
-pub fn get_output(
-    format: TexGenOutputKind,
-    transformed: wesl::syntax::Expression,
-) -> wesl::syntax::Expression {
+fn output(format: TexGenOutputKind) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     match format {
-        TexGenOutputKind::Vec2 => quote_expression! { vec3f(#transformed.xy, 1.0) },
-        TexGenOutputKind::Vec3 => transformed,
+        TexGenOutputKind::Vec2 => quote_expression! { vec3f(transformed.xy, 1.0) },
+        TexGenOutputKind::Vec3 => quote_expression! { transformed },
     }
 }
 
-pub fn normalize(normalize: bool, output: wesl::syntax::Expression) -> wesl::syntax::Expression {
+fn normalize(normalize: bool) -> wesl::syntax::Expression {
     use wesl::syntax::*;
     if normalize {
-        quote_expression! { normalize(#output) }
+        quote_expression! { normalize(output) }
     } else {
-        output
+        quote_expression! { output }
     }
 }
 
-pub fn post_transform(
-    stage_index: u32,
-    normalized: wesl::syntax::Expression,
-) -> wesl::syntax::Expression {
+pub fn stage(stage: &TexGenStageConfig, index: u32) -> wesl::syntax::Statement {
     use wesl::syntax::*;
-    quote_expression! { (config.post_transform_mtx[#stage_index] * vec4f(#normalized, 1.0)).xyz }
+
+    let source = source(stage.base.source(), stage.base.kind());
+    let input = input(stage.base.input_kind());
+    let transformed = transform(stage.base.kind());
+    let output = output(stage.base.output_kind());
+    let normalized = normalize(stage.normalize);
+
+    quote_statement! {
+        {
+            let matrix = render::matrices[vertex.tex_coord_mtx_idx[#index]];
+            let post_matrix = config.post_transform_mtx[#index];
+
+            let source = #source;
+            let input = #input;
+            let transformed = #transformed;
+            let output = #output;
+            let normalized = #normalized;
+
+            tex_coords[#index] = (post_matrix * vec4f(normalized, 1.0)).xyz;
+        }
+    }
 }

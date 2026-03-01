@@ -137,20 +137,7 @@ fn vertex_stage(texgen: &TexGenConfig) -> wesl::syntax::GlobalDeclaration {
     let mut stages = vec![];
     for (index, stage) in texgen.stages.iter().enumerate() {
         let index = index as u32;
-
-        let source = texgen::get_source(stage.base.source(), stage.base.kind());
-        let input = texgen::get_input(stage.base.input_kind(), source);
-        let transformed = texgen::transform(stage.base.kind(), input);
-        let output = texgen::get_output(stage.base.output_kind(), transformed);
-        let normalized = texgen::normalize(stage.normalize, output);
-        let result = texgen::post_transform(index, normalized);
-
-        stages.push(wesl_quote::quote_statement! {
-            {
-                let matrix = render::matrices[vertex.tex_coord_mtx_idx[#index]];
-                tex_coords[#index] = #result;
-            }
-        });
+        stages.push(texgen::stage(stage, index));
     }
 
     stages.resize(16, wesl_quote::quote_statement!({}));

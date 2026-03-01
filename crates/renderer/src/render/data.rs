@@ -32,10 +32,10 @@ pub struct Vertex {
 pub struct Light {
     pub color: Rgba,
 
-    pub cos_attenuation: Vec3,
+    pub cos_atten: Vec3,
     pub _pad0: u32,
 
-    pub dist_attenuation: Vec3,
+    pub dist_atten: Vec3,
     pub _pad1: u32,
 
     pub position: Vec3,
@@ -48,8 +48,8 @@ pub struct Light {
 impl Light {
     pub fn update(&mut self, light: xform::Light) {
         self.color = light.color.into();
-        self.cos_attenuation = light.cos_attenuation;
-        self.dist_attenuation = light.dist_attenuation;
+        self.cos_atten = light.cos_atten;
+        self.dist_atten = light.dist_atten;
         self.position = light.position;
         self.direction = light.direction;
     }

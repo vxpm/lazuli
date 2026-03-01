@@ -205,8 +205,8 @@ pub struct TexGen {
 #[repr(C)]
 pub struct Light {
     pub color: Abgr8,
-    pub cos_attenuation: Vec3,
-    pub dist_attenuation: Vec3,
+    pub cos_atten: Vec3,
+    pub dist_atten: Vec3,
     pub position: Vec3,
     pub direction: Vec3,
 }
