@@ -1,6 +1,6 @@
 //! Renderer module interface.
 
-use color::{Abgr8, Rgba, Rgba16};
+use color::{Abgr8, Rgba, Rgba8, Rgba16};
 use glam::Mat4;
 use oneshot::Sender;
 use ordered_float::OrderedFloat;
@@ -10,7 +10,8 @@ use crate::system::gx::pix::{
     BlendMode, BufferFormat, ColorCopyFormat, ConstantAlpha, CopyDims, CopySrc, DepthCopyFormat,
     DepthMode, Scissor,
 };
-use crate::system::gx::xform::{BaseTexGen, ChannelControl, Light, ProjectionMat};
+use crate::system::gx::tev::Fog;
+use crate::system::gx::xform::{BaseTexGen, Channel, Light, ProjectionMtx};
 use crate::system::gx::{CullingMode, EFB_HEIGHT, EFB_WIDTH, Topology, VertexStream, tev, tex};
 use crate::system::vi::Dimensions;
 
@@ -65,7 +66,6 @@ pub struct TexEnvStage {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TexEnvConfig {
     pub stages: Vec<TexEnvStage>,
-    pub constants: [Rgba16; 4],
     pub depth_tex: tev::depth::Texture,
 }
 
@@ -97,6 +97,12 @@ impl std::hash::Hash for TexGenStage {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TexGenConfig {
     pub stages: Vec<TexGenStage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexEnvRegisters {
+    pub regs: [Rgba16; 4],
+    pub constants: [Rgba8; 4],
 }
 
 #[derive(Debug, Clone)]
@@ -164,7 +170,7 @@ pub type Texels = Vec<u32>;
 
 pub enum Action {
     SetXfbDimensions(Dimensions),
-    SetFramebufferFormat(BufferFormat),
+    SetEfbFormat(BufferFormat),
     SetViewport(Viewport),
     SetScissor(Scissor),
     SetCullingMode(CullingMode),
@@ -173,15 +179,17 @@ pub enum Action {
     SetDepthMode(DepthMode),
     SetBlendMode(BlendMode),
     SetConstantAlpha(ConstantAlpha),
-    SetAlphaFunction(tev::alpha::Function),
-    SetProjectionMatrix(ProjectionMat),
+    SetAlphaTest(tev::alpha::Test),
+    SetProjectionMatrix(ProjectionMtx),
     SetTexEnvConfig(TexEnvConfig),
     SetTexGenConfig(TexGenConfig),
+    SetTexEnvRegisters(TexEnvRegisters),
     SetAmbient(u8, Abgr8),
     SetMaterial(u8, Abgr8),
-    SetColorChannel(u8, ChannelControl),
-    SetAlphaChannel(u8, ChannelControl),
+    SetColorChannel(u8, Channel),
+    SetAlphaChannel(u8, Channel),
     SetLight(u8, Light),
+    SetFog(Fog),
     LoadTexture {
         texture: Texture,
         id: TextureId,

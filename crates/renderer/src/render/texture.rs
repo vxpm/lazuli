@@ -1,10 +1,11 @@
 use std::collections::hash_map::Entry;
 
-use lazuli::modules::render::{ClutData, ClutId, ClutRef, Texture, TextureId};
+use lazuli::modules::render::{ClutData, ClutId, ClutRef, Sampler, Scaling, Texture, TextureId};
 use lazuli::system::gx::color::Rgba8;
-use lazuli::system::gx::tex::{ClutFormat, TextureData};
+use lazuli::system::gx::tex::{ClutFormat, TextureData, WrapMode};
 use rustc_hash::FxHashMap;
 
+use crate::render::{Renderer, TexSlotConfig};
 /// Configuration of a processed texture.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TextureRef {
@@ -31,6 +32,7 @@ type TmemHigh = Box<[u16; TMEM_HIGH_LEN]>;
 pub struct Cache {
     tmem: TmemHigh,
     families: FxHashMap<TextureId, Family>,
+    samplers: FxHashMap<Sampler, wgpu::Sampler>,
 }
 
 impl Default for Cache {
@@ -38,11 +40,60 @@ impl Default for Cache {
         Self {
             tmem: util::boxed_array(0),
             families: Default::default(),
+            samplers: Default::default(),
         }
     }
 }
 
 impl Cache {
+    fn create_sampler(device: &wgpu::Device, sampler: Sampler) -> wgpu::Sampler {
+        let address_mode = |wrap| match wrap {
+            WrapMode::Clamp => wgpu::AddressMode::ClampToEdge,
+            WrapMode::Repeat => wgpu::AddressMode::Repeat,
+            WrapMode::Mirror => wgpu::AddressMode::MirrorRepeat,
+            _ => panic!("reserved wrap mode"),
+        };
+
+        let mag_filter = if sampler.mode.mag_linear() {
+            wgpu::FilterMode::Linear
+        } else {
+            wgpu::FilterMode::Nearest
+        };
+
+        let min_filter = if sampler.mode.min_filter().is_linear() {
+            wgpu::FilterMode::Linear
+        } else {
+            wgpu::FilterMode::Nearest
+        };
+
+        let anisotropy_clamp = if sampler.mode.mag_linear() && sampler.mode.min_filter().is_linear()
+        {
+            16
+        } else {
+            1
+        };
+
+        let label = format!(
+            "Sampler {:?}x{:?} (Mag {:?}, Min {:?})",
+            sampler.mode.wrap_u(),
+            sampler.mode.wrap_v(),
+            mag_filter,
+            min_filter,
+        );
+        device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some(&label),
+            address_mode_u: address_mode(sampler.mode.wrap_u()),
+            address_mode_v: address_mode(sampler.mode.wrap_v()),
+            mag_filter,
+            min_filter,
+            mipmap_filter: min_filter,
+            anisotropy_clamp,
+            lod_min_clamp: sampler.lods.min(),
+            lod_max_clamp: sampler.lods.max(),
+            ..Default::default()
+        })
+    }
+
     fn create_texture_data_indirect(
         indirect: &[u16],
         palette: &[u16],
@@ -70,6 +121,7 @@ impl Cache {
         queue: &wgpu::Queue,
         tmem: &mut TmemHigh,
         raw: &Texture,
+        id: TextureId,
         clut: ClutRef,
     ) -> wgpu::TextureView {
         let owned_data;
@@ -94,8 +146,20 @@ impl Cache {
             }
         };
 
+        let label = if raw.format.is_direct() {
+            format!(
+                "Texture {:08X} [{:?}] ({}x{})",
+                id.0, raw.format, raw.width, raw.height
+            )
+        } else {
+            format!(
+                "Texture {:08X}:{:04X} [{:?}:{:?}] ({}x{})",
+                id.0, clut.id.0, raw.format, clut.fmt, raw.width, raw.height
+            )
+        };
+
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
+            label: Some(&label),
             dimension: wgpu::TextureDimension::D2,
             size: wgpu::Extent3d {
                 width: raw.width,
@@ -167,7 +231,7 @@ impl Cache {
         }
     }
 
-    pub fn get(
+    pub fn get_texture(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -181,6 +245,7 @@ impl Cache {
                     queue,
                     &mut self.tmem,
                     family.raw.as_ref().unwrap(),
+                    tex.id,
                     tex.clut,
                 )
             }),
@@ -192,12 +257,23 @@ impl Cache {
                         queue,
                         &mut self.tmem,
                         family.raw.as_ref().unwrap(),
+                        tex.id,
                         tex.clut,
                     );
 
                     v.insert(texture)
                 }
             },
+        }
+    }
+
+    pub fn get_sampler(&mut self, device: &wgpu::Device, sampler: Sampler) -> &wgpu::Sampler {
+        match self.samplers.entry(sampler) {
+            Entry::Occupied(o) => o.into_mut(),
+            Entry::Vacant(v) => {
+                let s = Self::create_sampler(device, sampler);
+                v.insert(s)
+            }
         }
     }
 
@@ -209,5 +285,37 @@ impl Cache {
                 processed: Processed::Direct(Some(tex)),
             },
         );
+    }
+}
+
+impl Renderer {
+    pub fn load_texture(&mut self, id: TextureId, texture: Texture) {
+        self.texture_cache.update_raw(id, texture);
+    }
+
+    pub fn load_clut(&mut self, id: ClutId, clut: ClutData) {
+        self.texture_cache.update_clut(id, clut);
+    }
+
+    pub fn set_texture_slot(
+        &mut self,
+        slot: usize,
+        id: TextureId,
+        clut: ClutRef,
+        sampler: Sampler,
+        scaling: Scaling,
+    ) {
+        let config = TexSlotConfig {
+            texture: TextureRef { id, clut },
+            sampler,
+            scaling,
+        };
+
+        if self.tex_slots[slot] == config {
+            return;
+        }
+
+        self.flush(format_args!("texture slot changed"));
+        self.tex_slots[slot] = config;
     }
 }

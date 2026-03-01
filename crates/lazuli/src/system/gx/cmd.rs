@@ -258,10 +258,10 @@ impl Fifo {
 pub struct VertexDescriptor {
     /// Whether the position/normal matrix index is present.
     #[bits(0)]
-    pub pos_mat_index: bool,
+    pub pos_mtx_index: bool,
     /// Whether the texture coordinate matrix N index is present.
     #[bits(1..9)]
-    pub tex_coord_mat_index: [bool; 8],
+    pub tex_coord_mtx_index: [bool; 8],
     /// Whether the position attribute is present.
     #[bits(9..11)]
     pub position: AttributeMode,
@@ -307,12 +307,12 @@ impl Internal {
         let vat = vat as usize;
 
         let mut size = 0;
-        if self.vertex_descriptor.pos_mat_index() {
+        if self.vertex_descriptor.pos_mtx_index() {
             size += 1;
         }
 
         for i in 0..8 {
-            if self.vertex_descriptor.tex_coord_mat_index_at(i).unwrap() {
+            if self.vertex_descriptor.tex_coord_mtx_index_at(i).unwrap() {
                 size += 1;
             }
         }

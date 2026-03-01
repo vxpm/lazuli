@@ -147,8 +147,8 @@ bitvec = "1.0"
 bytesize = "2"
 ciborium = "0.2"
 clap = { version = "4.5", features = ["derive"] }
-cranelift = { version = "0.128", features = ["frontend", "native"] }
-cranelift-codegen = { version = "0.128", default-features = false, features = [
+cranelift = { version = "0.129", features = ["frontend", "native"] }
+cranelift-codegen = { version = "0.129", default-features = false, features = [
     "std",
     "unwind",
     "host-arch",
@@ -161,7 +161,7 @@ indexmap = "2"
 insta = "1.46"
 libc = "0.2"
 nanorand = { version = "0.8", features = ["tls"], default-features = false }
-oneshot = { version = "0.1", default-features = false, features = ["std"] }
+oneshot = { version = "0.2", default-features = false, features = ["std"] }
 ordered-float = "5"
 powerpc = "0.4"
 ring-arena = { git = "https://github.com/vxpm/ring-arena.git" }
@@ -169,7 +169,7 @@ rustc-hash = "2"
 seq-macro = "0.3"
 serde = { version = "1", features = ["derive"] }
 static_assertions = "1.1"
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 tinyvec = { version = "1.10", features = ["alloc"] }
 tracing = { version = "0.1", default-features = false, features = [
     "std",

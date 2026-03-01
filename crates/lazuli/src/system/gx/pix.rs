@@ -387,19 +387,24 @@ impl Scissor {
 }
 
 #[derive(Debug, Default)]
+pub struct FramebufferCopy {
+    pub src: CopySrc,
+    pub dst: Address,
+    pub dims: CopyDims,
+    pub stride: u32,
+    pub clear_color: Abgr8,
+    pub clear_depth: u32,
+}
+
+#[derive(Debug, Default)]
 pub struct Interface {
     pub control: Control,
     pub interrupt: InterruptStatus,
     pub constant_alpha: ConstantAlpha,
-    pub copy_src: CopySrc,
-    pub copy_dst: Address,
-    pub copy_dims: CopyDims,
-    pub copy_stride: u32,
-    pub clear_color: Abgr8,
-    pub clear_depth: u32,
     pub depth_mode: DepthMode,
     pub blend_mode: BlendMode,
     pub scissor: Scissor,
+    pub copy: FramebufferCopy,
     pub token: u32,
 }
 

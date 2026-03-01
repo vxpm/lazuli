@@ -414,7 +414,7 @@ fn main() -> Result<()> {
     let _tracing_guard = setup_tracing();
     let cfg = cli::Config::parse();
 
-    let device_descriptor = Arc::new(|adapter: &wgpu::Adapter| {
+    let device_descriptor = Arc::new(move |adapter: &wgpu::Adapter| {
         let info = adapter.get_info();
 
         let mut required_features = wgpu::Features::empty();
@@ -423,10 +423,12 @@ fn main() -> Result<()> {
         required_features |= wgpu::Features::PUSH_CONSTANTS;
         required_features |= wgpu::Features::CLEAR_TEXTURE;
 
-        if matches!(
-            info.device_type,
-            wgpu::DeviceType::IntegratedGpu | wgpu::DeviceType::Cpu
-        ) {
+        if cfg.mappable_vram
+            || matches!(
+                info.device_type,
+                wgpu::DeviceType::IntegratedGpu | wgpu::DeviceType::Cpu
+            )
+        {
             required_features |= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS;
         }
 

@@ -1,383 +1,143 @@
 mod texenv;
 mod texgen;
 
-use lazuli::system::gx::tev;
+use std::borrow::Cow;
+
+use lazuli::modules::render::TexEnvStage;
+use lazuli::system::gx::tev::{self, FogMode};
+use lazuli::system::gx::xform::BaseTexGen;
 use wesl::{VirtualResolver, Wesl};
-use wesl_quote::quote_declaration;
 
-use crate::render::pipeline::ShaderSettings;
-use crate::render::pipeline::settings::{TexEnvSettings, TexGenSettings};
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AlphaComparisonValue {
+    False,
+    True,
+    Unknown,
+}
 
-fn base_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
-    use wesl::syntax::*;
-
-    let interpolate = if settings.texenv.alpha_func.is_noop() {
-        InterpolateAttribute {
-            ty: InterpolationType::Perspective,
-            sampling: Some(InterpolationSampling::Centroid),
-        }
-    } else {
-        // although not needed, drastically improves the quality of alpha testing
-        InterpolateAttribute {
-            ty: InterpolationType::Perspective,
-            sampling: Some(InterpolationSampling::Sample),
-        }
-    };
-
-    let has_frag_depth = match settings.texenv.depth_tex.mode.op() {
-        tev::depth::Op::Disabled => false,
-        tev::depth::Op::Add | tev::depth::Op::Replace => true,
-        _ => panic!("reserved depth tex mode"),
-    };
-
-    let fragment_out_struct = if has_frag_depth {
-        quote_declaration! {
-            struct FragmentOutput {
-                @location(0) @blend_src(0) color: vec4f,
-                @location(0) @blend_src(1) blend: vec4f,
-                @builtin(frag_depth) depth: f32,
-            }
-        }
-    } else {
-        quote_declaration! {
-            struct FragmentOutput {
-                @location(0) @blend_src(0) color: vec4f,
-                @location(0) @blend_src(1) blend: vec4f,
-            }
-        }
-    };
-
-    wesl_quote::quote_module! {
-        alias MtxIdx = u32;
-
-        const DEPTH_MAX: u32 = (1 << 24) - 1;
-        const PLACEHOLDER_RGB: vec3f = vec3f(1.0, 0.0, 0.8627);
-        const PLACEHOLDER_RGBA: vec4f = vec4f(1.0, 0.0, 0.8627, 0.5);
-
-        struct Light {
-            color: vec4f,
-
-            cos_atten: vec3f,
-            _pad0: u32,
-
-            dist_atten: vec3f,
-            _pad1: u32,
-
-            position: vec3f,
-            _pad2: u32,
-
-            direction: vec3f,
-            _pad3: u32,
-        }
-
-        struct Channel {
-            material_from_vertex: u32,
-            ambient_from_vertex: u32,
-            lighting_enabled: u32,
-            diffuse_attenuation: u32,
-            attenuation: u32,
-            specular: u32,
-            light_mask: array<u32, 8>,
-        }
-
-        struct Config {
-            ambient: array<vec4f, 2>,
-            material: array<vec4f, 2>,
-            lights: array<Light, 8>,
-            color_channels: array<Channel, 2>,
-            alpha_channels: array<Channel, 2>,
-            consts: array<vec4f, 4>,
-            projection_mat: mat4x4f,
-            post_transform_mat: array<mat4x4f, 8>,
-            constant_alpha: u32,
-            alpha_refs: array<u32, 2>,
-            _pad0: u32,
-        }
-
-        // An input vertex
-        struct Vertex {
-            position: vec3f,
-            config_idx: u32,
-            normal: vec3f,
-            _pad0: u32,
-
-            position_mat: MtxIdx,
-            normal_mat: MtxIdx,
-            _pad1: u32,
-            _pad2: u32,
-
-            chan0: vec4f,
-            chan1: vec4f,
-
-            tex_coord: array<vec2f, 8>,
-            tex_coord_mat: array<MtxIdx, 8>,
-        };
-
-        // Data group
-        @group(0) @binding(0) var<storage> vertices: array<Vertex>;
-        @group(0) @binding(1) var<storage> matrices: array<mat4x4f>;
-        @group(0) @binding(2) var<storage> configs: array<Config>;
-
-        // Textures group
-        @group(1) @binding(0) var texture0: texture_2d<f32>;
-        @group(1) @binding(1) var sampler0: sampler;
-        @group(1) @binding(2) var texture1: texture_2d<f32>;
-        @group(1) @binding(3) var sampler1: sampler;
-        @group(1) @binding(4) var texture2: texture_2d<f32>;
-        @group(1) @binding(5) var sampler2: sampler;
-        @group(1) @binding(6) var texture3: texture_2d<f32>;
-        @group(1) @binding(7) var sampler3: sampler;
-
-        @group(1) @binding(8) var texture4: texture_2d<f32>;
-        @group(1) @binding(9) var sampler4: sampler;
-        @group(1) @binding(10) var texture5: texture_2d<f32>;
-        @group(1) @binding(11) var sampler5: sampler;
-        @group(1) @binding(12) var texture6: texture_2d<f32>;
-        @group(1) @binding(13) var sampler6: sampler;
-        @group(1) @binding(14) var texture7: texture_2d<f32>;
-        @group(1) @binding(15) var sampler7: sampler;
-
-        // Pipeline immediates
-        struct PipelineImmediates {
-            scaling: array<vec4f, 4>,
-            lodbias: array<vec4f, 2>,
-        }
-        var<push_constant> pipeline_immediates: PipelineImmediates;
-
-        // A vertex stage output
-        struct VertexOutput {
-            @builtin(position) clip: vec4f,
-            @location(0) config_idx: u32,
-            @#interpolate @location(1) chan0: vec4f,
-            @#interpolate @location(2) chan1: vec4f,
-            @#interpolate @location(3) tex_coord0: vec3f,
-            @#interpolate @location(4) tex_coord1: vec3f,
-            @#interpolate @location(5) tex_coord2: vec3f,
-            @#interpolate @location(6) tex_coord3: vec3f,
-            @#interpolate @location(7) tex_coord4: vec3f,
-            @#interpolate @location(8) tex_coord5: vec3f,
-            @#interpolate @location(9) tex_coord6: vec3f,
-            @#interpolate @location(10) tex_coord7: vec3f,
-        };
-
-        const #fragment_out_struct: u32 = 0;
-
-        fn vec4f_to_vec4u(value: vec4f) -> vec4u {
-            return vec4u(
-                u32(value.r * 255.0),
-                u32(value.g * 255.0),
-                u32(value.b * 255.0),
-                u32(value.a * 255.0),
-            );
-        }
-
-        fn concat_texgen_color(value: vec4f) -> vec3f {
-            let int = vec4f_to_vec4u(value);
-            let s = int.r;
-            // yagcd says to concat green and blue..?
-            let t = int.g;
-            return vec3f(f32(s) / 255, f32(t) / 255, 1.0);
+impl AlphaComparisonValue {
+    pub fn new(comparison: tev::alpha::Comparison) -> Self {
+        match comparison {
+            tev::alpha::Comparison::Never => Self::False,
+            tev::alpha::Comparison::Always => Self::True,
+            _ => Self::Unknown,
         }
     }
 }
 
-fn compute_channels() -> [wesl::syntax::GlobalDeclaration; 2] {
-    use wesl::syntax::*;
-    let color = wesl_quote::quote_declaration! {
-        fn compute_color_channel(vertex_pos: vec3f, vertex_normal: vec3f, vertex_color: vec3f, index: u32, config: base::Config) -> vec3f {
-            let channel = config.color_channels[index];
+impl std::ops::BitAnd for AlphaComparisonValue {
+    type Output = Self;
 
-            // get material color
-            var material = config.material[index].rgb;
-            if channel.material_from_vertex != 0 {
-                material = vertex_color;
-            }
-
-            // if no lighting, return
-            if channel.lighting_enabled == 0 {
-                return material;
-            }
-
-            // get ambient color
-            var ambient = config.ambient[index].rgb;
-            if channel.ambient_from_vertex != 0 {
-                ambient = vertex_color;
-            }
-
-            var light_func = ambient;
-            for (var light_idx = 0; light_idx < 8; light_idx += 1) {
-                if channel.light_mask[light_idx] == 0 {
-                    continue;
-                }
-
-                let light = config.lights[light_idx];
-
-                // compute diffuse attenuation
-                var diff_atten: f32;
-                switch channel.diffuse_attenuation {
-                    case 0: {
-                        diff_atten = 1.0;
-                    }
-                    case 1: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = dot_product / length(vertex_to_light);
-                    }
-                    case 2: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = max(dot_product / length(vertex_to_light), 0.0);
-                    }
-                    default: {}
-                }
-
-                // compute angle and distance attenuation
-                var atten: f32 = 1.0;
-                if channel.attenuation != 0 {
-                    if channel.specular == 0 {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let vertex_to_light_dir = normalize(vertex_to_light);
-
-                        let cos = max(dot(vertex_to_light_dir, light.direction), 0.0);
-                        let dist = length(vertex_to_light);
-
-                        let ang_atten = max(light.cos_atten.x + cos * light.cos_atten.y + cos * cos * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + dist * light.dist_atten.y + dist * dist * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    } else {
-                        let l = normalize(light.position);
-                        let h = light.direction;
-                        let norm_dot_l = dot(vertex_normal, l);
-
-                        var value = 0.0;
-                        if norm_dot_l > 0 {
-                            let norm_dot_h = dot(vertex_normal, h);
-                            value = max(norm_dot_h, 0.0);
-                        }
-
-                        let ang_atten = max(light.cos_atten.x + value * light.cos_atten.y + value * value * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + value * light.dist_atten.y + value * value * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    }
-                }
-
-                light_func += light.color.rgb * diff_atten * atten;
-            }
-
-            return material * clamp(light_func, vec3f(0.0), vec3f(1.0));
+    fn bitand(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::True, Self::True) => Self::True,
+            (Self::False, _) => Self::False,
+            (_, Self::False) => Self::False,
+            _ => Self::Unknown,
         }
-    };
-
-    let alpha = wesl_quote::quote_declaration! {
-        fn compute_alpha_channel(vertex_pos: vec3f, vertex_normal: vec3f, vertex_alpha: f32, index: u32, config: base::Config) -> f32 {
-            let channel = config.alpha_channels[index];
-
-            // get material alpha
-            var material = config.material[index].a;
-            if channel.material_from_vertex != 0 {
-                material = vertex_alpha;
-            }
-
-            // if no lighting, return
-            if channel.lighting_enabled == 0 {
-                return material;
-            }
-
-            // get ambient alpha
-            var ambient = config.ambient[index].a;
-            if channel.ambient_from_vertex != 0 {
-                ambient = vertex_alpha;
-            }
-
-            var light_func = ambient;
-            for (var light_idx = 0; light_idx < 8; light_idx += 1) {
-                if channel.light_mask[light_idx] == 0 {
-                    continue;
-                }
-
-                let light = config.lights[light_idx];
-
-                // compute diffuse attenuation
-                var diff_atten: f32;
-                switch channel.diffuse_attenuation {
-                    case 0: {
-                        diff_atten = 1.0;
-                    }
-                    case 1: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = dot_product / length(vertex_to_light);
-                    }
-                    case 2: {
-                        let vertex_to_light = light.position - vertex_pos;
-                        let dot_product = dot(vertex_to_light, vertex_normal);
-                        diff_atten = max(dot_product / length(vertex_to_light), 0.0);
-                    }
-                    default: {}
-                }
-
-                // compute angle and distance attenuation
-                var atten: f32 = 1.0;
-                if channel.attenuation != 0 {
-                    if channel.specular == 0 {
-                        let l = light.position - vertex_pos;
-                        let cos = max(dot(normalize(l), light.direction), 0.0);
-                        let dist = length(l);
-
-                        let ang_atten = max(light.cos_atten.x + cos * light.cos_atten.y + cos * cos * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + dist * light.dist_atten.y + dist * dist * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    } else {
-                        let l = normalize(light.position);
-                        let h = light.direction;
-                        let norm_dot_l = dot(vertex_normal, l);
-
-                        var value = 0.0;
-                        if norm_dot_l > 0 {
-                            let norm_dot_h = dot(vertex_normal, h);
-                            value = max(norm_dot_h, 0.0);
-                        }
-
-                        let ang_atten = max(light.cos_atten.x + value * light.cos_atten.y + value * value * light.cos_atten.z, 0.0);
-                        let dist_atten = light.dist_atten.x + value * light.dist_atten.y + value * value * light.dist_atten.z;
-
-                        atten = ang_atten / dist_atten;
-                    }
-                }
-
-                light_func += light.color.a * diff_atten * atten;
-            }
-
-            return material * clamp(light_func, 0.0, 1.0);
-        }
-    };
-
-    [color, alpha]
+    }
 }
 
-fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
+impl std::ops::BitOr for AlphaComparisonValue {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::True, _) => Self::True,
+            (_, Self::True) => Self::True,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::ops::BitXor for AlphaComparisonValue {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::True, Self::False) => Self::True,
+            (Self::False, Self::True) => Self::True,
+            (Self::True, Self::True) => Self::False,
+            (Self::False, Self::False) => Self::False,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::ops::Not for AlphaComparisonValue {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::False => Self::True,
+            Self::True => Self::False,
+            Self::Unknown => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct AlphaTestConfig {
+    pub comparison: [tev::alpha::Comparison; 2],
+    pub logic: tev::alpha::ComparisonLogic,
+}
+
+impl AlphaTestConfig {
+    /// Returns whether this configuration is trivially passable (i.e. never discards).
+    pub fn is_noop(&self) -> bool {
+        let lhs = AlphaComparisonValue::new(self.comparison[0]);
+        let rhs = AlphaComparisonValue::new(self.comparison[1]);
+
+        let result = match self.logic {
+            tev::alpha::ComparisonLogic::And => lhs & rhs,
+            tev::alpha::ComparisonLogic::Or => lhs | rhs,
+            tev::alpha::ComparisonLogic::Xor => lhs ^ rhs,
+            tev::alpha::ComparisonLogic::Xnor => !(lhs ^ rhs),
+        };
+
+        result == AlphaComparisonValue::True
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct FogConfig {
+    pub mode: FogMode,
+    pub orthographic: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexEnvConfig {
+    pub stages: Vec<TexEnvStage>,
+    pub alpha_test: AlphaTestConfig,
+    pub depth_tex: tev::depth::Texture,
+    pub fog: FogConfig,
+    pub constant_alpha: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexGenStageConfig {
+    pub base: BaseTexGen,
+    pub normalize: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct TexGenConfig {
+    pub stages: Vec<TexGenStageConfig>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
+pub struct Config {
+    pub texenv: TexEnvConfig,
+    pub texgen: TexGenConfig,
+}
+
+fn vertex_stage(texgen: &TexGenConfig) -> wesl::syntax::GlobalDeclaration {
     use wesl::syntax::*;
 
     let mut stages = vec![];
     for (index, stage) in texgen.stages.iter().enumerate() {
         let index = index as u32;
-
-        let source = texgen::get_source(stage.base.source(), stage.base.kind());
-        let input = texgen::get_input(stage.base.input_kind(), source);
-        let transformed = texgen::transform(stage.base.kind(), input);
-        let output = texgen::get_output(stage.base.output_kind(), transformed);
-        let normalized = texgen::normalize(stage.normalize, output);
-        let result = texgen::post_transform(index, normalized);
-
-        stages.push(wesl_quote::quote_statement! {
-            {
-                let matrix = base::matrices[vertex.tex_coord_mat[#index]];
-                tex_coords[#index] = #result;
-            }
-        });
+        stages.push(texgen::stage(stage, index));
     }
 
     stages.resize(16, wesl_quote::quote_statement!({}));
@@ -421,19 +181,19 @@ fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
 
     wesl_quote::quote_declaration! {
         @vertex
-        fn vs_main(@builtin(vertex_index) index: u32) -> base::VertexOutput {
-            var out: base::VertexOutput;
+        fn vs_main(@builtin(vertex_index) index: u32) -> render::VertexOutput {
+            var out: render::VertexOutput;
 
-            let vertex = base::vertices[index];
-            let config = base::configs[vertex.config_idx];
+            let vertex = render::vertices[index];
+            let config = render::configs[vertex.config_idx];
             out.config_idx = vertex.config_idx;
 
             let vertex_local_pos = vec4f(vertex.position, 1.0);
-            let vertex_world_pos = base::matrices[vertex.position_mat] * vertex_local_pos;
-            var vertex_view_pos = config.projection_mat * vertex_world_pos;
+            let vertex_world_pos = render::matrices[vertex.position_mtx_idx] * vertex_local_pos;
+            var vertex_view_pos = config.projection_mtx * vertex_world_pos;
 
             let vertex_local_norm = vec4f(vertex.normal, 0.0);
-            let vertex_world_norm = normalize((base::matrices[vertex.normal_mat] * vertex_local_norm).xyz);
+            let vertex_world_norm = normalize((render::matrices[vertex.normal_mtx_idx] * vertex_local_norm).xyz);
 
             // GameCube's normalized device coordinates are -1.0..1.0 in x/y and -1.0..0.0 in z,
             // while wgpu's normalized device coordinates are -1.0..1.0 in x/y and 0.0..1.0 in z.
@@ -443,12 +203,12 @@ fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
             out.clip.z += out.clip.w;
 
             out.chan0 = vec4f(
-                compute_color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.rgb, 0, config),
-                compute_alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.a, 0, config),
+                render::lighting::color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.rgb, 0, config),
+                render::lighting::alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.a, 0, config),
             );
             out.chan1 = vec4f(
-                compute_color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.rgb, 1, config),
-                compute_alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.a, 1, config),
+                render::lighting::color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.rgb, 1, config),
+                render::lighting::alpha_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan1.a, 1, config),
             );
 
             var tex_coords: array<vec3f, 8>;
@@ -468,23 +228,23 @@ fn vertex_stage(texgen: &TexGenSettings) -> wesl::syntax::GlobalDeclaration {
     }
 }
 
-fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
+fn fragment_stage(texenv: &TexEnvConfig) -> wesl::syntax::GlobalDeclaration {
     use wesl::syntax::*;
 
     let mut stages = vec![];
     for stage in texenv.stages.iter() {
-        let color_compute = texenv::color_stage(stage);
-        let alpha_compute = texenv::alpha_stage(stage);
+        let color = texenv::color::stage(stage);
+        let alpha = texenv::alpha::stage(stage);
 
         stages.push(wesl_quote::quote_statement! {
             {
-                @#color_compute {}
-                @#alpha_compute {}
+                @#color {}
+                @#alpha {}
             }
         });
     }
 
-    stages.resize(16, wesl_quote::quote_statement!({}));
+    stages.resize(16, Statement::Void);
     let [
         s0,
         s1,
@@ -523,28 +283,18 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
         @#s15 {}
     });
 
-    let alpha_comparison = texenv::get_alpha_comparison(&texenv.alpha_func);
-    let depth_texture = texenv::get_depth_texture(texenv);
+    let alpha_test = texenv::alpha::compute_test(&texenv.alpha_test);
+    let depth_texture = texenv::compute_depth_texture(texenv);
+    let fog = texenv::compute_fog(texenv);
 
     wesl_quote::quote_declaration! {
         @fragment
-        fn fs_main(in: base::VertexOutput) -> base::FragmentOutput {
-            const R0: u32 = 1;
-            const R1: u32 = 2;
-            const R2: u32 = 3;
-            const R3: u32 = 0;
-
-            let config = base::configs[in.config_idx];
-            var last_color_output = R3;
-            var last_alpha_output = R3;
-            var regs: array<vec4f, 4>;
-            var consts: array<vec4f, 4>;
-
-            consts[R0] = config.consts[0];
-            consts[R1] = config.consts[1];
-            consts[R2] = config.consts[2];
-            consts[R3] = config.consts[3];
-            regs = consts;
+        fn fs_main(in: render::VertexOutput) -> render::FragmentOutput {
+            let config = render::configs[in.config_idx];
+            var last_color_output = 3u;
+            var last_alpha_output = 3u;
+            var regs: array<vec4f, 4> = config.regs;
+            var consts: array<vec4f, 4> = config.consts;
 
             @#compute_stages {}
 
@@ -554,38 +304,38 @@ fn fragment_stage(texenv: &TexEnvSettings) -> wesl::syntax::GlobalDeclaration {
             let alpha_ref0 = f32(config.alpha_refs[0]) / 255.0;
             let alpha_ref1 = f32(config.alpha_refs[1]) / 255.0;
 
-            if !(#alpha_comparison) {
+            if !(#alpha_test) {
                 discard;
             }
 
-            var out: base::FragmentOutput;
+            var out: render::FragmentOutput;
             out.blend = vec4f(regs[last_color_output].rgb, regs[last_alpha_output].a);
-            if config.constant_alpha < 256 {
-                out.color = vec4f(regs[last_color_output].rgb, f32(config.constant_alpha) / 255.0);
-            } else {
-                out.color = out.blend;
-            }
 
+            @if(constant_alpha)
+            out.color = vec4f(regs[last_color_output].rgb, f32(config.constant_alpha) / 255.0);
+
+            @if(!constant_alpha)
+            out.color = out.blend;
+
+            var frag_depth = in.clip.z;
             @#depth_texture {}
+            @#fog {}
 
             return out;
         }
     }
 }
 
-fn main_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
+fn main_module(config: &Config) -> wesl::syntax::TranslationUnit {
     use wesl::syntax::*;
 
     let extensions = wesl_quote::quote_directive!(enable dual_source_blending;);
-    let [color_chan, alpha_chan] = compute_channels();
-    let vertex = vertex_stage(&settings.texgen);
-    let fragment = fragment_stage(&settings.texenv);
+    let vertex = vertex_stage(&config.texgen);
+    let fragment = fragment_stage(&config.texenv);
 
     let mut module = wesl_quote::quote_module! {
-        import package::base;
-
-        const #color_chan = 0;
-        const #alpha_chan = 0;
+        import package::common;
+        import package::render;
 
         const #vertex = 0;
         const #fragment = 0;
@@ -595,22 +345,48 @@ fn main_module(settings: &ShaderSettings) -> wesl::syntax::TranslationUnit {
     module
 }
 
-pub fn compile(settings: &ShaderSettings) -> String {
+pub fn compile(config: &Config) -> String {
     let mut resolver = VirtualResolver::new();
-    resolver.add_translation_unit("package::base".parse().unwrap(), base_module(settings));
-    resolver.add_translation_unit("package::main".parse().unwrap(), main_module(settings));
+    resolver.add_translation_unit("package::main".parse().unwrap(), main_module(config));
+    resolver.add_module(
+        "package::common".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/common.wesl")),
+    );
+
+    resolver.add_module(
+        "package::render".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/render.wesl")),
+    );
+    resolver.add_module(
+        "package::render::lighting".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/render/lighting.wesl")),
+    );
+    resolver.add_module(
+        "package::render::fog".parse().unwrap(),
+        Cow::Borrowed(include_str!("../../../shaders/render/fog.wesl")),
+    );
 
     let mut wesl = Wesl::new("shaders").set_custom_resolver(resolver);
     wesl.use_sourcemap(true);
     wesl.set_options(wesl::CompileOptions {
         imports: true,
-        condcomp: false,
+        condcomp: true,
         generics: false,
         strip: true,
         lower: true,
         validate: true,
         ..Default::default()
     });
+
+    let needs_frag_depth = match config.texenv.depth_tex.mode.op() {
+        tev::depth::Op::Disabled | tev::depth::Op::Add => false,
+        tev::depth::Op::Replace => true,
+        _ => panic!("reserved depth tex mode"),
+    };
+
+    wesl.set_feature("sample_shading", !config.texenv.alpha_test.is_noop());
+    wesl.set_feature("frag_depth", needs_frag_depth);
+    wesl.set_feature("constant_alpha", config.texenv.constant_alpha);
 
     let compiled = match wesl.compile(&"package::main".parse().unwrap()) {
         Ok(ok) => ok,

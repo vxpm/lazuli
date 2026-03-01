@@ -1,6 +1,6 @@
 use bitos::bitos;
 
-use crate::system::gx::tev::{Bias, CompareOp, CompareTarget, OutputDst, Scale};
+use crate::system::gx::tev::{Bias, ComparisonOp, ComparisonTarget, OutputDst, Scale};
 
 #[bitos(4)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,13 +62,13 @@ pub struct Stage {
     #[bits(18)]
     pub negate: bool,
     #[bits(18)]
-    pub compare_op: CompareOp,
+    pub comparison_op: ComparisonOp,
     #[bits(19)]
     pub clamp: bool,
     #[bits(20..22)]
     pub scale: Scale,
     #[bits(20..22)]
-    pub compare_target: CompareTarget,
+    pub comparison_target: ComparisonTarget,
     #[bits(22..24)]
     pub output: OutputDst,
 }
@@ -176,8 +176,8 @@ impl std::fmt::Debug for Stage {
             let b = self.input_b();
             let c = self.input_c();
             let d = self.input_d();
-            let op = self.compare_op();
-            let target = self.compare_target();
+            let op = self.comparison_op();
+            let target = self.comparison_target();
             let output = self.output();
 
             write!(

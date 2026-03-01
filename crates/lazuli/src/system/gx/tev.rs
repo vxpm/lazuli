@@ -3,13 +3,13 @@ pub mod alpha;
 pub mod color;
 pub mod depth;
 
-use ::color::Rgba16;
-use bitos::bitos;
-use bitos::integer::u3;
+use ::color::{Rgba8, Rgba16};
+use bitos::integer::{u3, u5, u11, u24};
+use bitos::{BitUtils, bitos};
 
 #[bitos(3)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Channel {
+pub enum InputChannel {
     Channel0            = 0x0,
     Channel1            = 0x1,
     Reserved0           = 0x2,
@@ -30,7 +30,7 @@ pub struct StageRefs {
     #[bits(6)]
     pub map_enable: bool,
     #[bits(7..10)]
-    pub channel: Channel,
+    pub input: InputChannel,
 }
 
 #[bitos(32)]
@@ -135,12 +135,12 @@ impl Scale {
 
 #[bitos(1)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompareOp {
+pub enum ComparisonOp {
     GreaterThan = 0b0,
     Equal       = 0b1,
 }
 
-impl std::fmt::Display for CompareOp {
+impl std::fmt::Display for ComparisonOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GreaterThan => f.write_str(">"),
@@ -151,7 +151,7 @@ impl std::fmt::Display for CompareOp {
 
 #[bitos(2)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompareTarget {
+pub enum ComparisonTarget {
     R8        = 0b00,
     GR16      = 0b01,
     BGR16     = 0b10,
@@ -167,21 +167,133 @@ pub enum OutputDst {
     R2 = 0b11,
 }
 
+impl OutputDst {
+    pub fn index(self) -> u32 {
+        match self {
+            Self::R3 => 3,
+            Self::R0 => 0,
+            Self::R1 => 1,
+            Self::R2 => 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct StageOps {
     pub color: color::Stage,
     pub alpha: alpha::Stage,
 }
 
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamA {
+    #[bits(0..11)]
+    pub mantissa: u11,
+    #[bits(11..19)]
+    pub exponent: u8,
+    #[bits(19)]
+    pub negative: bool,
+}
+
+impl FogParamA {
+    pub fn value(self) -> f32 {
+        let mut value = 0;
+        value.set_bits(23 - 11, 23, self.mantissa().value() as u32);
+        value.set_bits(23, 31, self.exponent() as u32);
+        value.set_bit(31, self.negative());
+
+        f32::from_bits(value)
+    }
+}
+
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamB0 {
+    #[bits(0..24)]
+    pub magnitude: u24,
+}
+
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamB1 {
+    #[bits(0..5)]
+    pub shift: u5,
+}
+
+#[bitos(3)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub enum FogMode {
+    #[default]
+    None               = 0x0,
+    Reserved0          = 0x1,
+    Linear             = 0x2,
+    Reserved1          = 0x3,
+    Exponential        = 0x4,
+    ExponentialSquared = 0x5,
+    InverseExponential = 0x6,
+    InverseExponentialSquared = 0x7,
+}
+
+#[bitos(32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FogParamC {
+    #[bits(0..11)]
+    pub mantissa: u11,
+    #[bits(11..19)]
+    pub exponent: u8,
+    #[bits(19)]
+    pub negative: bool,
+    #[bits(20)]
+    pub orthographic: bool,
+    #[bits(21..24)]
+    pub mode: FogMode,
+}
+
+impl FogParamC {
+    pub fn value(self) -> f32 {
+        let mut value = 0;
+        value.set_bits(23 - 11, 23, self.mantissa().value() as u32);
+        value.set_bits(23, 31, self.exponent() as u32);
+        value.set_bit(31, self.negative());
+
+        f32::from_bits(value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Fog {
+    pub a: FogParamA,
+    pub b0: FogParamB0,
+    pub b1: FogParamB1,
+    pub c: FogParamC,
+    pub color: Rgba8,
+}
+
+impl Fog {
+    pub fn value_a(&self) -> f32 {
+        self.a.value()
+    }
+
+    pub fn value_b(&self) -> f32 {
+        let mantissa = self.b0.magnitude().value() as f32 / (((1 << 23) - 1) as f32);
+        let exp = 2f32.powi(self.b1.shift().value() as i32 - 1);
+        mantissa * exp
+    }
+
+    pub fn value_c(&self) -> f32 {
+        self.c.value()
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Interface {
-    pub active_stages: u8,
-    pub active_channels: u8,
     pub stage_ops: [StageOps; 16],
     pub stage_refs: [StageRefsPair; 8],
     pub stage_consts: [StageConstsPair; 8],
-    pub constants: [Rgba16; 4],
-    pub alpha_func: alpha::Function,
+    pub regs: [Rgba16; 4],
+    pub consts: [Rgba16; 4],
+    pub alpha_test: alpha::Test,
     pub depth_tex: depth::Texture,
+    pub fog: Fog,
     pub stages_dirty: bool,
 }

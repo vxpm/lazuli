@@ -205,8 +205,8 @@ pub struct TexGen {
 #[repr(C)]
 pub struct Light {
     pub color: Abgr8,
-    pub cos_attenuation: Vec3,
-    pub dist_attenuation: Vec3,
+    pub cos_atten: Vec3,
+    pub dist_atten: Vec3,
     pub position: Vec3,
     pub direction: Vec3,
 }
@@ -217,12 +217,12 @@ pub enum DiffuseAttenuation {
     One            = 0b00,
     Compute        = 0b01,
     ComputeClamped = 0b10,
-    Reserved0      = 0b011,
+    Reserved0      = 0b11,
 }
 
 #[bitos(32)]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ChannelControl {
+pub struct Channel {
     #[bits(0)]
     pub material_from_vertex: bool,
     #[bits(1)]
@@ -232,9 +232,9 @@ pub struct ChannelControl {
     #[bits(6)]
     pub ambient_from_vertex: bool,
     #[bits(7..9)]
-    pub diffuse_attenuation: DiffuseAttenuation,
+    pub diffuse_atten: DiffuseAttenuation,
     #[bits(9)]
-    pub attenuation: bool,
+    pub position_atten: bool,
     #[bits(10)]
     pub not_specular: bool,
     #[bits(11..15)]
@@ -261,12 +261,12 @@ pub struct Viewport {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ProjectionMat {
+pub struct ProjectionMtx {
     pub params: [f32; 6],
     pub orthographic: bool,
 }
 
-impl ProjectionMat {
+impl ProjectionMtx {
     pub fn value(&self) -> Mat4 {
         let p = &self.params;
         if self.orthographic {
@@ -292,12 +292,12 @@ impl ProjectionMat {
 pub struct Internal {
     pub ambient: [Abgr8; 2],
     pub material: [Abgr8; 2],
-    pub color_control: [ChannelControl; 2],
-    pub alpha_control: [ChannelControl; 2],
+    pub color_control: [Channel; 2],
+    pub alpha_control: [Channel; 2],
     pub viewport: Viewport,
     pub viewport_dirty: bool,
     pub default_matrices: DefaultMatrices,
-    pub projection_mat: ProjectionMat,
+    pub projection_mtx: ProjectionMtx,
     pub texgen: [TexGen; 8],
     pub post_texgen: [PostTexGen; 8],
     pub active_texgens: u8,
@@ -353,7 +353,7 @@ impl Interface {
     /// Returns the projection matrix.
     #[inline]
     pub fn projection_matrix(&self) -> Mat4 {
-        self.internal.projection_mat.value()
+        self.internal.projection_mtx.value()
     }
 
     /// Returns the post matrix at `index` in internal memory.
@@ -441,25 +441,25 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
                 .exec(render::Action::SetMaterial(1, xf.material[1]));
         }
         Reg::ColorControl0 => {
-            xf.color_control[0] = ChannelControl::from_bits(value);
+            xf.color_control[0] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetColorChannel(0, xf.color_control[0]));
         }
         Reg::ColorControl1 => {
-            xf.color_control[1] = ChannelControl::from_bits(value);
+            xf.color_control[1] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetColorChannel(1, xf.color_control[1]));
         }
         Reg::AlphaControl0 => {
-            xf.alpha_control[0] = ChannelControl::from_bits(value);
+            xf.alpha_control[0] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetAlphaChannel(0, xf.alpha_control[0]));
         }
         Reg::AlphaControl1 => {
-            xf.alpha_control[1] = ChannelControl::from_bits(value);
+            xf.alpha_control[1] = Channel::from_bits(value);
             sys.modules
                 .render
                 .exec(render::Action::SetAlphaChannel(1, xf.alpha_control[1]));
@@ -474,13 +474,13 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         Reg::ViewportOffsetY => xf.viewport.center_y = f32::from_bits(value) - 342.0,
         Reg::ViewportOffsetZ => xf.viewport.far = f32::from_bits(value) / DEPTH_24_BIT_MAX as f32,
 
-        Reg::ProjectionParam0 => xf.projection_mat.params[0] = f32::from_bits(value),
-        Reg::ProjectionParam1 => xf.projection_mat.params[1] = f32::from_bits(value),
-        Reg::ProjectionParam2 => xf.projection_mat.params[2] = f32::from_bits(value),
-        Reg::ProjectionParam3 => xf.projection_mat.params[3] = f32::from_bits(value),
-        Reg::ProjectionParam4 => xf.projection_mat.params[4] = f32::from_bits(value),
-        Reg::ProjectionParam5 => xf.projection_mat.params[5] = f32::from_bits(value),
-        Reg::ProjectionOrthographic => xf.projection_mat.orthographic = value != 0,
+        Reg::ProjectionParam0 => xf.projection_mtx.params[0] = f32::from_bits(value),
+        Reg::ProjectionParam1 => xf.projection_mtx.params[1] = f32::from_bits(value),
+        Reg::ProjectionParam2 => xf.projection_mtx.params[2] = f32::from_bits(value),
+        Reg::ProjectionParam3 => xf.projection_mtx.params[3] = f32::from_bits(value),
+        Reg::ProjectionParam4 => xf.projection_mtx.params[4] = f32::from_bits(value),
+        Reg::ProjectionParam5 => xf.projection_mtx.params[5] = f32::from_bits(value),
+        Reg::ProjectionOrthographic => xf.projection_mtx.orthographic = value != 0,
 
         Reg::TexGenCount => xf.active_texgens = value as u8,
         Reg::TexGen0 => xf.texgen[0].base = BaseTexGen::from_bits(value),
@@ -513,7 +513,7 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
 
     if reg.is_projection_param() {
         sys.modules.render.exec(render::Action::SetProjectionMatrix(
-            sys.gpu.xform.internal.projection_mat,
+            sys.gpu.xform.internal.projection_mtx,
         ));
     }
 }

@@ -280,11 +280,7 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "C-unwind" fn write<P: Primitive>(
-        ctx: &mut Context,
-        addr: Address,
-        value: P,
-    ) -> bool {
+    extern "C-unwind" fn write<P: Primitive>(ctx: &mut Context, addr: Address, value: P) -> bool {
         if ctx.sys.write_slow(addr, value) {
             true
         } else {
@@ -440,7 +436,7 @@ const CTX_HOOKS: Hooks = {
     }
 
     extern "C-unwind" fn dec_changed(ctx: &mut Context) {
-        ctx.sys.lazy.last_updated_dec = ctx.sys.scheduler.elapsed_time_base();
+        ctx.sys.lazy.last_updated_dec = ctx.sys.scheduler.elapsed();
         ctx.sys.scheduler.cancel(System::decrementer_overflow);
 
         let dec = ctx.sys.cpu.supervisor.misc.dec;
@@ -501,16 +497,13 @@ const CTX_HOOKS: Hooks = {
 
         let invalidate_icache =
             transmute::<_, InvalidateICache>(invalidate_icache as extern "C-unwind" fn(_, _));
-        let clear_icache =
-            transmute::<_, GenericHook>(clear_icache as extern "C-unwind" fn(_));
+        let clear_icache = transmute::<_, GenericHook>(clear_icache as extern "C-unwind" fn(_));
         let dcache_dma = transmute::<_, GenericHook>(dcache_dma as extern "C-unwind" fn(_));
 
         let msr_changed = transmute::<_, GenericHook>(msr_changed as extern "C-unwind" fn(_));
 
-        let ibat_changed =
-            transmute::<_, GenericHook>(ibat_changed as extern "C-unwind" fn(_));
-        let dbat_changed =
-            transmute::<_, GenericHook>(dbat_changed as extern "C-unwind" fn(_));
+        let ibat_changed = transmute::<_, GenericHook>(ibat_changed as extern "C-unwind" fn(_));
+        let dbat_changed = transmute::<_, GenericHook>(dbat_changed as extern "C-unwind" fn(_));
 
         let tb_read = transmute::<_, GenericHook>(tb_read as extern "C-unwind" fn(_));
         let tb_changed = transmute::<_, GenericHook>(tb_changed as extern "C-unwind" fn(_));

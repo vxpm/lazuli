@@ -23,7 +23,12 @@ fn coord_int(
     let value = parser.bd.ins().load(ty, MEMFLAGS_READONLY, ptr, 0);
 
     // 02. byteswap and extend
-    let value = parser.bd.ins().bswap(value);
+    let value = if ty.bytes() == 1 {
+        value
+    } else {
+        parser.bd.ins().bswap(value)
+    };
+
     let value = if signed {
         parser.bd.ins().sextend(ir::types::I32, value)
     } else {

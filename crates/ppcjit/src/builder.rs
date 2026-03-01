@@ -202,21 +202,55 @@ impl<'ctx> BlockBuilder<'ctx> {
 
             follow_link_hook: builder.import_signature(Hooks::follow_link_sig(ptr_type, default)),
             try_link_hook: builder.import_signature(Hooks::try_link_sig(ptr_type, default)),
-            read_i8_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I8, default)),
-            read_i16_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I16, default)),
-            read_i32_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I32, default)),
-            read_i64_hook: builder.import_signature(Hooks::read_sig(ptr_type, ir::types::I64, default)),
-            write_i8_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I8, default)),
-            write_i16_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I16, default)),
-            write_i32_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I32, default)),
-            write_i64_hook: builder.import_signature(Hooks::write_sig(ptr_type, ir::types::I64, default)),
+            read_i8_hook: builder.import_signature(Hooks::read_sig(
+                ptr_type,
+                ir::types::I8,
+                default,
+            )),
+            read_i16_hook: builder.import_signature(Hooks::read_sig(
+                ptr_type,
+                ir::types::I16,
+                default,
+            )),
+            read_i32_hook: builder.import_signature(Hooks::read_sig(
+                ptr_type,
+                ir::types::I32,
+                default,
+            )),
+            read_i64_hook: builder.import_signature(Hooks::read_sig(
+                ptr_type,
+                ir::types::I64,
+                default,
+            )),
+            write_i8_hook: builder.import_signature(Hooks::write_sig(
+                ptr_type,
+                ir::types::I8,
+                default,
+            )),
+            write_i16_hook: builder.import_signature(Hooks::write_sig(
+                ptr_type,
+                ir::types::I16,
+                default,
+            )),
+            write_i32_hook: builder.import_signature(Hooks::write_sig(
+                ptr_type,
+                ir::types::I32,
+                default,
+            )),
+            write_i64_hook: builder.import_signature(Hooks::write_sig(
+                ptr_type,
+                ir::types::I64,
+                default,
+            )),
             read_quant_hook: builder.import_signature(Hooks::read_quantized_sig(ptr_type, default)),
-            write_quant_hook: builder.import_signature(Hooks::write_quantized_sig(ptr_type, default)),
+            write_quant_hook: builder
+                .import_signature(Hooks::write_quantized_sig(ptr_type, default)),
             invalidate_icache_hook: builder
                 .import_signature(Hooks::invalidate_icache_sig(ptr_type, default)),
             generic_hook: builder.import_signature(Hooks::generic_hook_sig(ptr_type, default)),
 
-            raise_exception: builder.import_signature(exception::raise_exception_sig(ptr_type, default)),
+            raise_exception: builder
+                .import_signature(exception::raise_exception_sig(ptr_type, default)),
         };
 
         let raise_exception = {
@@ -532,6 +566,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Fadds => self.fadds(ins),
             Opcode::Fcmpo => self.fcmpo(ins),
             Opcode::Fcmpu => self.fcmpu(ins),
+            Opcode::Fctiw => self.fctiw(ins),
             Opcode::Fctiwz => self.fctiwz(ins),
             Opcode::Fdiv => self.fdiv(ins),
             Opcode::Fdivs => self.fdivs(ins),
@@ -612,6 +647,9 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Oris => self.oris(ins),
             Opcode::PsAdd => self.ps_add(ins),
             Opcode::PsCmpo0 => self.ps_cmpo0(ins),
+            Opcode::PsCmpo1 => self.ps_cmpo1(ins),
+            Opcode::PsCmpu0 => self.ps_cmpu0(ins),
+            Opcode::PsCmpu1 => self.ps_cmpu1(ins),
             Opcode::PsDiv => self.ps_div(ins),
             Opcode::PsMadd => self.ps_madd(ins),
             Opcode::PsMadds0 => self.ps_madds0(ins),
@@ -630,6 +668,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::PsNmsub => self.ps_nmsub(ins),
             Opcode::PsRes => self.ps_res(ins),
             Opcode::PsRsqrte => self.ps_rsqrte(ins),
+            Opcode::PsSel => self.ps_sel(ins),
             Opcode::PsSub => self.ps_sub(ins),
             Opcode::PsSum0 => self.ps_sum0(ins),
             Opcode::PsSum1 => self.ps_sum1(ins),

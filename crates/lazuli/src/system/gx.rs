@@ -11,7 +11,7 @@ use std::sync::{LazyLock, Mutex};
 use bitos::integer::{UnsignedInt, u3, u4};
 use bitos::{BitUtils, TryBits, bitos};
 use bitvec::array::BitArray;
-use color::Rgba;
+use color::{Rgba, Rgba8};
 use gekko::Address;
 use glam::{Mat4, Vec2, Vec3};
 use ring_arena::{Handle, RingArena};
@@ -83,14 +83,14 @@ pub enum Reg {
     RasterSs1           = 0x26,
     RasterIRef          = 0x27,
 
-    TevRefs01           = 0x28,
-    TevRefs23           = 0x29,
-    TevRefs45           = 0x2A,
-    TevRefs67           = 0x2B,
-    TevRefs89           = 0x2C,
-    TevRefsAB           = 0x2D,
-    TevRefsCD           = 0x2E,
-    TevRefsEF           = 0x2F,
+    TevRefs0            = 0x28,
+    TevRefs1            = 0x29,
+    TevRefs2            = 0x2A,
+    TevRefs3            = 0x2B,
+    TevRefs4            = 0x2C,
+    TevRefs5            = 0x2D,
+    TevRefs6            = 0x2E,
+    TevRefs7            = 0x2F,
 
     TexScaleU0          = 0x30,
     TexScaleV0          = 0x31,
@@ -253,23 +253,23 @@ pub enum Reg {
     TevRangeAdj3        = 0xEC,
     TevRangeAdj4        = 0xED,
 
-    TevFog0             = 0xEE,
-    TevFog1             = 0xEF,
-    TevFog2             = 0xF0,
-    TevFog3             = 0xF1,
+    TevFogA             = 0xEE,
+    TevFogB0            = 0xEF,
+    TevFogB1            = 0xF0,
+    TevFogC             = 0xF1,
     TevFogColor         = 0xF2,
 
-    TevAlphaFunc        = 0xF3,
+    TevAlphaTest        = 0xF3,
     TevDepthTexBias     = 0xF4,
     TevDepthTexMode     = 0xF5,
-    TevKSel0            = 0xF6,
-    TevKSel1            = 0xF7,
-    TevKSel2            = 0xF8,
-    TevKSel3            = 0xF9,
-    TevKSel4            = 0xFA,
-    TevKSel5            = 0xFB,
-    TevKSel6            = 0xFC,
-    TevKSel7            = 0xFD,
+    TevConstSelect0     = 0xF6,
+    TevConstSelect1     = 0xF7,
+    TevConstSelect2     = 0xF8,
+    TevConstSelect3     = 0xF9,
+    TevConstSelect4     = 0xFA,
+    TevConstSelect5     = 0xFB,
+    TevConstSelect6     = 0xFC,
+    TevConstSelect7     = 0xFD,
 
     WriteMask           = 0xFE,
 }
@@ -299,42 +299,41 @@ impl Reg {
     }
 
     #[inline]
-    pub fn is_tev(&self) -> bool {
+    pub fn is_tev_stage(&self) -> bool {
+        seq! {
+            N in 0..16 {
+                match self {
+                    #(
+                          Self::TevColor~N
+                        | Self::TevAlpha~N
+                        => true,
+                    )*
+                    _ => false
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn is_tev_refs(&self) -> bool {
+        seq! {
+            N in 0..8 {
+                match self {
+                    #(
+                          Self::TevRefs~N
+                        => true,
+                    )*
+                    _ => false
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn is_tev_constant(&self) -> bool {
         matches!(
             self,
-            Self::TevColor0
-                | Self::TevAlpha0
-                | Self::TevColor1
-                | Self::TevAlpha1
-                | Self::TevColor2
-                | Self::TevAlpha2
-                | Self::TevColor3
-                | Self::TevAlpha3
-                | Self::TevColor4
-                | Self::TevAlpha4
-                | Self::TevColor5
-                | Self::TevAlpha5
-                | Self::TevColor6
-                | Self::TevAlpha6
-                | Self::TevColor7
-                | Self::TevAlpha7
-                | Self::TevColor8
-                | Self::TevAlpha8
-                | Self::TevColor9
-                | Self::TevAlpha9
-                | Self::TevColor10
-                | Self::TevAlpha10
-                | Self::TevColor11
-                | Self::TevAlpha11
-                | Self::TevColor12
-                | Self::TevAlpha12
-                | Self::TevColor13
-                | Self::TevAlpha13
-                | Self::TevColor14
-                | Self::TevAlpha14
-                | Self::TevColor15
-                | Self::TevAlpha15
-                | Self::TevConstant3AR
+            Self::TevConstant3AR
                 | Self::TevConstant3GB
                 | Self::TevConstant0AR
                 | Self::TevConstant0GB
@@ -342,17 +341,25 @@ impl Reg {
                 | Self::TevConstant1GB
                 | Self::TevConstant2AR
                 | Self::TevConstant2GB
-                | Self::TevKSel0
-                | Self::TevKSel1
-                | Self::TevKSel2
-                | Self::TevKSel3
-                | Self::TevKSel4
-                | Self::TevKSel5
-                | Self::TevKSel6
-                | Self::TevKSel7
-                | Self::TevDepthTexBias
-                | Self::TevDepthTexMode
+                | Self::TevConstSelect0
+                | Self::TevConstSelect1
+                | Self::TevConstSelect2
+                | Self::TevConstSelect3
+                | Self::TevConstSelect4
+                | Self::TevConstSelect5
+                | Self::TevConstSelect6
+                | Self::TevConstSelect7
         )
+    }
+
+    #[inline]
+    pub fn is_depth_tex(&self) -> bool {
+        matches!(self, Self::TevDepthTexBias | Self::TevDepthTexMode)
+    }
+
+    #[inline]
+    pub fn is_texenv(&self) -> bool {
+        self.is_tev_stage() || self.is_tev_refs() || self.is_tev_constant() || self.is_depth_tex()
     }
 
     #[inline]
@@ -368,6 +375,14 @@ impl Reg {
         matches!(
             self,
             Self::ScissorTopLeft | Self::ScissorBottomRight | Self::ScissorOffset
+        )
+    }
+
+    #[inline]
+    pub fn is_fog(&self) -> bool {
+        matches!(
+            self,
+            Self::TevFogA | Self::TevFogB0 | Self::TevFogB1 | Self::TevFogC | Self::TevFogColor
         )
     }
 }
@@ -410,6 +425,12 @@ pub struct GenMode {
     pub bumpmap_count: u3,
     #[bits(19)]
     pub z_freeze: bool,
+}
+
+impl GenMode {
+    pub fn active_stages(&self) -> u8 {
+        self.tev_stages_minus_one().value() + 1
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -573,7 +594,7 @@ pub fn update_texenv(sys: &mut System) {
         .env
         .stage_ops
         .iter()
-        .take(sys.gpu.env.active_stages as usize)
+        .take(sys.gpu.mode.active_stages() as usize)
         .cloned()
         .enumerate()
         .map(|(i, ops)| {
@@ -597,13 +618,26 @@ pub fn update_texenv(sys: &mut System) {
 
     let config = render::TexEnvConfig {
         stages,
-        constants: sys.gpu.env.constants,
         depth_tex: sys.gpu.env.depth_tex,
+    };
+
+    let registers = render::TexEnvRegisters {
+        regs: sys.gpu.env.regs,
+        constants: sys.gpu.env.consts.map(|x| Rgba8 {
+            r: x.r as u8,
+            g: x.g as u8,
+            b: x.b as u8,
+            a: x.a as u8,
+        }),
     };
 
     sys.modules
         .render
         .exec(render::Action::SetTexEnvConfig(config));
+
+    sys.modules
+        .render
+        .exec(render::Action::SetTexEnvRegisters(registers));
 }
 
 pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
@@ -624,26 +658,65 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         }};
     }
 
+    macro_rules! tev_color {
+        (gb $reg_index:expr, $const_index:expr) => {{
+            if mask != 0x00FF_FFFF {
+                todo!();
+            }
+
+            if value.bit(23) {
+                let b = value.bits(0, 8) as i16;
+                let g = value.bits(12, 20) as i16;
+                sys.gpu.env.consts[$const_index].b = b;
+                sys.gpu.env.consts[$const_index].g = g;
+            } else {
+                let b = ((value.bits(0, 11) as i16) << 5) >> 5;
+                let g = ((value.bits(12, 23) as i16) << 5) >> 5;
+                sys.gpu.env.regs[$reg_index].b = b;
+                sys.gpu.env.regs[$reg_index].g = g;
+            }
+        }};
+        (ar $reg_index:expr, $const_index:expr) => {{
+            if mask != 0x00FF_FFFF {
+                todo!();
+            }
+
+            if value.bit(23) {
+                let r = value.bits(0, 8) as i16;
+                let a = value.bits(12, 20) as i16;
+                sys.gpu.env.consts[$const_index].r = r;
+                sys.gpu.env.consts[$const_index].a = a;
+            } else {
+                let r = ((value.bits(0, 11) as i16) << 5) >> 5;
+                let a = ((value.bits(12, 23) as i16) << 5) >> 5;
+                sys.gpu.env.regs[$reg_index].r = r;
+                sys.gpu.env.regs[$reg_index].a = a;
+            }
+        }};
+    }
+
     match reg {
         Reg::GenMode => {
             write_masked!(sys.gpu.mode);
-            let mode = &sys.gpu.mode;
-            sys.gpu.env.active_stages = mode.tev_stages_minus_one().value() + 1;
-            sys.gpu.env.active_channels = mode.color_channels_count().value();
+            sys.gpu.env.stages_dirty = true;
+            sys.gpu.xform.internal.stages_dirty = true;
+            sys.modules
+                .render
+                .exec(render::Action::SetCullingMode(sys.gpu.mode.culling_mode()));
         }
 
         Reg::ScissorTopLeft => write_masked!(sys.gpu.pix.scissor.top_left),
         Reg::ScissorBottomRight => write_masked!(sys.gpu.pix.scissor.bottom_right),
         Reg::ScissorOffset => write_masked!(sys.gpu.pix.scissor.offset),
 
-        Reg::TevRefs01 => write_masked!(sys.gpu.env.stage_refs[0]),
-        Reg::TevRefs23 => write_masked!(sys.gpu.env.stage_refs[1]),
-        Reg::TevRefs45 => write_masked!(sys.gpu.env.stage_refs[2]),
-        Reg::TevRefs67 => write_masked!(sys.gpu.env.stage_refs[3]),
-        Reg::TevRefs89 => write_masked!(sys.gpu.env.stage_refs[4]),
-        Reg::TevRefsAB => write_masked!(sys.gpu.env.stage_refs[5]),
-        Reg::TevRefsCD => write_masked!(sys.gpu.env.stage_refs[6]),
-        Reg::TevRefsEF => write_masked!(sys.gpu.env.stage_refs[7]),
+        Reg::TevRefs0 => write_masked!(sys.gpu.env.stage_refs[0]),
+        Reg::TevRefs1 => write_masked!(sys.gpu.env.stage_refs[1]),
+        Reg::TevRefs2 => write_masked!(sys.gpu.env.stage_refs[2]),
+        Reg::TevRefs3 => write_masked!(sys.gpu.env.stage_refs[3]),
+        Reg::TevRefs4 => write_masked!(sys.gpu.env.stage_refs[4]),
+        Reg::TevRefs5 => write_masked!(sys.gpu.env.stage_refs[5]),
+        Reg::TevRefs6 => write_masked!(sys.gpu.env.stage_refs[6]),
+        Reg::TevRefs7 => write_masked!(sys.gpu.env.stage_refs[7]),
         Reg::TexScaleU0 => write_masked!(sys.gpu.tex.maps[0].scaling.u),
         Reg::TexScaleV0 => write_masked!(sys.gpu.tex.maps[0].scaling.v),
         Reg::TexScaleU1 => write_masked!(sys.gpu.tex.maps[1].scaling.u),
@@ -683,9 +756,7 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             write_masked!(sys.gpu.pix.control);
             sys.modules
                 .render
-                .exec(render::Action::SetFramebufferFormat(
-                    sys.gpu.pix.control.format(),
-                ));
+                .exec(render::Action::SetEfbFormat(sys.gpu.pix.control.format()));
         }
         Reg::PixelDone => {
             sys.gpu.pix.interrupt.set_finish(true);
@@ -697,34 +768,34 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
             sys.gpu.pix.interrupt.set_token(true);
             sys.scheduler.schedule_now(pi::check_interrupts);
         }
-        Reg::PixelCopySrc => write_masked!(sys.gpu.pix.copy_src),
-        Reg::PixelCopyDimensions => write_masked!(sys.gpu.pix.copy_dims),
+        Reg::PixelCopySrc => write_masked!(sys.gpu.pix.copy.src),
+        Reg::PixelCopyDimensions => write_masked!(sys.gpu.pix.copy.dims),
         Reg::PixelCopyDst => {
-            let mut value = sys.gpu.pix.copy_dst.value() >> 5;
+            let mut value = sys.gpu.pix.copy.dst.value() >> 5;
             write_masked!(value);
-            sys.gpu.pix.copy_dst = Address((value << 5).with_bits(26, 32, 0));
+            sys.gpu.pix.copy.dst = Address((value << 5).with_bits(26, 32, 0));
         }
-        Reg::PixelCopyDstStride => write_masked!(sys.gpu.pix.copy_stride),
+        Reg::PixelCopyDstStride => write_masked!(sys.gpu.pix.copy.stride),
         Reg::PixelCopyClearAr => {
             let mut value = 0
-                .with_bits(0, 8, sys.gpu.pix.clear_color.r as u32)
-                .with_bits(8, 16, sys.gpu.pix.clear_color.a as u32);
+                .with_bits(0, 8, sys.gpu.pix.copy.clear_color.r as u32)
+                .with_bits(8, 16, sys.gpu.pix.copy.clear_color.a as u32);
             write_masked!(value);
-            sys.gpu.pix.clear_color.r = value.bits(0, 8) as u8;
-            sys.gpu.pix.clear_color.a = value.bits(8, 16) as u8;
+            sys.gpu.pix.copy.clear_color.r = value.bits(0, 8) as u8;
+            sys.gpu.pix.copy.clear_color.a = value.bits(8, 16) as u8;
         }
         Reg::PixelCopyClearGb => {
             let mut value = 0
-                .with_bits(0, 8, sys.gpu.pix.clear_color.b as u32)
-                .with_bits(8, 16, sys.gpu.pix.clear_color.g as u32);
+                .with_bits(0, 8, sys.gpu.pix.copy.clear_color.b as u32)
+                .with_bits(8, 16, sys.gpu.pix.copy.clear_color.g as u32);
             write_masked!(value);
-            sys.gpu.pix.clear_color.b = value.bits(0, 8) as u8;
-            sys.gpu.pix.clear_color.g = value.bits(8, 16) as u8;
+            sys.gpu.pix.copy.clear_color.b = value.bits(0, 8) as u8;
+            sys.gpu.pix.copy.clear_color.g = value.bits(8, 16) as u8;
         }
         Reg::PixelCopyClearZ => {
-            write_masked!(sys.gpu.pix.clear_depth);
+            write_masked!(sys.gpu.pix.copy.clear_depth);
             sys.modules.render.exec(render::Action::SetClearDepth(
-                sys.gpu.pix.clear_depth as f32 / DEPTH_24_BIT_MAX as f32,
+                sys.gpu.pix.copy.clear_depth as f32 / DEPTH_24_BIT_MAX as f32,
             ));
         }
         Reg::PixelCopyCmd => {
@@ -859,104 +930,51 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         Reg::TevAlpha14 => write_masked!(sys.gpu.env.stage_ops[14].alpha),
         Reg::TevColor15 => write_masked!(sys.gpu.env.stage_ops[15].color),
         Reg::TevAlpha15 => write_masked!(sys.gpu.env.stage_ops[15].alpha),
-        Reg::TevConstant3AR => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
 
-            let r = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let a = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[3].a = a;
-            sys.gpu.env.constants[3].r = r;
-        }
-        Reg::TevConstant3GB => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
+        Reg::TevConstant3AR => tev_color!(ar 3, 0),
+        Reg::TevConstant3GB => tev_color!(gb 3, 0),
+        Reg::TevConstant0AR => tev_color!(ar 0, 1),
+        Reg::TevConstant0GB => tev_color!(gb 0, 1),
+        Reg::TevConstant1AR => tev_color!(ar 1, 2),
+        Reg::TevConstant1GB => tev_color!(gb 1, 2),
+        Reg::TevConstant2AR => tev_color!(ar 2, 3),
+        Reg::TevConstant2GB => tev_color!(gb 2, 3),
 
-            let b = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let g = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[3].b = b;
-            sys.gpu.env.constants[3].g = g;
+        Reg::TevFogA => write_masked!(sys.gpu.env.fog.a),
+        Reg::TevFogB0 => write_masked!(sys.gpu.env.fog.b0),
+        Reg::TevFogB1 => write_masked!(sys.gpu.env.fog.b1),
+        Reg::TevFogC => write_masked!(sys.gpu.env.fog.c),
+        Reg::TevFogColor => {
+            let mut value = 0
+                .with_bits(0, 8, sys.gpu.pix.copy.clear_color.b as u32)
+                .with_bits(8, 16, sys.gpu.pix.copy.clear_color.g as u32)
+                .with_bits(16, 24, sys.gpu.pix.copy.clear_color.r as u32);
+            write_masked!(value);
+            sys.gpu.env.fog.color.b = value.bits(0, 8) as u8;
+            sys.gpu.env.fog.color.g = value.bits(8, 16) as u8;
+            sys.gpu.env.fog.color.r = value.bits(16, 24) as u8;
+            sys.gpu.env.fog.color.a = 255;
         }
-        Reg::TevConstant0AR => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
 
-            let r = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let a = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[0].a = a;
-            sys.gpu.env.constants[0].r = r;
-        }
-        Reg::TevConstant0GB => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
-
-            let b = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let g = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[0].b = b;
-            sys.gpu.env.constants[0].g = g;
-        }
-        Reg::TevConstant1AR => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
-
-            let r = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let a = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[1].a = a;
-            sys.gpu.env.constants[1].r = r;
-        }
-        Reg::TevConstant1GB => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
-
-            let b = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let g = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[1].b = b;
-            sys.gpu.env.constants[1].g = g;
-        }
-        Reg::TevConstant2AR => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
-
-            let r = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let a = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[2].a = a;
-            sys.gpu.env.constants[2].r = r;
-        }
-        Reg::TevConstant2GB => {
-            if mask != 0x00FF_FFFF {
-                todo!();
-            }
-
-            let b = ((value.bits(0, 11) as i16) << 5) >> 5;
-            let g = ((value.bits(12, 23) as i16) << 5) >> 5;
-            sys.gpu.env.constants[2].b = b;
-            sys.gpu.env.constants[2].g = g;
-        }
-        Reg::TevAlphaFunc => {
-            write_masked!(sys.gpu.env.alpha_func);
-            sys.modules.render.exec(render::Action::SetAlphaFunction(
-                sys.gpu.env.alpha_func.clone(),
-            ));
+        Reg::TevAlphaTest => {
+            write_masked!(sys.gpu.env.alpha_test);
+            sys.modules
+                .render
+                .exec(render::Action::SetAlphaTest(sys.gpu.env.alpha_test.clone()));
         }
 
         Reg::TevDepthTexBias => write_masked!(sys.gpu.env.depth_tex.bias),
         Reg::TevDepthTexMode => write_masked!(sys.gpu.env.depth_tex.mode),
 
-        Reg::TevKSel0 => write_masked!(sys.gpu.env.stage_consts[0]),
-        Reg::TevKSel1 => write_masked!(sys.gpu.env.stage_consts[1]),
-        Reg::TevKSel2 => write_masked!(sys.gpu.env.stage_consts[2]),
-        Reg::TevKSel3 => write_masked!(sys.gpu.env.stage_consts[3]),
-        Reg::TevKSel4 => write_masked!(sys.gpu.env.stage_consts[4]),
-        Reg::TevKSel5 => write_masked!(sys.gpu.env.stage_consts[5]),
-        Reg::TevKSel6 => write_masked!(sys.gpu.env.stage_consts[6]),
-        Reg::TevKSel7 => write_masked!(sys.gpu.env.stage_consts[7]),
+        Reg::TevConstSelect0 => write_masked!(sys.gpu.env.stage_consts[0]),
+        Reg::TevConstSelect1 => write_masked!(sys.gpu.env.stage_consts[1]),
+        Reg::TevConstSelect2 => write_masked!(sys.gpu.env.stage_consts[2]),
+        Reg::TevConstSelect3 => write_masked!(sys.gpu.env.stage_consts[3]),
+        Reg::TevConstSelect4 => write_masked!(sys.gpu.env.stage_consts[4]),
+        Reg::TevConstSelect5 => write_masked!(sys.gpu.env.stage_consts[5]),
+        Reg::TevConstSelect6 => write_masked!(sys.gpu.env.stage_consts[6]),
+        Reg::TevConstSelect7 => write_masked!(sys.gpu.env.stage_consts[7]),
+
         Reg::WriteMask => {
             sys.gpu.write_mask = value;
         }
@@ -965,25 +983,17 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         }
     }
 
-    if reg == Reg::GenMode {
-        sys.gpu.env.stages_dirty = true;
-        sys.gpu.xform.internal.stages_dirty = true;
-        sys.modules
-            .render
-            .exec(render::Action::SetCullingMode(sys.gpu.mode.culling_mode()));
-    }
-
     if let Some(map) = reg.texmap() {
         sys.gpu.tex.maps[map as usize].dirty = true;
     }
 
-    if reg.is_tev() {
+    if reg.is_texenv() {
         sys.gpu.env.stages_dirty = true;
     }
 
     if reg.is_pixel_clear() {
         sys.modules.render.exec(render::Action::SetClearColor(
-            sys.gpu.pix.clear_color.into(),
+            sys.gpu.pix.copy.clear_color.into(),
         ));
     }
 
@@ -991,6 +1001,12 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
         sys.modules
             .render
             .exec(render::Action::SetScissor(sys.gpu.pix.scissor));
+    }
+
+    if reg.is_fog() {
+        sys.modules
+            .render
+            .exec(render::Action::SetFog(sys.gpu.env.fog));
     }
 }
 
@@ -1105,8 +1121,8 @@ fn call(sys: &mut System, address: Address, length: u32) {
 
 fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     let args = render::CopyArgs {
-        src: sys.gpu.pix.copy_src,
-        dims: sys.gpu.pix.copy_dims,
+        src: sys.gpu.pix.copy.src,
+        dims: sys.gpu.pix.copy.dims,
         half: cmd.half(),
         clear: cmd.clear(),
     };
@@ -1114,8 +1130,8 @@ fn efb_copy(sys: &mut System, cmd: pix::CopyCmd) {
     let divisor = if args.half { 2 } else { 1 };
     let width = args.dims.width() as u32 / divisor;
     let height = args.dims.height() as u32 / divisor;
-    let dst = sys.gpu.pix.copy_dst;
-    let stride = sys.gpu.pix.copy_stride;
+    let dst = sys.gpu.pix.copy.dst;
+    let stride = sys.gpu.pix.copy.stride;
 
     if cmd.to_xfb() {
         let id = sys.gpu.xfb_copies.len() as u32;
