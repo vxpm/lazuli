@@ -467,6 +467,64 @@ pub struct Accelerator {
     pub wrapped: Option<AccelWrap>,
     pub previous_samples: [i16; 2],
     pub has_data: bool,
+    pub dma_masked: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
+#[repr(u8)]
+pub enum Mmio {
+    // Accelerator coefficients
+    AccelCoeffA0       = 0xA0,
+    AccelCoeffB0       = 0xA1,
+    AccelCoeffA1       = 0xA2,
+    AccelCoeffB1       = 0xA3,
+    AccelCoeffA2       = 0xA4,
+    AccelCoeffB2       = 0xA5,
+    AccelCoeffA3       = 0xA6,
+    AccelCoeffB3       = 0xA7,
+    AccelCoeffA4       = 0xA8,
+    AccelCoeffB4       = 0xA9,
+    AccelCoeffA5       = 0xAA,
+    AccelCoeffB5       = 0xAB,
+    AccelCoeffA6       = 0xAC,
+    AccelCoeffB6       = 0xAD,
+    AccelCoeffA7       = 0xAE,
+    AccelCoeffB7       = 0xAF,
+
+    // DMA
+    DmaControl         = 0xC9,
+    DmaLength          = 0xCB,
+    DmaDspAddr         = 0xCD,
+    DmaAramAddrHigh    = 0xCE,
+    DmaAramAddrLow     = 0xCF,
+
+    // Accelerator
+    AccelFormat        = 0xD1,
+    AccelRaw           = 0xD3,
+    AccelStartAddrHigh = 0xD4,
+    AccelStartAddrLow  = 0xD5,
+    AccelEndAddrHigh   = 0xD6,
+    AccelEndAddrLow    = 0xD7,
+    AccelCurrAddrHigh  = 0xD8,
+    AccelCurrAddrLow   = 0xD9,
+    AccelPredictor     = 0xDA,
+    AccelPrevSample0   = 0xDB,
+    AccelPrevSample1   = 0xDC,
+    AccelSample        = 0xDD,
+    AccelGain          = 0xDE,
+    AccelInput         = 0xDF,
+
+    // DMA mask
+    DmaMasked          = 0xEF,
+
+    // Interrupts
+    InterruptRequest   = 0xFB,
+
+    // Mailboxes
+    DspMailboxHigh     = 0xFC,
+    DspMailboxLow      = 0xFD,
+    CpuMailboxHigh     = 0xFE,
+    CpuMailboxLow      = 0xFF,
 }
 
 #[derive(Clone, Copy)]
@@ -941,9 +999,14 @@ impl Interpreter {
     }
 
     pub fn read_mmio(&mut self, sys: &mut System, offset: u8) -> u16 {
-        match offset {
+        let Some(mmio) = Mmio::from_repr(offset) else {
+            println!("!!!!! reading from unknown MMIO 0x{offset:02X}");
+            return 0;
+        };
+
+        match mmio {
             // Coefficients
-            0xA0..=0xAF => {
+            _ if (0xA0..=0xAF).contains(&offset) => {
                 let index = (offset as usize - 0xA0) / 2;
                 if offset.is_multiple_of(2) {
                     self.accel.coefficients[index].a as u16
@@ -953,32 +1016,32 @@ impl Interpreter {
             }
 
             // DMA
-            0xC9 => sys.dsp.dsp_dma.control.to_bits(),
-            0xCB => sys.dsp.dsp_dma.length,
-            0xCD => sys.dsp.dsp_dma.dsp_base,
-            0xCE => (sys.dsp.dsp_dma.ram_base >> 16) as u16,
-            0xCF => sys.dsp.dsp_dma.ram_base as u16,
+            Mmio::DmaControl => sys.dsp.dsp_dma.control.to_bits(),
+            Mmio::DmaLength => sys.dsp.dsp_dma.length,
+            Mmio::DmaDspAddr => sys.dsp.dsp_dma.dsp_base,
+            Mmio::DmaAramAddrHigh => (sys.dsp.dsp_dma.ram_base >> 16) as u16,
+            Mmio::DmaAramAddrLow => sys.dsp.dsp_dma.ram_base as u16,
 
             // Accelerator
-            0xD3 => self.read_accelerator_raw(sys),
-            0xD4 => self.accel.aram_start.bits(16, 32) as u16,
-            0xD5 => self.accel.aram_start.bits(0, 16) as u16,
-            0xD6 => self.accel.aram_end.bits(16, 32) as u16,
-            0xD7 => self.accel.aram_end.bits(0, 16) as u16,
-            0xD8 => self.accel.aram_curr.bits(16, 32) as u16,
-            0xD9 => self.accel.aram_curr.bits(0, 16) as u16,
-            0xDA => self.accel.predictor.to_bits(),
-            0xDB => self.accel.previous_samples[0] as u16,
-            0xDC => self.accel.previous_samples[1] as u16,
-            0xDD => self.read_accelerator_sample(sys) as u16,
-            0xDE => self.accel.gain as u16,
-            0xDF => self.accel.input as u16,
+            Mmio::AccelRaw => self.read_accelerator_raw(sys),
+            Mmio::AccelStartAddrHigh => self.accel.aram_start.bits(16, 32) as u16,
+            Mmio::AccelStartAddrLow => self.accel.aram_start.bits(0, 16) as u16,
+            Mmio::AccelEndAddrHigh => self.accel.aram_end.bits(16, 32) as u16,
+            Mmio::AccelEndAddrLow => self.accel.aram_end.bits(0, 16) as u16,
+            Mmio::AccelCurrAddrHigh => self.accel.aram_curr.bits(16, 32) as u16,
+            Mmio::AccelCurrAddrLow => self.accel.aram_curr.bits(0, 16) as u16,
+            Mmio::AccelPredictor => self.accel.predictor.to_bits(),
+            Mmio::AccelPrevSample0 => self.accel.previous_samples[0] as u16,
+            Mmio::AccelPrevSample1 => self.accel.previous_samples[1] as u16,
+            Mmio::AccelSample => self.read_accelerator_sample(sys) as u16,
+            Mmio::AccelGain => self.accel.gain as u16,
+            Mmio::AccelInput => self.accel.input as u16,
 
             // Mailboxes
-            0xFC => sys.dsp.dsp_mailbox.high_and_status(),
-            0xFD => sys.dsp.dsp_mailbox.low(),
-            0xFE => sys.dsp.cpu_mailbox.high_and_status(),
-            0xFF => {
+            Mmio::DspMailboxHigh => sys.dsp.dsp_mailbox.high_and_status(),
+            Mmio::DspMailboxLow => sys.dsp.dsp_mailbox.low(),
+            Mmio::CpuMailboxHigh => sys.dsp.cpu_mailbox.high_and_status(),
+            Mmio::CpuMailboxLow => {
                 if sys.dsp.cpu_mailbox.status() {
                     tracing::trace!(
                         "received from CPU mailbox: 0x{:08X}",
@@ -989,14 +1052,19 @@ impl Interpreter {
 
                 sys.dsp.cpu_mailbox.low()
             }
-            _ => unimplemented!("read from {offset:02X}"),
+            _ => unimplemented!("read from {mmio:?}"),
         }
     }
 
     pub fn write_mmio(&mut self, sys: &mut System, offset: u8, value: u16) {
-        match offset {
+        let Some(mmio) = Mmio::from_repr(offset) else {
+            println!("!!!!! writing to unknown MMIO 0x{offset:02X}");
+            return;
+        };
+
+        match mmio {
             // Coefficients
-            0xA0..=0xAF => {
+            _ if (0xA0..=0xAF).contains(&offset) => {
                 let index = (offset as usize - 0xA0) / 2;
                 if offset.is_multiple_of(2) {
                     self.accel.coefficients[index].a = value as i16
@@ -1006,29 +1074,31 @@ impl Interpreter {
             }
 
             // DMA
-            0xC9 => sys.dsp.dsp_dma.control = DspDmaControl::from_bits(value),
-            0xCB => {
+            Mmio::DmaControl => sys.dsp.dsp_dma.control = DspDmaControl::from_bits(value),
+            Mmio::DmaLength => {
                 sys.dsp.dsp_dma.length = value;
-                sys.dsp.dsp_dma.control.set_transfer_ongoing(true);
+                if !self.accel.dma_masked {
+                    sys.dsp.dsp_dma.control.set_transfer_ongoing(true);
+                }
             }
-            0xCD => sys.dsp.dsp_dma.dsp_base = value,
-            0xCE => {
+            Mmio::DmaDspAddr => sys.dsp.dsp_dma.dsp_base = value,
+            Mmio::DmaAramAddrHigh => {
                 sys.dsp.dsp_dma.ram_base = sys.dsp.dsp_dma.ram_base.with_bits(16, 32, value as u32)
             }
-            0xCF => {
+            Mmio::DmaAramAddrLow => {
                 sys.dsp.dsp_dma.ram_base = sys.dsp.dsp_dma.ram_base.with_bits(0, 16, value as u32)
             }
 
             // Interrupt
-            0xFB => {
+            Mmio::InterruptRequest => {
                 if value > 0 {
                     sys.dsp.control.set_dsp_interrupt(true);
                 }
             }
 
             // Accelerator
-            0xD1 => self.accel.format = AccelFormat::from_bits(value),
-            0xD3 => {
+            Mmio::AccelFormat => self.accel.format = AccelFormat::from_bits(value),
+            Mmio::AccelRaw => {
                 tracing::debug!(
                     "accelerator writing 0x{value:04X} to ARAM 0x{:08X} (wraps at 0x{:08X})",
                     self.accel.aram_curr,
@@ -1045,32 +1115,44 @@ impl Interpreter {
                     todo!("should wrap");
                 }
             }
-            0xD4 => self.accel.aram_start = self.accel.aram_start.with_bits(16, 32, value as u32),
-            0xD5 => self.accel.aram_start = self.accel.aram_start.with_bits(0, 16, value as u32),
-            0xD6 => self.accel.aram_end = self.accel.aram_end.with_bits(16, 32, value as u32),
-            0xD7 => self.accel.aram_end = self.accel.aram_end.with_bits(0, 16, value as u32),
-            0xD8 => self.accel.aram_curr = self.accel.aram_curr.with_bits(16, 32, value as u32),
-            0xD9 => self.accel.aram_curr = self.accel.aram_curr.with_bits(0, 16, value as u32),
-            0xDA => self.accel.predictor = AccelPredictor::from_bits(value),
-            0xDB => {
+            Mmio::AccelStartAddrHigh => {
+                self.accel.aram_start = self.accel.aram_start.with_bits(16, 32, value as u32)
+            }
+            Mmio::AccelStartAddrLow => {
+                self.accel.aram_start = self.accel.aram_start.with_bits(0, 16, value as u32)
+            }
+            Mmio::AccelEndAddrHigh => {
+                self.accel.aram_end = self.accel.aram_end.with_bits(16, 32, value as u32)
+            }
+            Mmio::AccelEndAddrLow => {
+                self.accel.aram_end = self.accel.aram_end.with_bits(0, 16, value as u32)
+            }
+            Mmio::AccelCurrAddrHigh => {
+                self.accel.aram_curr = self.accel.aram_curr.with_bits(16, 32, value as u32)
+            }
+            Mmio::AccelCurrAddrLow => {
+                self.accel.aram_curr = self.accel.aram_curr.with_bits(0, 16, value as u32)
+            }
+            Mmio::AccelPredictor => self.accel.predictor = AccelPredictor::from_bits(value),
+            Mmio::AccelPrevSample0 => {
                 self.accel.previous_samples[0] = value as i16;
             }
-            0xDC => {
+            Mmio::AccelPrevSample1 => {
                 self.accel.previous_samples[1] = value as i16;
                 self.accel.has_data = true;
             }
-            0xDE => self.accel.gain = value as i16,
-            0xDF => self.accel.input = value as i16,
+            Mmio::AccelGain => self.accel.gain = value as i16,
+            Mmio::AccelInput => self.accel.input = value as i16,
 
             // Mailboxes
-            0xFC => {
+            Mmio::DspMailboxHigh => {
                 sys.dsp.dsp_mailbox.set_high(u15::new(value));
             }
-            0xFD => {
+            Mmio::DspMailboxLow => {
                 sys.dsp.dsp_mailbox.set_low(value);
                 sys.dsp.dsp_mailbox.set_status(true);
             }
-            _ => unimplemented!("write to {offset:02X}"),
+            _ => unimplemented!("write to {mmio:?}"),
         }
     }
 
