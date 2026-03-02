@@ -522,7 +522,6 @@ pub struct Interpreter {
     pub regs: Registers,
     pub mem: Memory,
     pub accel: Accelerator,
-    pub loop_counter: Option<u16>,
     pub old_reset_high: bool,
 
     cached: Box<[Option<CachedIns>; 1 << 16]>,
@@ -535,7 +534,6 @@ impl Default for Interpreter {
             regs: Default::default(),
             mem: Default::default(),
             accel: Default::default(),
-            loop_counter: Default::default(),
             old_reset_high: Default::default(),
             cached: util::boxed_array(None),
         }
@@ -719,10 +717,6 @@ impl Interpreter {
 
     #[inline(always)]
     pub fn check_interrupts(&mut self, sys: &mut System) {
-        if self.loop_counter.is_some() {
-            return;
-        }
-
         // external interrupt does not care about status interrupt enable
         if self.regs.status.external_interrupt_enable() && sys.dsp.control.interrupt() {
             std::hint::cold_path();
@@ -733,8 +727,13 @@ impl Interpreter {
     }
 
     #[inline(always)]
-    fn check_stacks(&mut self) {
-        if self.regs.loop_stack.last().is_some_and(|v| *v == self.pc) {
+    fn check_loop(&mut self) {
+        if self
+            .regs
+            .loop_stack
+            .last()
+            .is_some_and(|v| *v == self.pc - 1)
+        {
             std::hint::cold_path();
 
             let counter = self.regs.loop_count.last_mut().unwrap();
@@ -754,8 +753,6 @@ impl Interpreter {
 
     /// Soft resets the DSP.
     pub fn reset(&mut self, sys: &mut System) {
-        self.loop_counter = None;
-
         self.regs = Default::default();
         sys.dsp.dsp_mailbox = Mailbox::from_bits(0);
         sys.dsp.cpu_mailbox = Mailbox::from_bits(0);
@@ -891,9 +888,10 @@ impl Interpreter {
         };
 
         tracing::debug!(
-            "accelerator reading 0x{value:04X} from ARAM 0x{:08X} (wraps at 0x{:08X})",
+            "accelerator reading 0x{value:04X} from ARAM 0x{:08X} (wraps at 0x{:08X}) [0x{:04X}]",
             self.accel.aram_curr,
-            self.accel.aram_end
+            self.accel.aram_end,
+            self.pc
         );
 
         self.increment_aram_curr();
@@ -1301,8 +1299,8 @@ impl Interpreter {
                 break;
             }
 
+            self.check_loop();
             self.check_interrupts(sys);
-            self.check_stacks();
 
             // have we cached this instruction already?
             let ins = if let Some(cached) = self.cached[self.pc as usize] {
@@ -1321,18 +1319,7 @@ impl Interpreter {
                 (ins.main)(self, sys, ins.ins);
             }
 
-            if let Some(loop_counter) = &mut self.loop_counter {
-                if *loop_counter == 0 {
-                    std::hint::cold_path();
-                    self.loop_counter = None;
-                    self.pc += 1;
-                } else {
-                    *loop_counter -= 1;
-                }
-            } else {
-                self.pc = self.pc.wrapping_add(ins.len);
-            }
-
+            self.pc = self.pc.wrapping_add(ins.len);
             i += 1;
         }
     }

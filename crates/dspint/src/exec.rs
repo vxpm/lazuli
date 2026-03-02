@@ -1570,7 +1570,7 @@ impl Interpreter {
 
         if counter != 0 {
             self.regs.call_stack.push(self.pc.wrapping_add(2));
-            self.regs.loop_stack.push(ins.extra + 1);
+            self.regs.loop_stack.push(ins.extra);
             self.regs.loop_count.push(counter);
         } else {
             self.pc = (ins.extra + 1) - 2;
@@ -1582,7 +1582,7 @@ impl Interpreter {
 
         if counter != 0 {
             self.regs.call_stack.push(self.pc.wrapping_add(2));
-            self.regs.loop_stack.push(ins.extra + 1);
+            self.regs.loop_stack.push(ins.extra);
             self.regs.loop_count.push(counter);
         } else {
             panic!("what the fuck?")
@@ -1844,14 +1844,28 @@ impl Interpreter {
         let r = ins.base.bits(0, 5) as u8;
 
         let counter = self.regs.get(Reg::new(r));
-        self.loop_counter = Some(counter);
-        self.pc += 1;
+
+        if counter != 0 {
+            self.regs.call_stack.push(self.pc.wrapping_add(1));
+            self.regs.loop_stack.push(self.pc.wrapping_add(1));
+            self.regs.loop_count.push(counter);
+        } else {
+            self.pc += 1;
+        }
     }
 
     pub fn loopi(&mut self, _: &mut System, ins: Ins) {
         let imm = ins.base.bits(0, 8) as u8;
-        self.loop_counter = Some(imm as u16);
-        self.pc += 1;
+
+        let counter = imm as u16;
+
+        if counter != 0 {
+            self.regs.call_stack.push(self.pc.wrapping_add(1));
+            self.regs.loop_stack.push(self.pc.wrapping_add(1));
+            self.regs.loop_count.push(counter);
+        } else {
+            self.pc += 1;
+        }
     }
 
     pub fn rti(&mut self, _: &mut System, ins: Ins) {
