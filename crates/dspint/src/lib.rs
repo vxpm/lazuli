@@ -422,23 +422,6 @@ pub struct AccelFormat {
     pub divisor: PcmDivisor,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AccelWrap {
-    RawRead,
-    RawWrite,
-    SampleRead,
-}
-
-impl AccelWrap {
-    pub fn interrupt(self) -> Interrupt {
-        match self {
-            Self::RawRead => Interrupt::AccelRawReadOverflow,
-            Self::RawWrite => Interrupt::AccelRawWriteOverflow,
-            Self::SampleRead => Interrupt::AccelSampleReadOverflow,
-        }
-    }
-}
-
 #[bitos(16)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AccelPredictor {
@@ -464,7 +447,6 @@ pub struct Accelerator {
     pub aram_curr: u32,
     pub gain: i16,
     pub input: i16,
-    pub wrapped: Option<AccelWrap>,
     pub previous_samples: [i16; 2],
     pub has_data: bool,
     pub dma_masked: bool,
@@ -495,8 +477,8 @@ pub enum Mmio {
     DmaControl         = 0xC9,
     DmaLength          = 0xCB,
     DmaDspAddr         = 0xCD,
-    DmaAramAddrHigh    = 0xCE,
-    DmaAramAddrLow     = 0xCF,
+    DmaRamAddrHigh     = 0xCE,
+    DmaRamAddrLow      = 0xCF,
 
     // Accelerator
     AccelFormat        = 0xD1,
@@ -741,14 +723,6 @@ impl Interpreter {
             return;
         }
 
-        if self.regs.status.interrupt_enable()
-            && let Some(wrap) = self.accel.wrapped.take()
-        {
-            std::hint::cold_path();
-            self.raise_interrupt(wrap.interrupt());
-            return;
-        }
-
         // external interrupt does not care about status interrupt enable
         if self.regs.status.external_interrupt_enable() && sys.dsp.control.interrupt() {
             std::hint::cold_path();
@@ -887,30 +861,28 @@ impl Interpreter {
         }
     }
 
-    fn increment_aram_curr(&mut self, _wrap: Option<AccelWrap>) {
+    fn increment_aram_curr(&mut self) {
         self.accel.aram_curr += 1;
         if self.accel.aram_curr > self.accel.aram_end {
             self.accel.aram_curr = self.accel.aram_start;
-            // HACK: wrap exceptions break Disney Cars (stacks overflow)
-            // self.accel.wrapped = wrap;
             self.accel.has_data = false;
         }
     }
 
-    fn read_aram_raw(&mut self, sys: &mut System, wrap: Option<AccelWrap>) -> u16 {
+    fn read_aram_raw(&mut self, sys: &mut System) -> u16 {
         let format = self.accel.format;
         let index = self.accel.aram_curr.with_bit(31, false);
         let value = match format.sample() {
             SampleSize::Nibble => {
                 let address = index / 2;
-                let byte = u8::read_be_bytes(&sys.dsp.aram[address as usize..]) as u16;
+                let byte = sys.dsp.aram[address as usize] as u16;
                 if index.is_multiple_of(2) {
-                    byte >> 4
-                } else {
                     byte & 0xF
+                } else {
+                    byte >> 4
                 }
             }
-            SampleSize::Byte => u8::read_be_bytes(&sys.dsp.aram[index as usize..]) as u16,
+            SampleSize::Byte => sys.dsp.aram[index as usize] as u16,
             SampleSize::Word => {
                 let address = index * 2;
                 u16::read_be_bytes(&sys.dsp.aram[address as usize..])
@@ -924,12 +896,8 @@ impl Interpreter {
             self.accel.aram_end
         );
 
-        self.increment_aram_curr(wrap);
+        self.increment_aram_curr();
         value
-    }
-
-    fn read_accelerator_raw(&mut self, sys: &mut System) -> u16 {
-        self.read_aram_raw(sys, Some(AccelWrap::RawRead))
     }
 
     fn pcm_gain(&self, value: i32) -> i32 {
@@ -952,8 +920,8 @@ impl Interpreter {
         assert_eq!(self.accel.format.sample(), SampleSize::Nibble);
 
         if self.accel.aram_curr.is_multiple_of(16) {
-            let coeff_idx = self.read_aram_raw(sys, None) as u8;
-            let scale = self.read_aram_raw(sys, None) as u8;
+            let coeff_idx = self.read_aram_raw(sys) as u8;
+            let scale = self.read_aram_raw(sys) as u8;
             self.accel.predictor.set_coefficients(u3::new(coeff_idx));
             self.accel.predictor.set_scale_log2(u4::new(scale));
         }
@@ -964,7 +932,7 @@ impl Interpreter {
         let coeffs = self.accel.coefficients[coeff_idx as usize];
         let scale = 1 << predictor.scale_log2().value();
 
-        let data = ((self.read_aram_raw(sys, None) as i8) << 4) >> 4;
+        let data = ((self.read_aram_raw(sys) as i8) << 4) >> 4;
         let value = scale * data as i32;
 
         let prediction = coeffs.a as i32 * self.accel.previous_samples[0] as i32
@@ -983,11 +951,11 @@ impl Interpreter {
             SampleDecoding::AramAdpcm => self.adpcm_decode(sys),
             SampleDecoding::AcinPcm => self.pcm_decode(self.accel.input as i32),
             SampleDecoding::AramPcm => {
-                let value = self.read_aram_raw(sys, Some(AccelWrap::SampleRead)) as i16;
+                let value = self.read_aram_raw(sys) as i16;
                 self.pcm_decode(value as i32)
             }
             SampleDecoding::AcinPcmInc => {
-                self.increment_aram_curr(Some(AccelWrap::SampleRead));
+                self.increment_aram_curr();
                 self.pcm_decode(self.accel.input as i32)
             }
         };
@@ -1019,11 +987,11 @@ impl Interpreter {
             Mmio::DmaControl => sys.dsp.dsp_dma.control.to_bits(),
             Mmio::DmaLength => sys.dsp.dsp_dma.length,
             Mmio::DmaDspAddr => sys.dsp.dsp_dma.dsp_base,
-            Mmio::DmaAramAddrHigh => (sys.dsp.dsp_dma.ram_base >> 16) as u16,
-            Mmio::DmaAramAddrLow => sys.dsp.dsp_dma.ram_base as u16,
+            Mmio::DmaRamAddrHigh => (sys.dsp.dsp_dma.ram_base >> 16) as u16,
+            Mmio::DmaRamAddrLow => sys.dsp.dsp_dma.ram_base as u16,
 
             // Accelerator
-            Mmio::AccelRaw => self.read_accelerator_raw(sys),
+            Mmio::AccelRaw => self.read_aram_raw(sys),
             Mmio::AccelStartAddrHigh => self.accel.aram_start.bits(16, 32) as u16,
             Mmio::AccelStartAddrLow => self.accel.aram_start.bits(0, 16) as u16,
             Mmio::AccelEndAddrHigh => self.accel.aram_end.bits(16, 32) as u16,
@@ -1082,10 +1050,10 @@ impl Interpreter {
                 }
             }
             Mmio::DmaDspAddr => sys.dsp.dsp_dma.dsp_base = value,
-            Mmio::DmaAramAddrHigh => {
+            Mmio::DmaRamAddrHigh => {
                 sys.dsp.dsp_dma.ram_base = sys.dsp.dsp_dma.ram_base.with_bits(16, 32, value as u32)
             }
-            Mmio::DmaAramAddrLow => {
+            Mmio::DmaRamAddrLow => {
                 sys.dsp.dsp_dma.ram_base = sys.dsp.dsp_dma.ram_base.with_bits(0, 16, value as u32)
             }
 
@@ -1105,6 +1073,7 @@ impl Interpreter {
                     self.accel.aram_end
                 );
 
+                // TODO: this is probably wrong
                 value.write_be_bytes(
                     sys.dsp.aram[self.accel.aram_curr.with_bit(31, false) as usize..]
                         .as_mut_bytes(),
