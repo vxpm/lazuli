@@ -877,9 +877,9 @@ impl Interpreter {
                 let address = index / 2;
                 let byte = sys.dsp.aram[address as usize] as u16;
                 if index.is_multiple_of(2) {
-                    byte & 0xF
-                } else {
                     byte >> 4
+                } else {
+                    byte & 0xF
                 }
             }
             SampleSize::Byte => sys.dsp.aram[index as usize] as u16,
