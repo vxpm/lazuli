@@ -1913,7 +1913,7 @@ impl Interpreter {
         let d = ins.base.bits(2, 4) as u8;
 
         self.regs
-            .set(Reg::new(0x18 + d), regs.get(Reg::new(0x1C + s)));
+            .set(Reg::new(0x18 + d), regs.get_pure(Reg::new(0x1C + s)));
     }
 
     pub fn ext_l(&mut self, sys: &mut System, ins: Ins, regs: &Registers) {
@@ -2184,7 +2184,7 @@ impl Interpreter {
         let s = ins.base.bits(3, 5) as u8;
 
         let ar = regs.addressing[d];
-        let data = regs.get(Reg::new(0x1C + s));
+        let data = regs.get_pure(Reg::new(0x1C + s));
         self.write_dmem(sys, ar, data);
 
         let ar = regs.addressing[d];
@@ -2197,7 +2197,7 @@ impl Interpreter {
         let s = ins.base.bits(3, 5) as u8;
 
         let ar = regs.addressing[d];
-        let data = regs.get(Reg::new(0x1C + s));
+        let data = regs.get_pure(Reg::new(0x1C + s));
         self.write_dmem(sys, ar, data);
 
         let ar = regs.addressing[d];

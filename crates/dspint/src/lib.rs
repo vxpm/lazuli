@@ -240,7 +240,7 @@ impl Default for Registers {
 }
 
 impl Registers {
-    pub fn get(&self, reg: Reg) -> u16 {
+    pub fn get_pure(&self, reg: Reg) -> u16 {
         let acc_saturate = |i: usize| {
             let ml = self.acc40[i].get() as i32 as i64;
             let hml = self.acc40[i].get();
@@ -285,6 +285,16 @@ impl Registers {
             Reg::Acc40Low1 => self.acc40[1].low,
             Reg::Acc40Mid0 => acc_saturate(0),
             Reg::Acc40Mid1 => acc_saturate(1),
+        }
+    }
+
+    pub fn get(&mut self, reg: Reg) -> u16 {
+        match reg {
+            Reg::CallStack => self.call_stack.pop().unwrap_or_default(),
+            Reg::DataStack => self.data_stack.pop().unwrap_or_default(),
+            Reg::LoopStack => self.loop_stack.pop().unwrap_or_default(),
+            Reg::LoopCount => self.loop_count.pop().unwrap_or_default(),
+            _ => self.get_pure(reg),
         }
     }
 
@@ -439,6 +449,15 @@ pub struct AccelCoefficients {
     pub b: i16,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AccelOverflow {
+    #[default]
+    None,
+    RawRead,
+    RawWrite,
+    Sample,
+}
+
 #[derive(Default)]
 pub struct Accelerator {
     pub coefficients: [AccelCoefficients; 8],
@@ -452,6 +471,7 @@ pub struct Accelerator {
     pub previous_samples: [i16; 2],
     pub has_data: bool,
     pub dma_masked: bool,
+    pub overflow: AccelOverflow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
@@ -725,6 +745,18 @@ impl Interpreter {
             tracing::warn!("DSP external interrupt raised");
             sys.dsp.control.set_interrupt(false);
             self.raise_interrupt(Interrupt::External);
+            return;
+        }
+
+        if !self.regs.status.interrupt_enable() {
+            return;
+        }
+
+        match std::mem::replace(&mut self.accel.overflow, AccelOverflow::None) {
+            AccelOverflow::None => (),
+            AccelOverflow::RawRead => self.raise_interrupt(Interrupt::AccelRawReadOverflow),
+            AccelOverflow::RawWrite => self.raise_interrupt(Interrupt::AccelRawWriteOverflow),
+            AccelOverflow::Sample => self.raise_interrupt(Interrupt::AccelSampleReadOverflow),
         }
     }
 
@@ -860,15 +892,16 @@ impl Interpreter {
         }
     }
 
-    fn increment_aram_curr(&mut self) {
+    fn increment_accel_curr(&mut self, overflow: AccelOverflow) {
         self.accel.aram_curr += 1;
         if self.accel.aram_curr > self.accel.aram_end {
             self.accel.aram_curr = self.accel.aram_start;
             self.accel.has_data = false;
+            self.accel.overflow = overflow;
         }
     }
 
-    fn read_aram_raw(&mut self, sys: &mut System) -> u16 {
+    fn read_accel_raw(&mut self, sys: &mut System) -> u16 {
         let format = self.accel.format;
         let index = self.accel.aram_curr.with_bit(31, false);
         let value = match format.sample() {
@@ -896,7 +929,6 @@ impl Interpreter {
             self.pc
         );
 
-        self.increment_aram_curr();
         value
     }
 
@@ -920,8 +952,12 @@ impl Interpreter {
         assert_eq!(self.accel.format.sample(), SampleSize::Nibble);
 
         if self.accel.aram_curr.is_multiple_of(16) {
-            let coeff_idx = self.read_aram_raw(sys) as u8;
-            let scale = self.read_aram_raw(sys) as u8;
+            let coeff_idx = self.read_accel_raw(sys) as u8;
+            self.increment_accel_curr(AccelOverflow::Sample);
+
+            let scale = self.read_accel_raw(sys) as u8;
+            self.increment_accel_curr(AccelOverflow::Sample);
+
             self.accel.predictor.set_coefficients(u3::new(coeff_idx));
             self.accel.predictor.set_scale_log2(u4::new(scale));
         }
@@ -932,9 +968,10 @@ impl Interpreter {
         let coeffs = self.accel.coefficients[coeff_idx as usize];
         let scale = 1 << predictor.scale_log2().value();
 
-        let data = ((self.read_aram_raw(sys) as i8) << 4) >> 4;
-        let value = scale * data as i32;
+        let data = ((self.read_accel_raw(sys) as i8) << 4) >> 4;
+        self.increment_accel_curr(AccelOverflow::Sample);
 
+        let value = scale * data as i32;
         let prediction = coeffs.a as i32 * self.accel.previous_samples[0] as i32
             + coeffs.b as i32 * self.accel.previous_samples[1] as i32;
 
@@ -942,8 +979,10 @@ impl Interpreter {
         result.clamp(i16::MIN as i32, i16::MAX as i32) as i16
     }
 
-    fn read_accelerator_sample(&mut self, sys: &mut System) -> i16 {
+    fn read_accel_sample(&mut self, sys: &mut System) -> i16 {
         if !self.accel.has_data {
+            self.accel.previous_samples[1] = self.accel.previous_samples[0];
+            self.accel.previous_samples[0] = 0;
             return 0;
         }
 
@@ -951,11 +990,12 @@ impl Interpreter {
             SampleDecoding::AramAdpcm => self.adpcm_decode(sys),
             SampleDecoding::AcinPcm => self.pcm_decode(self.accel.input as i32),
             SampleDecoding::AramPcm => {
-                let value = self.read_aram_raw(sys) as i16;
+                let value = self.read_accel_raw(sys) as i16;
+                self.increment_accel_curr(AccelOverflow::Sample);
                 self.pcm_decode(value as i32)
             }
             SampleDecoding::AcinPcmInc => {
-                self.increment_aram_curr();
+                self.increment_accel_curr(AccelOverflow::Sample);
                 self.pcm_decode(self.accel.input as i32)
             }
         };
@@ -991,7 +1031,11 @@ impl Interpreter {
             Mmio::DmaRamAddrLow => sys.dsp.dsp_dma.ram_base as u16,
 
             // Accelerator
-            Mmio::AccelRaw => self.read_aram_raw(sys),
+            Mmio::AccelRaw => {
+                let value = self.read_accel_raw(sys);
+                self.increment_accel_curr(AccelOverflow::RawRead);
+                value
+            }
             Mmio::AccelStartAddrHigh => self.accel.aram_start.bits(16, 32) as u16,
             Mmio::AccelStartAddrLow => self.accel.aram_start.bits(0, 16) as u16,
             Mmio::AccelEndAddrHigh => self.accel.aram_end.bits(16, 32) as u16,
@@ -1001,7 +1045,7 @@ impl Interpreter {
             Mmio::AccelPredictor => self.accel.predictor.to_bits(),
             Mmio::AccelPrevSample0 => self.accel.previous_samples[0] as u16,
             Mmio::AccelPrevSample1 => self.accel.previous_samples[1] as u16,
-            Mmio::AccelSample => self.read_accelerator_sample(sys) as u16,
+            Mmio::AccelSample => self.read_accel_sample(sys) as u16,
             Mmio::AccelGain => self.accel.gain as u16,
             Mmio::AccelInput => self.accel.input as u16,
 
