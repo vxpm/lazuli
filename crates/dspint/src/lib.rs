@@ -1,3 +1,5 @@
+#![feature(array_try_map)]
+
 mod exec;
 
 pub mod ins;
@@ -1129,10 +1131,7 @@ impl Interpreter {
             0x0000..0x1000 => self.mem.dram[addr as usize],
             0x1000..0x1800 => self.mem.coef[addr as usize - 0x1000],
             0xFF00.. => self.read_mmio(sys, addr as u8),
-            _ => {
-                std::hint::cold_path();
-                0
-            }
+            _ => panic!("out of range read from dmem"),
         }
     }
 
@@ -1145,31 +1144,35 @@ impl Interpreter {
                 tracing::warn!("writing to coefficient data");
             }
             0xFF00.. => self.write_mmio(sys, addr as u8, value),
-            _ => (),
+            _ => panic!("out of range write to dmem"),
+        }
+    }
+
+    /// Reads from instruction memory.
+    #[inline(always)]
+    pub fn try_read_imem(&mut self, addr: u16) -> Option<u16> {
+        match addr {
+            0x0000..0x1000 => Some(self.mem.iram[addr as usize]),
+            0x8000..0x9000 => {
+                std::hint::cold_path();
+                Some(self.mem.irom[addr as usize - 0x8000])
+            }
+            _ => None,
         }
     }
 
     /// Reads from instruction memory.
     #[inline(always)]
     pub fn read_imem(&mut self, addr: u16) -> u16 {
-        match addr {
-            0x0000..0x1000 => self.mem.iram[addr as usize],
-            0x8000..0x9000 => {
-                std::hint::cold_path();
-                self.mem.irom[addr as usize - 0x8000]
-            }
-            _ => {
-                std::hint::cold_path();
-                0
-            }
-        }
+        self.try_read_imem(addr).unwrap()
     }
 
     /// Writes to instruction memory.
     #[inline(always)]
     pub fn write_imem(&mut self, addr: u16, value: u16) {
-        if let 0x0000..0x1000 = addr {
-            self.mem.iram[addr as usize] = value
+        match addr {
+            0x0000..0x1000 => self.mem.iram[addr as usize] = value,
+            _ => panic!("out of range write to imem"),
         }
     }
 
@@ -1198,12 +1201,16 @@ impl Interpreter {
         ];
 
         let current = [
-            self.read_imem(start),
-            self.read_imem(start.wrapping_add(1)),
-            self.read_imem(start.wrapping_add(2)),
-            self.read_imem(start.wrapping_add(3)),
-            self.read_imem(start.wrapping_add(4)),
+            self.try_read_imem(start),
+            self.try_read_imem(start.wrapping_add(1)),
+            self.try_read_imem(start.wrapping_add(2)),
+            self.try_read_imem(start.wrapping_add(3)),
+            self.try_read_imem(start.wrapping_add(4)),
         ];
+
+        let Some(current) = current.try_map(|x| x) else {
+            return false;
+        };
 
         current == pattern_a || current == pattern_b
     }
