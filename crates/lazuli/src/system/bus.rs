@@ -379,7 +379,7 @@ impl System {
                 }
 
                 if self.gpu.cmd.control.fifo_read_enable() {
-                    self.scheduler.schedule(4096, gx::cmd::consume);
+                    self.scheduler.schedule(2048, gx::cmd::consume);
                 } else {
                     self.scheduler.cancel(gx::cmd::consume);
                 }

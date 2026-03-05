@@ -104,23 +104,23 @@ impl Reg {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Operation {
     #[default]
-    NOP               = 0b0_0000,
-    SetCP             = 0b0_0001,
-    SetXF             = 0b0_0010,
-    IndexedSetXFA     = 0b0_0100,
-    IndexedSetXFB     = 0b0_0101,
-    IndexedSetXFC     = 0b0_0110,
-    IndexedSetXFD     = 0b0_0111,
-    Call              = 0b0_1000,
-    InvalidateVertexCache = 0b0_1001,
-    SetBP             = 0b0_1100,
-    DrawQuadList      = 0b1_0000,
-    DrawTriangleList  = 0b1_0010,
-    DrawTriangleStrip = 0b1_0011,
-    DrawTriangleFan   = 0b1_0100,
-    DrawLineList      = 0b1_0101,
-    DrawLineStrip     = 0b1_0110,
-    DrawPointList     = 0b1_0111,
+    NOP                = 0b0_0000,
+    SetCP              = 0b0_0001,
+    SetXF              = 0b0_0010,
+    IndexedSetXFA      = 0b0_0100,
+    IndexedSetXFB      = 0b0_0101,
+    IndexedSetXFC      = 0b0_0110,
+    IndexedSetXFD      = 0b0_0111,
+    Call               = 0b0_1000,
+    InvalidateVtxCache = 0b0_1001,
+    SetBP              = 0b0_1100,
+    DrawQuadList       = 0b1_0000,
+    DrawTriangleList   = 0b1_0010,
+    DrawTriangleStrip  = 0b1_0011,
+    DrawTriangleFan    = 0b1_0100,
+    DrawLineList       = 0b1_0101,
+    DrawLineStrip      = 0b1_0110,
+    DrawPointList      = 0b1_0111,
 }
 
 #[bitos(8)]
@@ -201,7 +201,7 @@ pub struct Control {
     #[bits(0)]
     pub fifo_read_enable: bool,
     #[bits(1)]
-    pub fifo_breakpoint_enable: bool,
+    pub breakpoint_enable: bool,
     #[bits(2)]
     pub fifo_overflow_interrupt_enable: bool,
     #[bits(3)]
@@ -497,7 +497,7 @@ impl Gpu {
 
                 Command::Call { address, length }
             }
-            Operation::InvalidateVertexCache => Command::InvalidateVertexCache,
+            Operation::InvalidateVtxCache => Command::InvalidateVertexCache,
             Operation::SetBP => {
                 let register = reader.read_be::<u8>()?;
                 let value = u32::from_be_bytes([
@@ -671,14 +671,16 @@ pub fn consume(sys: &mut System) {
         let data = self::fifo_pop(sys);
         sys.gpu.cmd.queue.push_be(data);
 
-        if sys.gpu.cmd.fifo.read_ptr == sys.gpu.cmd.fifo.breakpoint_ptr {
+        if sys.gpu.cmd.control.breakpoint_enable()
+            && sys.gpu.cmd.fifo.read_ptr == sys.gpu.cmd.fifo.breakpoint_ptr
+        {
             sys.gpu.cmd.status.set_breakpoint_interrupt(true);
             sys.gpu.cmd.control.set_fifo_read_enable(false);
             break;
         }
     }
 
-    sys.scheduler.schedule(4096, gx::cmd::consume);
+    sys.scheduler.schedule(2048, gx::cmd::consume);
 }
 
 /// Process consumed CP commands until the queue is either empty or incomplete.
