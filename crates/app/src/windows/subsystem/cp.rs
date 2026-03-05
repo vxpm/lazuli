@@ -45,6 +45,7 @@ impl AppWindow for Window {
             mmio_dbg(ui, "FIFO count", &self.fifo.count());
             mmio_dbg(ui, "FIFO write ptr", &self.fifo.write_ptr);
             mmio_dbg(ui, "FIFO read ptr", &self.fifo.read_ptr);
+            mmio_dbg(ui, "FIFO breakpoint ptr", &self.fifo.breakpoint_ptr);
         });
     }
 }

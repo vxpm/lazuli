@@ -125,6 +125,8 @@ impl System {
             Mmio::CpFifoWritePtrHigh => ne!(self.gpu.cmd.fifo.write_ptr.as_bytes()[2..4]),
             Mmio::CpFifoReadPtrLow => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[0..2]),
             Mmio::CpFifoReadPtrHigh => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[2..4]),
+            Mmio::CpFifoBreakpointLow => ne!(self.gpu.cmd.fifo.breakpoint_ptr.as_bytes()[0..2]),
+            Mmio::CpFifoBreakpointHigh => ne!(self.gpu.cmd.fifo.breakpoint_ptr.as_bytes()[2..4]),
 
             // === Pixel Engine ===
             Mmio::PixelInterruptStatus => {
@@ -375,6 +377,12 @@ impl System {
                 if self.gpu.cmd.control.linked_mode() {
                     gx::cmd::sync_to_pi(self);
                 }
+
+                if self.gpu.cmd.control.fifo_read_enable() {
+                    self.scheduler.schedule(4096, gx::cmd::consume);
+                } else {
+                    self.scheduler.cancel(gx::cmd::consume);
+                }
             }
             Mmio::CpClear => {
                 let mut written = 0;
@@ -383,53 +391,45 @@ impl System {
             }
             Mmio::CpFifoStartLow => {
                 ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
             }
             Mmio::CpFifoStartHigh => {
                 ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
             }
             Mmio::CpFifoEndLow => {
                 ne!(self.gpu.cmd.fifo.end.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
             }
             Mmio::CpFifoEndHigh => {
                 ne!(self.gpu.cmd.fifo.end.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
             }
             Mmio::CpHighWatermarkLow => {
                 ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
             }
             Mmio::CpHighWatermarkHigh => {
                 ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
             }
             Mmio::CpLowWatermarkLow => {
                 ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
             }
             Mmio::CpLowWatermarkHigh => {
                 ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
             }
             // Mmio::CpFifoCountLow => ne!(self.gpu.command.fifo.count().as_mut_bytes()[0..2]),
             // Mmio::CpFifoCountHigh => ne!(self.gpu.command.fifo.count().as_mut_bytes()[2..4]),
             Mmio::CpFifoWritePtrLow => {
                 ne!(self.gpu.cmd.fifo.write_ptr.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
             }
             Mmio::CpFifoWritePtrHigh => {
                 ne!(self.gpu.cmd.fifo.write_ptr.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
             }
             Mmio::CpFifoReadPtrLow => {
                 ne!(self.gpu.cmd.fifo.read_ptr.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
             }
             Mmio::CpFifoReadPtrHigh => {
                 ne!(self.gpu.cmd.fifo.read_ptr.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
+            }
+            Mmio::CpFifoBreakpointLow => ne!(self.gpu.cmd.fifo.breakpoint_ptr.as_mut_bytes()[0..2]),
+            Mmio::CpFifoBreakpointHigh => {
+                ne!(self.gpu.cmd.fifo.breakpoint_ptr.as_mut_bytes()[2..4])
             }
 
             // === Pixel Engine ===

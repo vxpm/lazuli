@@ -209,7 +209,7 @@ pub struct Control {
     #[bits(4)]
     pub linked_mode: bool,
     #[bits(5)]
-    pub fifo_breakpoint_interrupt_enable: bool,
+    pub breakpoint_interrupt_enable: bool,
 }
 
 impl Default for Control {
@@ -226,6 +226,7 @@ pub struct Fifo {
     pub low_mark: u32,
     pub write_ptr: Address,
     pub read_ptr: Address,
+    pub breakpoint_ptr: Address,
 }
 
 impl Fifo {
@@ -390,6 +391,10 @@ pub struct Interface {
 }
 
 impl Interface {
+    pub fn any_interrupt(&self) -> bool {
+        self.status.breakpoint_interrupt() && self.control.breakpoint_interrupt_enable()
+    }
+
     /// Write a value to the clear register.
     pub fn write_clear(&mut self, value: u16) {
         if value.bit(0) {
@@ -665,7 +670,15 @@ pub fn consume(sys: &mut System) {
     while sys.gpu.cmd.fifo.count() > 0 {
         let data = self::fifo_pop(sys);
         sys.gpu.cmd.queue.push_be(data);
+
+        if sys.gpu.cmd.fifo.read_ptr == sys.gpu.cmd.fifo.breakpoint_ptr {
+            sys.gpu.cmd.status.set_breakpoint_interrupt(true);
+            sys.gpu.cmd.control.set_fifo_read_enable(false);
+            break;
+        }
     }
+
+    sys.scheduler.schedule(4096, gx::cmd::consume);
 }
 
 /// Process consumed CP commands until the queue is either empty or incomplete.

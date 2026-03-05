@@ -10,7 +10,7 @@ use crate::system::{System, gx};
 #[derive(Default, Clone, Copy)]
 pub struct InterruptSources {
     #[bits(0)]
-    pub gp_error: bool,
+    pub gx_error: bool,
     #[bits(1)]
     pub reset: bool,
     #[bits(2)]
@@ -53,7 +53,7 @@ impl std::fmt::Debug for InterruptSources {
         }
 
         debug! {
-            gp_error,
+            gx_error,
             reset,
             dvd_interface,
             serial_interface,
@@ -155,6 +155,9 @@ pub fn get_active_interrupts(sys: &System) -> InterruptSources {
     // SI
     sources.set_serial_interface(sys.serial.any_interrupt());
 
+    // CP
+    sources.set_command_processor(sys.gpu.cmd.any_interrupt());
+
     sources
 }
 
@@ -214,6 +217,5 @@ pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
 
     if sys.gpu.cmd.control.linked_mode() {
         gx::cmd::sync_to_pi(sys);
-        gx::cmd::consume(sys);
     }
 }
