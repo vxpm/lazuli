@@ -396,4 +396,35 @@ impl BlockBuilder<'_> {
 
         FLOAT_INFO
     }
+
+    pub fn ps_abs(&mut self, ins: Ins) -> InstructionInfo {
+        self.check_floats();
+
+        let fpr_b = self.get(ins.fpr_b());
+
+        let value = self.bd.ins().fabs(fpr_b);
+        self.set(ins.fpr_d(), value);
+
+        if ins.field_rc() {
+            self.update_cr1_float();
+        }
+
+        FLOAT_INFO
+    }
+
+    pub fn ps_nabs(&mut self, ins: Ins) -> InstructionInfo {
+        self.check_floats();
+
+        let fpr_b = self.get(ins.fpr_b());
+
+        let value = self.bd.ins().fabs(fpr_b);
+        let value = self.bd.ins().fneg(value);
+        self.set(ins.fpr_d(), value);
+
+        if ins.field_rc() {
+            self.update_cr1_float();
+        }
+
+        FLOAT_INFO
+    }
 }
