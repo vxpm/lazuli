@@ -1261,6 +1261,34 @@ impl BlockBuilder<'_> {
         LOAD_INFO
     }
 
+    pub fn psq_lux(&mut self, ins: Ins) -> InstructionInfo {
+        self.check_floats();
+
+        let rb = self.get(ins.gpr_b());
+        let addr = if ins.field_ra() == 0 {
+            rb
+        } else {
+            let ra = self.get(ins.gpr_a());
+            self.bd.ins().iadd(ra, rb)
+        };
+
+        let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
+        let (ps0, size) = self.mem_load_quant(addr, gqr);
+        let ps1 = if ins.field_ps_w() == 0 {
+            let addr = self.bd.ins().iadd(addr, size);
+            self.mem_load_quant(addr, gqr).0
+        } else {
+            self.ir_value(1.0f64)
+        };
+
+        let value = self.bd.ins().scalar_to_vector(ir::types::F64X2, ps0);
+        let value = self.bd.ins().insertlane(value, ps1, 1);
+        self.set(ins.fpr_d(), value);
+        self.set(ins.gpr_a(), addr);
+
+        LOAD_INFO
+    }
+
     pub fn psq_st(&mut self, ins: Ins) -> InstructionInfo {
         self.check_floats();
 
@@ -1332,6 +1360,33 @@ impl BlockBuilder<'_> {
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_store_quant(addr, gqr, ps1);
         }
+
+        STORE_INFO
+    }
+
+    pub fn psq_stux(&mut self, ins: Ins) -> InstructionInfo {
+        self.check_floats();
+
+        let rb = self.get(ins.gpr_b());
+        let addr = if ins.field_ra() == 0 {
+            rb
+        } else {
+            let ra = self.get(ins.gpr_a());
+            self.bd.ins().iadd(ra, rb)
+        };
+
+        let fpr_s = self.get(ins.fpr_s());
+        let ps0 = self.bd.ins().extractlane(fpr_s, 0);
+        let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
+
+        let size = self.mem_store_quant(addr, gqr, ps0);
+        if ins.field_ps_w() == 0 {
+            let ps1 = self.bd.ins().extractlane(fpr_s, 1);
+            let addr = self.bd.ins().iadd(addr, size);
+            self.mem_store_quant(addr, gqr, ps1);
+        }
+
+        self.set(ins.gpr_a(), addr);
 
         STORE_INFO
     }
