@@ -107,6 +107,7 @@ fn run_test(file: file::TestFile, quiet: bool) -> Result<(), Failed> {
             ipl: None,
             sideload: None,
             ipl_lle: false,
+            perform_efb_copies: false,
         },
     );
 

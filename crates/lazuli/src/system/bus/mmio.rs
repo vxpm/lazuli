@@ -202,7 +202,10 @@ impl Mmio {
     pub(super) fn log_reads(self) -> bool {
         !matches!(
             self,
-            Mmio::DiskControl | Mmio::DspSendMailbox | Mmio::DspRecvMailbox
+            Mmio::DiskControl
+                | Mmio::DspSendMailbox
+                | Mmio::DspRecvMailbox
+                | Mmio::ProcessorInterruptCause
         )
     }
 }

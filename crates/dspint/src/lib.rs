@@ -1,3 +1,5 @@
+#![feature(array_try_map)]
+
 mod exec;
 
 pub mod ins;
@@ -238,7 +240,7 @@ impl Default for Registers {
 }
 
 impl Registers {
-    pub fn get(&self, reg: Reg) -> u16 {
+    pub fn get_pure(&self, reg: Reg) -> u16 {
         let acc_saturate = |i: usize| {
             let ml = self.acc40[i].get() as i32 as i64;
             let hml = self.acc40[i].get();
@@ -283,6 +285,16 @@ impl Registers {
             Reg::Acc40Low1 => self.acc40[1].low,
             Reg::Acc40Mid0 => acc_saturate(0),
             Reg::Acc40Mid1 => acc_saturate(1),
+        }
+    }
+
+    pub fn get(&mut self, reg: Reg) -> u16 {
+        match reg {
+            Reg::CallStack => self.call_stack.pop().unwrap_or_default(),
+            Reg::DataStack => self.data_stack.pop().unwrap_or_default(),
+            Reg::LoopStack => self.loop_stack.pop().unwrap_or_default(),
+            Reg::LoopCount => self.loop_count.pop().unwrap_or_default(),
+            _ => self.get_pure(reg),
         }
     }
 
@@ -422,23 +434,6 @@ pub struct AccelFormat {
     pub divisor: PcmDivisor,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AccelWrap {
-    RawRead,
-    RawWrite,
-    SampleRead,
-}
-
-impl AccelWrap {
-    pub fn interrupt(self) -> Interrupt {
-        match self {
-            Self::RawRead => Interrupt::AccelRawReadOverflow,
-            Self::RawWrite => Interrupt::AccelRawWriteOverflow,
-            Self::SampleRead => Interrupt::AccelSampleReadOverflow,
-        }
-    }
-}
-
 #[bitos(16)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AccelPredictor {
@@ -454,6 +449,15 @@ pub struct AccelCoefficients {
     pub b: i16,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AccelOverflow {
+    #[default]
+    None,
+    RawRead,
+    RawWrite,
+    Sample,
+}
+
 #[derive(Default)]
 pub struct Accelerator {
     pub coefficients: [AccelCoefficients; 8],
@@ -464,9 +468,67 @@ pub struct Accelerator {
     pub aram_curr: u32,
     pub gain: i16,
     pub input: i16,
-    pub wrapped: Option<AccelWrap>,
     pub previous_samples: [i16; 2],
     pub has_data: bool,
+    pub dma_masked: bool,
+    pub overflow: AccelOverflow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
+#[repr(u8)]
+pub enum Mmio {
+    // Accelerator coefficients
+    AccelCoeffA0       = 0xA0,
+    AccelCoeffB0       = 0xA1,
+    AccelCoeffA1       = 0xA2,
+    AccelCoeffB1       = 0xA3,
+    AccelCoeffA2       = 0xA4,
+    AccelCoeffB2       = 0xA5,
+    AccelCoeffA3       = 0xA6,
+    AccelCoeffB3       = 0xA7,
+    AccelCoeffA4       = 0xA8,
+    AccelCoeffB4       = 0xA9,
+    AccelCoeffA5       = 0xAA,
+    AccelCoeffB5       = 0xAB,
+    AccelCoeffA6       = 0xAC,
+    AccelCoeffB6       = 0xAD,
+    AccelCoeffA7       = 0xAE,
+    AccelCoeffB7       = 0xAF,
+
+    // DMA
+    DmaControl         = 0xC9,
+    DmaLength          = 0xCB,
+    DmaDspAddr         = 0xCD,
+    DmaRamAddrHigh     = 0xCE,
+    DmaRamAddrLow      = 0xCF,
+
+    // Accelerator
+    AccelFormat        = 0xD1,
+    AccelRaw           = 0xD3,
+    AccelStartAddrHigh = 0xD4,
+    AccelStartAddrLow  = 0xD5,
+    AccelEndAddrHigh   = 0xD6,
+    AccelEndAddrLow    = 0xD7,
+    AccelCurrAddrHigh  = 0xD8,
+    AccelCurrAddrLow   = 0xD9,
+    AccelPredictor     = 0xDA,
+    AccelPrevSample0   = 0xDB,
+    AccelPrevSample1   = 0xDC,
+    AccelSample        = 0xDD,
+    AccelGain          = 0xDE,
+    AccelInput         = 0xDF,
+
+    // DMA mask
+    DmaMasked          = 0xEF,
+
+    // Interrupts
+    InterruptRequest   = 0xFB,
+
+    // Mailboxes
+    DspMailboxHigh     = 0xFC,
+    DspMailboxLow      = 0xFD,
+    CpuMailboxHigh     = 0xFE,
+    CpuMailboxLow      = 0xFF,
 }
 
 #[derive(Clone, Copy)]
@@ -482,7 +544,6 @@ pub struct Interpreter {
     pub regs: Registers,
     pub mem: Memory,
     pub accel: Accelerator,
-    pub loop_counter: Option<u16>,
     pub old_reset_high: bool,
 
     cached: Box<[Option<CachedIns>; 1 << 16]>,
@@ -495,7 +556,6 @@ impl Default for Interpreter {
             regs: Default::default(),
             mem: Default::default(),
             accel: Default::default(),
-            loop_counter: Default::default(),
             old_reset_high: Default::default(),
             cached: util::boxed_array(None),
         }
@@ -679,30 +739,35 @@ impl Interpreter {
 
     #[inline(always)]
     pub fn check_interrupts(&mut self, sys: &mut System) {
-        if self.loop_counter.is_some() {
-            return;
-        }
-
-        if self.regs.status.interrupt_enable()
-            && let Some(wrap) = self.accel.wrapped.take()
-        {
-            std::hint::cold_path();
-            self.raise_interrupt(wrap.interrupt());
-            return;
-        }
-
         // external interrupt does not care about status interrupt enable
         if self.regs.status.external_interrupt_enable() && sys.dsp.control.interrupt() {
             std::hint::cold_path();
             tracing::warn!("DSP external interrupt raised");
             sys.dsp.control.set_interrupt(false);
             self.raise_interrupt(Interrupt::External);
+            return;
+        }
+
+        if !self.regs.status.interrupt_enable() {
+            return;
+        }
+
+        match std::mem::replace(&mut self.accel.overflow, AccelOverflow::None) {
+            AccelOverflow::None => (),
+            AccelOverflow::RawRead => self.raise_interrupt(Interrupt::AccelRawReadOverflow),
+            AccelOverflow::RawWrite => self.raise_interrupt(Interrupt::AccelRawWriteOverflow),
+            AccelOverflow::Sample => self.raise_interrupt(Interrupt::AccelSampleReadOverflow),
         }
     }
 
     #[inline(always)]
-    fn check_stacks(&mut self) {
-        if self.regs.loop_stack.last().is_some_and(|v| *v == self.pc) {
+    fn check_loop(&mut self) {
+        if self
+            .regs
+            .loop_stack
+            .last()
+            .is_some_and(|v| *v == self.pc - 1)
+        {
             std::hint::cold_path();
 
             let counter = self.regs.loop_count.last_mut().unwrap();
@@ -722,8 +787,6 @@ impl Interpreter {
 
     /// Soft resets the DSP.
     pub fn reset(&mut self, sys: &mut System) {
-        self.loop_counter = None;
-
         self.regs = Default::default();
         sys.dsp.dsp_mailbox = Mailbox::from_bits(0);
         sys.dsp.cpu_mailbox = Mailbox::from_bits(0);
@@ -829,30 +892,29 @@ impl Interpreter {
         }
     }
 
-    fn increment_aram_curr(&mut self, _wrap: Option<AccelWrap>) {
+    fn increment_accel_curr(&mut self, overflow: AccelOverflow) {
         self.accel.aram_curr += 1;
         if self.accel.aram_curr > self.accel.aram_end {
             self.accel.aram_curr = self.accel.aram_start;
-            // HACK: wrap exceptions break Disney Cars (stacks overflow)
-            // self.accel.wrapped = wrap;
             self.accel.has_data = false;
+            self.accel.overflow = overflow;
         }
     }
 
-    fn read_aram_raw(&mut self, sys: &mut System, wrap: Option<AccelWrap>) -> u16 {
+    fn read_accel_raw(&mut self, sys: &mut System) -> u16 {
         let format = self.accel.format;
         let index = self.accel.aram_curr.with_bit(31, false);
         let value = match format.sample() {
             SampleSize::Nibble => {
                 let address = index / 2;
-                let byte = u8::read_be_bytes(&sys.dsp.aram[address as usize..]) as u16;
+                let byte = sys.dsp.aram[address as usize] as u16;
                 if index.is_multiple_of(2) {
                     byte >> 4
                 } else {
                     byte & 0xF
                 }
             }
-            SampleSize::Byte => u8::read_be_bytes(&sys.dsp.aram[index as usize..]) as u16,
+            SampleSize::Byte => sys.dsp.aram[index as usize] as u16,
             SampleSize::Word => {
                 let address = index * 2;
                 u16::read_be_bytes(&sys.dsp.aram[address as usize..])
@@ -861,17 +923,13 @@ impl Interpreter {
         };
 
         tracing::debug!(
-            "accelerator reading 0x{value:04X} from ARAM 0x{:08X} (wraps at 0x{:08X})",
+            "accelerator reading 0x{value:04X} from ARAM 0x{:08X} (wraps at 0x{:08X}) [0x{:04X}]",
             self.accel.aram_curr,
-            self.accel.aram_end
+            self.accel.aram_end,
+            self.pc
         );
 
-        self.increment_aram_curr(wrap);
         value
-    }
-
-    fn read_accelerator_raw(&mut self, sys: &mut System) -> u16 {
-        self.read_aram_raw(sys, Some(AccelWrap::RawRead))
     }
 
     fn pcm_gain(&self, value: i32) -> i32 {
@@ -884,8 +942,8 @@ impl Interpreter {
         let coeffs = self.accel.coefficients[coeff_idx as usize];
 
         let acc = self.pcm_gain(value)
-            + self.pcm_gain(coeffs.a as i32 * self.accel.previous_samples[0] as i32)
-            + self.pcm_gain(coeffs.b as i32 * self.accel.previous_samples[1] as i32);
+            + coeffs.a as i32 * self.accel.previous_samples[0] as i32
+            + coeffs.b as i32 * self.accel.previous_samples[1] as i32;
 
         self.accel.format.divisor().apply(acc) as i16
     }
@@ -894,8 +952,12 @@ impl Interpreter {
         assert_eq!(self.accel.format.sample(), SampleSize::Nibble);
 
         if self.accel.aram_curr.is_multiple_of(16) {
-            let coeff_idx = self.read_aram_raw(sys, None) as u8;
-            let scale = self.read_aram_raw(sys, None) as u8;
+            let coeff_idx = self.read_accel_raw(sys) as u8;
+            self.increment_accel_curr(AccelOverflow::Sample);
+
+            let scale = self.read_accel_raw(sys) as u8;
+            self.increment_accel_curr(AccelOverflow::Sample);
+
             self.accel.predictor.set_coefficients(u3::new(coeff_idx));
             self.accel.predictor.set_scale_log2(u4::new(scale));
         }
@@ -906,9 +968,10 @@ impl Interpreter {
         let coeffs = self.accel.coefficients[coeff_idx as usize];
         let scale = 1 << predictor.scale_log2().value();
 
-        let data = ((self.read_aram_raw(sys, None) as i8) << 4) >> 4;
-        let value = scale * data as i32;
+        let data = ((self.read_accel_raw(sys) as i8) << 4) >> 4;
+        self.increment_accel_curr(AccelOverflow::Sample);
 
+        let value = scale * data as i32;
         let prediction = coeffs.a as i32 * self.accel.previous_samples[0] as i32
             + coeffs.b as i32 * self.accel.previous_samples[1] as i32;
 
@@ -916,8 +979,10 @@ impl Interpreter {
         result.clamp(i16::MIN as i32, i16::MAX as i32) as i16
     }
 
-    fn read_accelerator_sample(&mut self, sys: &mut System) -> i16 {
+    fn read_accel_sample(&mut self, sys: &mut System) -> i16 {
         if !self.accel.has_data {
+            self.accel.previous_samples[1] = self.accel.previous_samples[0];
+            self.accel.previous_samples[0] = 0;
             return 0;
         }
 
@@ -925,11 +990,12 @@ impl Interpreter {
             SampleDecoding::AramAdpcm => self.adpcm_decode(sys),
             SampleDecoding::AcinPcm => self.pcm_decode(self.accel.input as i32),
             SampleDecoding::AramPcm => {
-                let value = self.read_aram_raw(sys, Some(AccelWrap::SampleRead)) as i16;
+                let value = self.read_accel_raw(sys) as i16;
+                self.increment_accel_curr(AccelOverflow::Sample);
                 self.pcm_decode(value as i32)
             }
             SampleDecoding::AcinPcmInc => {
-                self.increment_aram_curr(Some(AccelWrap::SampleRead));
+                self.increment_accel_curr(AccelOverflow::Sample);
                 self.pcm_decode(self.accel.input as i32)
             }
         };
@@ -941,9 +1007,14 @@ impl Interpreter {
     }
 
     pub fn read_mmio(&mut self, sys: &mut System, offset: u8) -> u16 {
-        match offset {
+        let Some(mmio) = Mmio::from_repr(offset) else {
+            println!("!!!!! reading from unknown MMIO 0x{offset:02X}");
+            return 0;
+        };
+
+        match mmio {
             // Coefficients
-            0xA0..=0xAF => {
+            _ if (0xA0..=0xAF).contains(&offset) => {
                 let index = (offset as usize - 0xA0) / 2;
                 if offset.is_multiple_of(2) {
                     self.accel.coefficients[index].a as u16
@@ -953,32 +1024,36 @@ impl Interpreter {
             }
 
             // DMA
-            0xC9 => sys.dsp.dsp_dma.control.to_bits(),
-            0xCB => sys.dsp.dsp_dma.length,
-            0xCD => sys.dsp.dsp_dma.dsp_base,
-            0xCE => (sys.dsp.dsp_dma.ram_base >> 16) as u16,
-            0xCF => sys.dsp.dsp_dma.ram_base as u16,
+            Mmio::DmaControl => sys.dsp.dsp_dma.control.to_bits(),
+            Mmio::DmaLength => sys.dsp.dsp_dma.length,
+            Mmio::DmaDspAddr => sys.dsp.dsp_dma.dsp_base,
+            Mmio::DmaRamAddrHigh => (sys.dsp.dsp_dma.ram_base >> 16) as u16,
+            Mmio::DmaRamAddrLow => sys.dsp.dsp_dma.ram_base as u16,
 
             // Accelerator
-            0xD3 => self.read_accelerator_raw(sys),
-            0xD4 => self.accel.aram_start.bits(16, 32) as u16,
-            0xD5 => self.accel.aram_start.bits(0, 16) as u16,
-            0xD6 => self.accel.aram_end.bits(16, 32) as u16,
-            0xD7 => self.accel.aram_end.bits(0, 16) as u16,
-            0xD8 => self.accel.aram_curr.bits(16, 32) as u16,
-            0xD9 => self.accel.aram_curr.bits(0, 16) as u16,
-            0xDA => self.accel.predictor.to_bits(),
-            0xDB => self.accel.previous_samples[0] as u16,
-            0xDC => self.accel.previous_samples[1] as u16,
-            0xDD => self.read_accelerator_sample(sys) as u16,
-            0xDE => self.accel.gain as u16,
-            0xDF => self.accel.input as u16,
+            Mmio::AccelRaw => {
+                let value = self.read_accel_raw(sys);
+                self.increment_accel_curr(AccelOverflow::RawRead);
+                value
+            }
+            Mmio::AccelStartAddrHigh => self.accel.aram_start.bits(16, 32) as u16,
+            Mmio::AccelStartAddrLow => self.accel.aram_start.bits(0, 16) as u16,
+            Mmio::AccelEndAddrHigh => self.accel.aram_end.bits(16, 32) as u16,
+            Mmio::AccelEndAddrLow => self.accel.aram_end.bits(0, 16) as u16,
+            Mmio::AccelCurrAddrHigh => self.accel.aram_curr.bits(16, 32) as u16,
+            Mmio::AccelCurrAddrLow => self.accel.aram_curr.bits(0, 16) as u16,
+            Mmio::AccelPredictor => self.accel.predictor.to_bits(),
+            Mmio::AccelPrevSample0 => self.accel.previous_samples[0] as u16,
+            Mmio::AccelPrevSample1 => self.accel.previous_samples[1] as u16,
+            Mmio::AccelSample => self.read_accel_sample(sys) as u16,
+            Mmio::AccelGain => self.accel.gain as u16,
+            Mmio::AccelInput => self.accel.input as u16,
 
             // Mailboxes
-            0xFC => sys.dsp.dsp_mailbox.high_and_status(),
-            0xFD => sys.dsp.dsp_mailbox.low(),
-            0xFE => sys.dsp.cpu_mailbox.high_and_status(),
-            0xFF => {
+            Mmio::DspMailboxHigh => sys.dsp.dsp_mailbox.high_and_status(),
+            Mmio::DspMailboxLow => sys.dsp.dsp_mailbox.low(),
+            Mmio::CpuMailboxHigh => sys.dsp.cpu_mailbox.high_and_status(),
+            Mmio::CpuMailboxLow => {
                 if sys.dsp.cpu_mailbox.status() {
                     tracing::trace!(
                         "received from CPU mailbox: 0x{:08X}",
@@ -989,14 +1064,18 @@ impl Interpreter {
 
                 sys.dsp.cpu_mailbox.low()
             }
-            _ => unimplemented!("read from {offset:02X}"),
+            _ => unimplemented!("read from {mmio:?}"),
         }
     }
 
     pub fn write_mmio(&mut self, sys: &mut System, offset: u8, value: u16) {
-        match offset {
+        let Some(mmio) = Mmio::from_repr(offset) else {
+            panic!("writing to unknown MMIO 0x{offset:02X}");
+        };
+
+        match mmio {
             // Coefficients
-            0xA0..=0xAF => {
+            _ if (0xA0..=0xAF).contains(&offset) => {
                 let index = (offset as usize - 0xA0) / 2;
                 if offset.is_multiple_of(2) {
                     self.accel.coefficients[index].a = value as i16
@@ -1006,35 +1085,38 @@ impl Interpreter {
             }
 
             // DMA
-            0xC9 => sys.dsp.dsp_dma.control = DspDmaControl::from_bits(value),
-            0xCB => {
+            Mmio::DmaControl => sys.dsp.dsp_dma.control = DspDmaControl::from_bits(value),
+            Mmio::DmaLength => {
                 sys.dsp.dsp_dma.length = value;
-                sys.dsp.dsp_dma.control.set_transfer_ongoing(true);
+                if !self.accel.dma_masked {
+                    sys.dsp.dsp_dma.control.set_transfer_ongoing(true);
+                }
             }
-            0xCD => sys.dsp.dsp_dma.dsp_base = value,
-            0xCE => {
+            Mmio::DmaDspAddr => sys.dsp.dsp_dma.dsp_base = value,
+            Mmio::DmaRamAddrHigh => {
                 sys.dsp.dsp_dma.ram_base = sys.dsp.dsp_dma.ram_base.with_bits(16, 32, value as u32)
             }
-            0xCF => {
+            Mmio::DmaRamAddrLow => {
                 sys.dsp.dsp_dma.ram_base = sys.dsp.dsp_dma.ram_base.with_bits(0, 16, value as u32)
             }
 
             // Interrupt
-            0xFB => {
+            Mmio::InterruptRequest => {
                 if value > 0 {
                     sys.dsp.control.set_dsp_interrupt(true);
                 }
             }
 
             // Accelerator
-            0xD1 => self.accel.format = AccelFormat::from_bits(value),
-            0xD3 => {
+            Mmio::AccelFormat => self.accel.format = AccelFormat::from_bits(value),
+            Mmio::AccelRaw => {
                 tracing::debug!(
                     "accelerator writing 0x{value:04X} to ARAM 0x{:08X} (wraps at 0x{:08X})",
                     self.accel.aram_curr,
                     self.accel.aram_end
                 );
 
+                // TODO: this is probably wrong
                 value.write_be_bytes(
                     sys.dsp.aram[self.accel.aram_curr.with_bit(31, false) as usize..]
                         .as_mut_bytes(),
@@ -1045,32 +1127,44 @@ impl Interpreter {
                     todo!("should wrap");
                 }
             }
-            0xD4 => self.accel.aram_start = self.accel.aram_start.with_bits(16, 32, value as u32),
-            0xD5 => self.accel.aram_start = self.accel.aram_start.with_bits(0, 16, value as u32),
-            0xD6 => self.accel.aram_end = self.accel.aram_end.with_bits(16, 32, value as u32),
-            0xD7 => self.accel.aram_end = self.accel.aram_end.with_bits(0, 16, value as u32),
-            0xD8 => self.accel.aram_curr = self.accel.aram_curr.with_bits(16, 32, value as u32),
-            0xD9 => self.accel.aram_curr = self.accel.aram_curr.with_bits(0, 16, value as u32),
-            0xDA => self.accel.predictor = AccelPredictor::from_bits(value),
-            0xDB => {
+            Mmio::AccelStartAddrHigh => {
+                self.accel.aram_start = self.accel.aram_start.with_bits(16, 32, value as u32)
+            }
+            Mmio::AccelStartAddrLow => {
+                self.accel.aram_start = self.accel.aram_start.with_bits(0, 16, value as u32)
+            }
+            Mmio::AccelEndAddrHigh => {
+                self.accel.aram_end = self.accel.aram_end.with_bits(16, 32, value as u32)
+            }
+            Mmio::AccelEndAddrLow => {
+                self.accel.aram_end = self.accel.aram_end.with_bits(0, 16, value as u32)
+            }
+            Mmio::AccelCurrAddrHigh => {
+                self.accel.aram_curr = self.accel.aram_curr.with_bits(16, 32, value as u32)
+            }
+            Mmio::AccelCurrAddrLow => {
+                self.accel.aram_curr = self.accel.aram_curr.with_bits(0, 16, value as u32)
+            }
+            Mmio::AccelPredictor => self.accel.predictor = AccelPredictor::from_bits(value),
+            Mmio::AccelPrevSample0 => {
                 self.accel.previous_samples[0] = value as i16;
             }
-            0xDC => {
+            Mmio::AccelPrevSample1 => {
                 self.accel.previous_samples[1] = value as i16;
                 self.accel.has_data = true;
             }
-            0xDE => self.accel.gain = value as i16,
-            0xDF => self.accel.input = value as i16,
+            Mmio::AccelGain => self.accel.gain = value as i16,
+            Mmio::AccelInput => self.accel.input = value as i16,
 
             // Mailboxes
-            0xFC => {
+            Mmio::DspMailboxHigh => {
                 sys.dsp.dsp_mailbox.set_high(u15::new(value));
             }
-            0xFD => {
+            Mmio::DspMailboxLow => {
                 sys.dsp.dsp_mailbox.set_low(value);
                 sys.dsp.dsp_mailbox.set_status(true);
             }
-            _ => unimplemented!("write to {offset:02X}"),
+            _ => unimplemented!("write to {mmio:?}"),
         }
     }
 
@@ -1080,10 +1174,7 @@ impl Interpreter {
             0x0000..0x1000 => self.mem.dram[addr as usize],
             0x1000..0x1800 => self.mem.coef[addr as usize - 0x1000],
             0xFF00.. => self.read_mmio(sys, addr as u8),
-            _ => {
-                std::hint::cold_path();
-                0
-            }
+            _ => panic!("out of range read from dmem"),
         }
     }
 
@@ -1096,31 +1187,35 @@ impl Interpreter {
                 tracing::warn!("writing to coefficient data");
             }
             0xFF00.. => self.write_mmio(sys, addr as u8, value),
-            _ => (),
+            _ => panic!("out of range write to dmem"),
+        }
+    }
+
+    /// Reads from instruction memory.
+    #[inline(always)]
+    pub fn try_read_imem(&mut self, addr: u16) -> Option<u16> {
+        match addr {
+            0x0000..0x1000 => Some(self.mem.iram[addr as usize]),
+            0x8000..0x9000 => {
+                std::hint::cold_path();
+                Some(self.mem.irom[addr as usize - 0x8000])
+            }
+            _ => None,
         }
     }
 
     /// Reads from instruction memory.
     #[inline(always)]
     pub fn read_imem(&mut self, addr: u16) -> u16 {
-        match addr {
-            0x0000..0x1000 => self.mem.iram[addr as usize],
-            0x8000..0x9000 => {
-                std::hint::cold_path();
-                self.mem.irom[addr as usize - 0x8000]
-            }
-            _ => {
-                std::hint::cold_path();
-                0
-            }
-        }
+        self.try_read_imem(addr).unwrap()
     }
 
     /// Writes to instruction memory.
     #[inline(always)]
     pub fn write_imem(&mut self, addr: u16, value: u16) {
-        if let 0x0000..0x1000 = addr {
-            self.mem.iram[addr as usize] = value
+        match addr {
+            0x0000..0x1000 => self.mem.iram[addr as usize] = value,
+            _ => panic!("out of range write to imem"),
         }
     }
 
@@ -1149,12 +1244,16 @@ impl Interpreter {
         ];
 
         let current = [
-            self.read_imem(start),
-            self.read_imem(start.wrapping_add(1)),
-            self.read_imem(start.wrapping_add(2)),
-            self.read_imem(start.wrapping_add(3)),
-            self.read_imem(start.wrapping_add(4)),
+            self.try_read_imem(start),
+            self.try_read_imem(start.wrapping_add(1)),
+            self.try_read_imem(start.wrapping_add(2)),
+            self.try_read_imem(start.wrapping_add(3)),
+            self.try_read_imem(start.wrapping_add(4)),
         ];
+
+        let Some(current) = current.try_map(|x| x) else {
+            return false;
+        };
 
         current == pattern_a || current == pattern_b
     }
@@ -1250,8 +1349,8 @@ impl Interpreter {
                 break;
             }
 
+            self.check_loop();
             self.check_interrupts(sys);
-            self.check_stacks();
 
             // have we cached this instruction already?
             let ins = if let Some(cached) = self.cached[self.pc as usize] {
@@ -1270,18 +1369,7 @@ impl Interpreter {
                 (ins.main)(self, sys, ins.ins);
             }
 
-            if let Some(loop_counter) = &mut self.loop_counter {
-                if *loop_counter == 0 {
-                    std::hint::cold_path();
-                    self.loop_counter = None;
-                    self.pc += 1;
-                } else {
-                    *loop_counter -= 1;
-                }
-            } else {
-                self.pc = self.pc.wrapping_add(ins.len);
-            }
-
+            self.pc = self.pc.wrapping_add(ins.len);
             i += 1;
         }
     }
