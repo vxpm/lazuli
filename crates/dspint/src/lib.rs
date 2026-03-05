@@ -942,8 +942,8 @@ impl Interpreter {
         let coeffs = self.accel.coefficients[coeff_idx as usize];
 
         let acc = self.pcm_gain(value)
-            + self.pcm_gain(coeffs.a as i32 * self.accel.previous_samples[0] as i32)
-            + self.pcm_gain(coeffs.b as i32 * self.accel.previous_samples[1] as i32);
+            + coeffs.a as i32 * self.accel.previous_samples[0] as i32
+            + coeffs.b as i32 * self.accel.previous_samples[1] as i32;
 
         self.accel.format.divisor().apply(acc) as i16
     }
@@ -1070,8 +1070,7 @@ impl Interpreter {
 
     pub fn write_mmio(&mut self, sys: &mut System, offset: u8, value: u16) {
         let Some(mmio) = Mmio::from_repr(offset) else {
-            println!("!!!!! writing to unknown MMIO 0x{offset:02X}");
-            return;
+            panic!("writing to unknown MMIO 0x{offset:02X}");
         };
 
         match mmio {
