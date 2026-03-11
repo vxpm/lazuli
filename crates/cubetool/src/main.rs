@@ -139,6 +139,7 @@ fn main() -> Result<()> {
             match extension {
                 "dol" => inspect::inspect_dol(input),
                 "iso" => inspect::inspect_iso(input, filesystem),
+                "ciso" | "cso" => inspect::inspect_cso(input),
                 "rvz" => inspect::inspect_rvz(input),
                 _ => bail!("unknown or missing file extension"),
             }

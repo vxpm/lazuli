@@ -7,9 +7,10 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
 use disks::binrw::BinRead;
 use disks::binrw::io::BufReader;
+use disks::cso::CsoReader;
 use disks::iso::{self, Meta};
 use disks::rvz::{self, RvzReader};
-use disks::{Console, apploader, dol};
+use disks::{Console, apploader, cso, dol};
 use eyre_pretty::{Context, Result};
 
 use crate::vfs::{self, VfsEntryId, VfsGraph, VirtualEntry};
@@ -385,6 +386,64 @@ pub fn inspect_iso(input: PathBuf, filesystem: bool) -> Result<()> {
     }
 
     if let Ok(bootfile) = iso.bootfile_header() {
+        label([
+            "> Bootfile (.dol)".to_string(),
+            format!("Entry: 0x{:08X}", bootfile.entry),
+        ]);
+        dol_table(&bootfile);
+    }
+
+    Ok(())
+}
+
+pub fn inspect_cso(input: PathBuf) -> Result<()> {
+    let mut file = std::fs::File::open(&input).context("opening file")?;
+    let meta = file.metadata()?;
+    let cso = cso::Cso::new(BufReader::new(&mut file)).context("parsing .cso header")?;
+    let mut cso = CsoReader::new(cso);
+
+    label([format!(
+        "{} ({})",
+        input.file_name().unwrap().to_string_lossy(),
+        ByteSize(meta.len()).display()
+    )]);
+
+    let disk_header = cso.iso_header().context("reading ISO header from CISO")?;
+    let ciso_header = cso.inner().header();
+
+    let disk_properties = disk_properties_table(&disk_header);
+
+    let mut ciso_properties = Table::new();
+    ciso_properties
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("Property").set_alignment(CellAlignment::Center),
+            Cell::new("Value").set_alignment(CellAlignment::Center),
+        ]);
+
+    ciso_properties.add_row(vec![
+        Cell::new("Map Size"),
+        Cell::new(format!("{} bytes", ciso_header.map.len()))
+    ]);
+
+    ciso_properties.add_row(vec![
+        Cell::new("Block Size"),
+        Cell::new(format!("{}", ByteSize(ciso_header.block_size as u64))),
+    ]);
+
+    label(["> CISO Properties".into()]);
+    println!("{ciso_properties}");
+    label(["> Disk Properties".into()]);
+    println!("{disk_properties}");
+
+    if let Ok(apploader) = cso.apploader_header() {
+        label(["> Apploader".into()]);
+        apploader_table(&apploader);
+    }
+
+    if let Ok(bootfile) = cso.bootfile_header() {
         label([
             "> Bootfile (.dol)".to_string(),
             format!("Entry: 0x{:08X}", bootfile.entry),

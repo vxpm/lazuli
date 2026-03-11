@@ -3,7 +3,7 @@
 
 use std::io::{Read, Seek, SeekFrom};
 use binrw::{BinRead, BinWrite};
-use crate::{apploader, iso};
+use crate::{apploader, dol, iso};
 
 const CSO_HEADER_SIZE: usize = 0x8000; // 32KB
 const CSO_MAP_SIZE: usize = CSO_HEADER_SIZE - size_of::<u32>() - 4; // 0x8000 (32768) - 4 (magic) - 4 (block_size)
@@ -169,7 +169,7 @@ impl<R> CsoReader<R>
 where
     R: Read + Seek,
 {
-    fn iso_header(&mut self) -> Result<iso::Header, binrw::Error> {
+    pub fn iso_header(&mut self) -> Result<iso::Header, binrw::Error> {
         self.seek(SeekFrom::Start(0))?;
         iso::Header::read_be(self)
     }
@@ -182,6 +182,18 @@ where
     pub fn apploader_header(&mut self) -> Result<apploader::Header, binrw::Error> {
         self.seek(SeekFrom::Start(0x2440))?;
         apploader::Header::read(self)
+    }
+
+    pub fn bootfile(&mut self) -> Result<dol::Dol, binrw::Error> {
+        let header = self.iso_header()?;
+        self.seek(SeekFrom::Start(header.bootfile_offset as u64))?;
+        dol::Dol::read(self)
+    }
+
+    pub fn bootfile_header(&mut self) -> Result<dol::Header, binrw::Error> {
+        let header = self.iso_header()?;
+        self.seek(SeekFrom::Start(header.bootfile_offset as u64))?;
+        dol::Header::read(self)
     }
 
     pub fn filesystem(&mut self) -> Result<iso::filesystem::FileSystem, binrw::Error> {
