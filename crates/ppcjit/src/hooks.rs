@@ -4,23 +4,46 @@ use gekko::{Address, Cpu, QuantReg};
 use strum::FromRepr;
 
 use crate::FastmemLut;
-use crate::block::{Info, LinkData};
+use crate::block::BlockFn;
 
+/// Caller context.
 pub type Context = std::ffi::c_void;
+/// Data specific to a block exit.
+pub type ExitData = std::ffi::c_void;
 
+/// Hook called before the first block in the chain starts executing. Should return a pointer to
+/// the CPU registers struct.
 pub type GetRegistersHook = extern "C-unwind" fn(*mut Context) -> *mut Cpu;
+/// Hook called before the first block in the chain starts executing. Should return a pointer to
+/// the fastmem lookup-table.
 pub type GetFastmemHook = extern "C-unwind" fn(*mut Context) -> *mut FastmemLut;
 
-pub type FollowLinkHook = extern "C-unwind" fn(*const Info, *mut Context, *mut LinkData) -> bool;
-pub type TryLinkHook = extern "C-unwind" fn(*mut Context, Address, *mut LinkData);
+/// Hook called on any block exit.
+///
+/// Each exit has some data associated with it which can be used by this hook as it wish. The size
+/// of the data is configurable in the JIT [`Settings`](super::Settings).
+///
+/// Should return a pointer to a block to jump to and keep the chain executing or `None` if you
+/// wish to exit the chain. In other words, this allows for _block linking_.
+pub type OnExit = extern "C-unwind" fn(*const Context, *mut ExitData) -> Option<BlockFn>;
 
+/// Hook called whenever the JIT wants to read a value of type `T` from an address that isn't
+/// accessible through fastmem. Should return whether the read failed.
 pub type ReadHook<T> = extern "C-unwind" fn(*mut Context, Address, *mut T) -> bool;
+/// Hook called whenever the JIT wants to write a value of type `T` to an address that isn't
+/// accessible through fastmem. Should return whether the write failed.
 pub type WriteHook<T> = extern "C-unwind" fn(*mut Context, Address, T) -> bool;
+/// Hook called whenever the JIT wants to read a quantized paired-single from an address that isn't
+/// accessible through fastmem. Should return whether the read failed.
 pub type ReadQuantizedHook = extern "C-unwind" fn(*mut Context, Address, QuantReg, *mut f64) -> u8;
+/// Hook called whenever the JIT wants to write a quantized paired-single to an address that isn't
+/// accessible through fastmem. Should return whether the write failed.
 pub type WriteQuantizedHook = extern "C-unwind" fn(*mut Context, Address, QuantReg, f64) -> u8;
 
+/// Hook that invalidates the instruction cache line that contains the given address.
 pub type InvalidateICache = extern "C-unwind" fn(*mut Context, Address);
 
+/// Generic hook signature for hooks that don't take any arguments or return anything.
 pub type GenericHook = extern "C-unwind" fn(*mut Context);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
