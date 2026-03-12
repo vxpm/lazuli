@@ -2,21 +2,29 @@
 //! to save space without the CPU overhead of actual compression
 
 use std::io::{Read, Seek, SeekFrom};
-use binrw::{BinRead, BinWrite};
+use binrw::{BinRead, BinResult};
 use crate::{apploader, dol, iso};
 
 const CSO_HEADER_SIZE: usize = 0x8000; // 32KB
 const CSO_MAP_SIZE: usize = CSO_HEADER_SIZE - size_of::<u32>() - 4; // 0x8000 (32768) - 4 (magic) - 4 (block_size)
 
+#[binrw::parser(reader, endian)]
+fn parse_bool_array() -> BinResult<[bool; CSO_MAP_SIZE]> {
+    let block_used: [u8; CSO_MAP_SIZE] = BinRead::read_options(reader, endian, ())?;
+
+    Ok(block_used.map(|block| block != 0))
+}
+
 /// The header of a CSO file.
-#[derive(Debug, Clone, BinRead, BinWrite)]
+#[derive(Debug, Clone, BinRead)]
 #[br(big, magic = b"CISO")]
 pub struct CsoHeader {
     #[br(little)]
     /// Size of the blocks
     pub block_size: u32,
+    #[br(parse_with = parse_bool_array)]
     /// Used (1) or Unused (0)
-    pub map: [u8; CSO_MAP_SIZE]
+    pub map: [bool; CSO_MAP_SIZE]
 }
 
 /// A Gamecube .cso file.
@@ -41,7 +49,7 @@ where
         let mut current_offset = CSO_HEADER_SIZE as u64;
 
         for is_present in header.map {
-            if is_present == 1
+            if is_present
             {
                 map.push(Some(current_offset));
                 current_offset += header.block_size as u64;
