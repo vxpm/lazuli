@@ -6,7 +6,7 @@ use gekko::disasm::Ins;
 use gekko::{Reg, SPR};
 
 use super::BlockBuilder;
-use crate::NAMESPACE_LINK_DATA;
+use crate::NAMESPACE_EXIT_DATA;
 use crate::builder::util::IntoIrValue;
 use crate::builder::{Action, InstructionInfo, MEMFLAGS};
 
@@ -56,7 +56,7 @@ impl BlockBuilder<'_> {
             self.bd
                 .func
                 .declare_imported_user_function(ir::UserExternalName::new(
-                    NAMESPACE_LINK_DATA,
+                    NAMESPACE_EXIT_DATA,
                     self.link_index,
                 ));
 

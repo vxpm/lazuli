@@ -88,8 +88,7 @@ pub(crate) struct InstructionInfo {
 struct Signatures {
     block: ir::SigRef,
 
-    follow_link_hook: ir::SigRef,
-    try_link_hook: ir::SigRef,
+    exit_hook: ir::SigRef,
     read_i8_hook: ir::SigRef,
     read_i16_hook: ir::SigRef,
     read_i32_hook: ir::SigRef,
@@ -107,8 +106,7 @@ struct Signatures {
 }
 
 struct HookFuncs {
-    follow_link: ir::FuncRef,
-    try_link: ir::FuncRef,
+    exit: ir::FuncRef,
     read_i8: ir::FuncRef,
     read_i16: ir::FuncRef,
     read_i32: ir::FuncRef,
@@ -190,7 +188,7 @@ impl<'ctx> BlockBuilder<'ctx> {
         ));
 
         let ptr_type = codegen.isa.pointer_type();
-        let default = codegen.isa.default_call_conv();
+        let call_conv = codegen.isa.default_call_conv();
         let params = builder.block_params(entry_bb);
         let info_ptr = params[0];
         let ctx_ptr = params[1];
@@ -200,57 +198,57 @@ impl<'ctx> BlockBuilder<'ctx> {
         let sigs = Signatures {
             block: builder.import_signature(builder.func.signature.clone()),
 
-            follow_link_hook: builder.import_signature(Hooks::follow_link_sig(ptr_type, default)),
-            try_link_hook: builder.import_signature(Hooks::try_link_sig(ptr_type, default)),
+            exit_hook: builder.import_signature(Hooks::on_exit_sig(ptr_type, call_conv)),
             read_i8_hook: builder.import_signature(Hooks::read_sig(
                 ptr_type,
                 ir::types::I8,
-                default,
+                call_conv,
             )),
             read_i16_hook: builder.import_signature(Hooks::read_sig(
                 ptr_type,
                 ir::types::I16,
-                default,
+                call_conv,
             )),
             read_i32_hook: builder.import_signature(Hooks::read_sig(
                 ptr_type,
                 ir::types::I32,
-                default,
+                call_conv,
             )),
             read_i64_hook: builder.import_signature(Hooks::read_sig(
                 ptr_type,
                 ir::types::I64,
-                default,
+                call_conv,
             )),
             write_i8_hook: builder.import_signature(Hooks::write_sig(
                 ptr_type,
                 ir::types::I8,
-                default,
+                call_conv,
             )),
             write_i16_hook: builder.import_signature(Hooks::write_sig(
                 ptr_type,
                 ir::types::I16,
-                default,
+                call_conv,
             )),
             write_i32_hook: builder.import_signature(Hooks::write_sig(
                 ptr_type,
                 ir::types::I32,
-                default,
+                call_conv,
             )),
             write_i64_hook: builder.import_signature(Hooks::write_sig(
                 ptr_type,
                 ir::types::I64,
-                default,
+                call_conv,
             )),
-            read_quant_hook: builder.import_signature(Hooks::read_quantized_sig(ptr_type, default)),
+            read_quant_hook: builder
+                .import_signature(Hooks::read_quantized_sig(ptr_type, call_conv)),
             write_quant_hook: builder
-                .import_signature(Hooks::write_quantized_sig(ptr_type, default)),
+                .import_signature(Hooks::write_quantized_sig(ptr_type, call_conv)),
             invalidate_icache_hook: builder
-                .import_signature(Hooks::invalidate_icache_sig(ptr_type, default)),
-            generic_hook: builder.import_signature(Hooks::generic_hook_sig(ptr_type, default)),
+                .import_signature(Hooks::invalidate_icache_sig(ptr_type, call_conv)),
+            generic_hook: builder.import_signature(Hooks::generic_hook_sig(ptr_type, call_conv)),
 
             raise_exception: builder
-                .import_signature(exception::raise_exception_sig(ptr_type, default)),
+                .import_signature(exception::raise_exception_sig(ptr_type, call_conv)),
         };
 
         let raise_exception = {
@@ -286,8 +284,7 @@ impl<'ctx> BlockBuilder<'ctx> {
         };
 
         let hooks = HookFuncs {
-            follow_link: hook(sigs.follow_link_hook, HookKind::FollowLink),
-            try_link: hook(sigs.try_link_hook, HookKind::TryLink),
+            exit: hook(sigs.exit_hook, HookKind::Exit),
             read_i8: hook(sigs.read_i8_hook, HookKind::ReadI8),
             read_i16: hook(sigs.read_i16_hook, HookKind::ReadI16),
             read_i32: hook(sigs.read_i32_hook, HookKind::ReadI32),

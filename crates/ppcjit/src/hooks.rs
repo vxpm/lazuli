@@ -10,6 +10,10 @@ use crate::block::BlockFn;
 pub type Context = std::ffi::c_void;
 /// Data specific to a block exit.
 pub type ExitData = std::ffi::c_void;
+/// Count of how many instructions were executed in a block.
+pub type InstructionCount = u16;
+/// Count of how many cycles were executed in a block.
+pub type CycleCount = u16;
 
 /// Hook called before the first block in the chain starts executing. Should return a pointer to
 /// the CPU registers struct.
@@ -25,7 +29,12 @@ pub type GetFastmemHook = extern "C-unwind" fn(*mut Context) -> *mut FastmemLut;
 ///
 /// Should return a pointer to a block to jump to and keep the chain executing or `None` if you
 /// wish to exit the chain. In other words, this allows for _block linking_.
-pub type OnExit = extern "C-unwind" fn(*const Context, *mut ExitData) -> Option<BlockFn>;
+pub type ExitHook = extern "C-unwind" fn(
+    *const Context,
+    *mut ExitData,
+    InstructionCount,
+    CycleCount,
+) -> Option<BlockFn>;
 
 /// Hook called whenever the JIT wants to read a value of type `T` from an address that isn't
 /// accessible through fastmem. Should return whether the read failed.
@@ -51,8 +60,7 @@ pub type GenericHook = extern "C-unwind" fn(*mut Context);
 pub enum HookKind {
     GetRegisters,
     GetFastmem,
-    FollowLink,
-    TryLink,
+    Exit,
     ReadI8,
     ReadI16,
     ReadI32,
@@ -77,16 +85,9 @@ pub enum HookKind {
 
 /// External functions that JITed code calls.
 pub struct Hooks {
-    /// Hook that returns a pointer to the CPU state struct given the context.
     pub get_registers: GetRegistersHook,
-    /// Hook that returns a pointer to the fastmem LUT given the context.
     pub get_fastmem: GetFastmemHook,
-
-    /// Hook that checks whether a linked block should be followed or the execution should return.
-    pub follow_link: FollowLinkHook,
-    /// Tries to link this block to another one given the current context, the destination address
-    /// and a pointer to where the linked block function pointer should be stored.
-    pub try_link: TryLinkHook,
+    pub exit: ExitHook,
 
     // memory
     pub read_i8: ReadHook<i8>,
@@ -137,8 +138,7 @@ impl Hooks {
         Self {
             get_registers: stub!(),
             get_fastmem: stub!(),
-            follow_link: stub!(),
-            try_link: stub!(),
+            exit: stub!(),
             read_i8: stub!(),
             write_i8: stub!(),
             read_i16: stub!(),
@@ -184,28 +184,16 @@ impl Hooks {
         }
     }
 
-    /// Returns the function signature for the `follow_link` hook.
-    pub(crate) fn follow_link_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
-        ir::Signature {
-            params: vec![
-                ir::AbiParam::new(ptr_type), // info
-                ir::AbiParam::new(ptr_type), // ctx
-                ir::AbiParam::new(ptr_type), // lnk data
-            ],
-            returns: vec![ir::AbiParam::new(ir::types::I8)], // follow?
-            call_conv,
-        }
-    }
-
-    /// Returns the function signature for the `try_link` hook.
-    pub(crate) fn try_link_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
+    /// Returns the function signature for the `on_exit` hook.
+    pub(crate) fn on_exit_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
-                ir::AbiParam::new(ir::types::I32), // address to link to
-                ir::AbiParam::new(ptr_type),       // link ptr storage
+                ir::AbiParam::new(ptr_type),       // exit data
+                ir::AbiParam::new(ir::types::I16), // inst count
+                ir::AbiParam::new(ir::types::I16), // cycle count
             ],
-            returns: vec![],
+            returns: vec![ir::AbiParam::new(ptr_type)], // pointer to linked block
             call_conv,
         }
     }

@@ -42,7 +42,7 @@ pub use crate::{
     sequence::Sequence,
 };
 
-#[derive(Debug, Clone, PartialEq, Default, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct CodegenSettings {
     /// Whether to treat `sc` instructions as no-ops.
     pub nop_syscalls: bool,
@@ -52,6 +52,20 @@ pub struct CodegenSettings {
     pub ignore_unimplemented: bool,
     /// Whether to perform round to single operations.
     pub round_to_single: bool,
+    /// Layout of the exit data.
+    pub exit_data_layout: Layout,
+}
+
+impl Default for CodegenSettings {
+    fn default() -> Self {
+        Self {
+            nop_syscalls: false,
+            force_fpu: false,
+            ignore_unimplemented: false,
+            round_to_single: false,
+            exit_data_layout: Layout::new::<()>(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -67,7 +81,7 @@ pub type FastmemLut = [Option<NonNull<u8>>; FASTMEM_LUT_COUNT];
 
 const NAMESPACE_USER_HOOKS: u32 = 0;
 const NAMESPACE_INTERNALS: u32 = 1;
-const NAMESPACE_LINK_DATA: u32 = 2;
+const NAMESPACE_EXIT_DATA: u32 = 2;
 
 const INTERNAL_RAISE_EXCEPTION: u32 = 0;
 
@@ -178,8 +192,7 @@ impl Codegen {
                 let addr = match hook_kind {
                     HookKind::GetRegisters => self.hooks.get_registers as usize,
                     HookKind::GetFastmem => self.hooks.get_fastmem as usize,
-                    HookKind::FollowLink => self.hooks.follow_link as usize,
-                    HookKind::TryLink => self.hooks.try_link as usize,
+                    HookKind::Exit => self.hooks.exit as usize,
                     HookKind::ReadI8 => self.hooks.read_i8 as usize,
                     HookKind::ReadI16 => self.hooks.read_i16 as usize,
                     HookKind::ReadI32 => self.hooks.read_i32 as usize,
@@ -213,15 +226,15 @@ impl Codegen {
                 let addr = raise_exception as extern "C-unwind" fn(_, _) as usize;
                 jitclif::write_relocation(code, reloc, addr);
             }
-            NAMESPACE_LINK_DATA => {
-                let link_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
+            NAMESPACE_EXIT_DATA => {
+                let exit_data = self.module.allocate_data(self.settings.exit_data_layout);
 
                 // initialize as None
                 unsafe {
-                    link_data.as_ptr().cast::<Option<LinkData>>().write(None);
+                    exit_data.as_ptr().cast::<Option<LinkData>>().write(None);
                 }
 
-                let addr = unsafe { link_data.as_ptr().addr().get() };
+                let addr = unsafe { exit_data.as_ptr().addr().get() };
                 jitclif::write_relocation(code, reloc, addr);
             }
             _ => unreachable!(),
