@@ -8,8 +8,6 @@ mod memory;
 mod others;
 mod util;
 
-use std::mem::offset_of;
-
 use cranelift::codegen::ir;
 use cranelift::frontend;
 use cranelift::prelude::InstBuilder;
@@ -18,11 +16,12 @@ use gekko::disasm::{Ins, Opcode};
 use gekko::{Reg, SPR};
 use rustc_hash::FxHashMap;
 
-use crate::block::Info;
+use crate::block::ExitReason;
 use crate::builder::util::IntoIrValue;
 use crate::hooks::{HookKind, Hooks};
 use crate::{
-    Codegen, INTERNAL_RAISE_EXCEPTION, NAMESPACE_INTERNALS, NAMESPACE_USER_HOOKS, Sequence,
+    Codegen, INTERNAL_RAISE_EXCEPTION, NAMESPACE_EXIT_DATA, NAMESPACE_INTERNALS,
+    NAMESPACE_USER_HOOKS, Sequence,
 };
 
 const MEMFLAGS: ir::MemFlags = ir::MemFlags::trusted();
@@ -70,12 +69,10 @@ pub enum BuilderError {
 pub enum Action {
     /// Continue emitting instructions.
     Continue,
-    /// Flush registers and emit the prologue (returns).
-    FlushAndPrologue,
-    /// Just emit the prologue (returns).
-    Prologue,
-    /// Just return, no need to do anything else.
-    Finish,
+    /// Flush registers and exit the block.
+    FlushAndExit(ExitReason),
+    /// Exit the block (does not flush registers).
+    Exit(ExitReason),
 }
 
 #[derive(Clone, Copy)]
@@ -138,7 +135,6 @@ struct HookFuncs {
 struct Consts {
     ptr_type: ir::Type,
 
-    info_ptr: ir::Value,
     ctx_ptr: ir::Value,
     regs_ptr: ir::Value,
     fmem_ptr: ir::Value,
@@ -165,10 +161,7 @@ pub struct BlockBuilder<'ctx> {
     executed_cycles: u32,
     executed_instructions: u32,
 
-    link_index: u32,
-    last_updated_cycles: u32,
-    last_updated_instructions: u32,
-
+    exit_index: u32,
     ibat_changed: bool,
     dbat_changed: bool,
     floats_checked: bool,
@@ -190,15 +183,14 @@ impl<'ctx> BlockBuilder<'ctx> {
         let ptr_type = codegen.isa.pointer_type();
         let call_conv = codegen.isa.default_call_conv();
         let params = builder.block_params(entry_bb);
-        let info_ptr = params[0];
-        let ctx_ptr = params[1];
-        let regs_ptr = params[2];
-        let fmem_ptr = params[3];
+        let ctx_ptr = params[0];
+        let regs_ptr = params[1];
+        let fmem_ptr = params[2];
 
         let sigs = Signatures {
             block: builder.import_signature(builder.func.signature.clone()),
 
-            exit_hook: builder.import_signature(Hooks::on_exit_sig(ptr_type, call_conv)),
+            exit_hook: builder.import_signature(Hooks::exit_sig(ptr_type, call_conv)),
             read_i8_hook: builder.import_signature(Hooks::read_sig(
                 ptr_type,
                 ir::types::I8,
@@ -311,7 +303,6 @@ impl<'ctx> BlockBuilder<'ctx> {
         let consts = Consts {
             ptr_type,
 
-            info_ptr,
             ctx_ptr,
             regs_ptr,
             fmem_ptr,
@@ -329,12 +320,9 @@ impl<'ctx> BlockBuilder<'ctx> {
             hooks,
             current_bb: entry_bb,
 
-            link_index: 0,
+            exit_index: 0,
             executed_cycles: 0,
             executed_instructions: 0,
-
-            last_updated_cycles: 0,
-            last_updated_instructions: 0,
 
             ibat_changed: false,
             dbat_changed: false,
@@ -431,62 +419,34 @@ impl<'ctx> BlockBuilder<'ctx> {
         }
     }
 
-    /// Updates the Info struct.
-    fn update_info(&mut self) {
-        let cycles_delta = self.executed_cycles as i32 - self.last_updated_cycles as i32;
-        let instruction_delta =
-            self.executed_instructions as i32 - self.last_updated_instructions as i32;
-
-        if cycles_delta == 0 && instruction_delta == 0 {
-            return;
-        }
-
-        let instructions = self.bd.ins().load(
-            ir::types::I32,
-            MEMFLAGS,
-            self.consts.info_ptr,
-            offset_of!(Info, instructions) as i32,
-        );
-        let instructions = self
-            .bd
-            .ins()
-            .iadd_imm(instructions, instruction_delta as i64);
-        self.bd.ins().store(
-            MEMFLAGS,
-            instructions,
-            self.consts.info_ptr,
-            offset_of!(Info, instructions) as i32,
-        );
-
-        let cycles = self.bd.ins().load(
-            ir::types::I32,
-            MEMFLAGS,
-            self.consts.info_ptr,
-            offset_of!(Info, cycles) as i32,
-        );
-        let cycles = self.bd.ins().iadd_imm(cycles, cycles_delta as i64);
-        self.bd.ins().store(
-            MEMFLAGS,
-            cycles,
-            self.consts.info_ptr,
-            offset_of!(Info, cycles) as i32,
-        );
-
-        self.last_updated_cycles = self.executed_cycles;
-        self.last_updated_instructions = self.executed_instructions;
-    }
-
     /// Calls a generic context hook.
     fn call_generic_hook(&mut self, hook: ir::FuncRef) {
         self.bd.ins().call(hook, &[self.consts.ctx_ptr]);
     }
 
-    /// Emits the prologue:
-    /// - Call BAT hooks if they were changed
-    /// - Returns
-    fn prologue(&mut self) {
-        self.update_info();
+    fn create_exit_data(&mut self) -> ir::Value {
+        let exit_data_name =
+            self.bd
+                .func
+                .declare_imported_user_function(ir::UserExternalName::new(
+                    NAMESPACE_EXIT_DATA,
+                    self.exit_index,
+                ));
 
+        self.exit_index += 1;
+
+        let exit_data = self.bd.create_global_value(ir::GlobalValueData::Symbol {
+            name: ir::ExternalName::User(exit_data_name),
+            offset: ir::immediates::Imm64::new(0),
+            colocated: false,
+            tls: false,
+        });
+
+        self.bd.ins().global_value(self.consts.ptr_type, exit_data)
+    }
+
+    /// Emits the prologue and exits the block.
+    fn exit(&mut self, reason: ExitReason) {
         if self.dbat_changed {
             self.call_generic_hook(self.hooks.dbat_changed);
         }
@@ -495,17 +455,33 @@ impl<'ctx> BlockBuilder<'ctx> {
             self.call_generic_hook(self.hooks.ibat_changed);
         }
 
+        let exit_data_ptr = self.create_exit_data();
+        let reason = self.ir_value(reason.to_bits());
+        let inst_count = self.ir_value(self.executed_instructions);
+        let cycle_count = self.ir_value(self.executed_cycles);
+
+        self.bd.ins().call(
+            self.hooks.exit,
+            &[
+                self.consts.ctx_ptr,
+                exit_data_ptr,
+                reason,
+                inst_count,
+                cycle_count,
+            ],
+        );
+
         self.bd.ins().return_(&[]);
         self.bd
             .set_srcloc(ir::SourceLoc::new(self.executed_instructions));
     }
 
-    /// Calls [`prologue`] as if an instruction with `info` had been executed.
-    fn prologue_with(&mut self, info: InstructionInfo) {
+    /// Calls [`exit`] as if an instruction with `info` had been executed.
+    fn exit_with(&mut self, info: InstructionInfo, reason: ExitReason) {
         self.executed_instructions += 1;
         self.executed_cycles += info.cycles as u32;
 
-        self.prologue();
+        self.exit(reason);
 
         self.executed_instructions -= 1;
         self.executed_cycles -= info.cycles as u32;
@@ -716,7 +692,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Subfic => self.subfic(ins),
             Opcode::Subfme => self.subfme(ins),
             Opcode::Subfze => self.subfze(ins),
-            Opcode::Sync => self.nop(Action::FlushAndPrologue),
+            Opcode::Sync => self.nop(Action::FlushAndExit(ExitReason::SYNC)),
             Opcode::Tlbie => self.nop(Action::Continue),
             Opcode::Tlbsync => self.nop(Action::Continue),
             Opcode::Xor => self.xor(ins),
@@ -759,7 +735,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             let Some(ins) = instructions.next() else {
                 self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                 self.flush();
-                self.prologue();
+                self.exit(ExitReason::SYNC);
                 self.bd.finalize();
                 break;
             };
@@ -768,21 +744,16 @@ impl<'ctx> BlockBuilder<'ctx> {
 
             match self.emit(ins)? {
                 Action::Continue => (),
-                Action::FlushAndPrologue => {
+                Action::FlushAndExit(reason) => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.flush();
-                    self.prologue();
+                    self.exit(reason);
                     self.bd.finalize();
                     break;
                 }
-                Action::Prologue => {
+                Action::Exit(reason) => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
-                    self.prologue();
-                    self.bd.finalize();
-                    break;
-                }
-                Action::Finish => {
-                    self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
+                    self.exit(reason);
                     self.bd.finalize();
                     break;
                 }

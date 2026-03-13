@@ -8,7 +8,7 @@ use lazuli::gekko::{self, Cpu, DEQUANTIZATION_LUT, QUANTIZATION_LUT, QuantReg, Q
 use lazuli::system::{self, System};
 use lazuli::{Address, Cycles, Primitive};
 use mapping::Mapping;
-use ppcjit::block::{BlockFn, Info, LinkData, Pattern};
+use ppcjit::block::{BlockFn, LinkData, Pattern};
 use ppcjit::hooks::*;
 use ppcjit::{Block, FastmemLut};
 

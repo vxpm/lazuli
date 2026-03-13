@@ -57,10 +57,10 @@ impl BlockBuilder<'_> {
                 .func
                 .declare_imported_user_function(ir::UserExternalName::new(
                     NAMESPACE_EXIT_DATA,
-                    self.link_index,
+                    self.exit_index,
                 ));
 
-        self.link_index += 1;
+        self.exit_index += 1;
 
         let link_data = self.bd.create_global_value(ir::GlobalValueData::Symbol {
             name: ir::ExternalName::User(link_data_name),
@@ -94,7 +94,7 @@ impl BlockBuilder<'_> {
 
         // => dont follow link, exit
         self.switch_to_bb(exit);
-        self.prologue();
+        self.exit();
 
         // => follow link
         self.switch_to_bb(follow_link);
@@ -166,7 +166,7 @@ impl BlockBuilder<'_> {
 
         // => link failure
         self.switch_to_bb(link_failure);
-        self.prologue();
+        self.exit();
     }
 
     fn jump(&mut self, relative: bool, link_register: bool, block_link: bool, data: ir::Value) {
@@ -190,7 +190,7 @@ impl BlockBuilder<'_> {
         } else {
             self.set(Reg::PC, destination);
             self.flush();
-            self.prologue();
+            self.exit();
         }
 
         self.executed_instructions -= 1;

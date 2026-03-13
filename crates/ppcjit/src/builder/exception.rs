@@ -5,18 +5,19 @@ use gekko::disasm::Ins;
 use gekko::{Exception, Reg, SPR};
 
 use super::BlockBuilder;
+use crate::block::ExitReason;
 use crate::builder::{Action, InstructionInfo};
 
 const RFI_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::FlushAndPrologue,
+    action: Action::FlushAndExit(ExitReason::SYNC),
 };
 
 const EXCEPTION_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::Prologue,
+    action: Action::Exit(ExitReason::SYNC),
 };
 
 pub fn raise_exception_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
@@ -71,7 +72,7 @@ impl BlockBuilder<'_> {
 
         self.switch_to_bb(exit_block);
         self.raise_exception(Exception::FloatUnavailable);
-        self.prologue();
+        self.exit(ExitReason::SYNC);
 
         self.switch_to_bb(continue_block);
         self.current_bb = continue_block;
@@ -79,7 +80,7 @@ impl BlockBuilder<'_> {
 
     pub fn sc(&mut self, _: Ins) -> InstructionInfo {
         if self.codegen.settings.nop_syscalls {
-            return self.nop(Action::FlushAndPrologue);
+            return self.nop(Action::FlushAndExit(ExitReason::SYNC));
         }
 
         self.raise_exception(Exception::Syscall);

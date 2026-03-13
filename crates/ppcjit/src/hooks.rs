@@ -4,7 +4,7 @@ use gekko::{Address, Cpu, QuantReg};
 use strum::FromRepr;
 
 use crate::FastmemLut;
-use crate::block::BlockFn;
+use crate::block::{BlockFn, ExitReason};
 
 /// Caller context.
 pub type Context = std::ffi::c_void;
@@ -32,6 +32,7 @@ pub type GetFastmemHook = extern "C-unwind" fn(*mut Context) -> *mut FastmemLut;
 pub type ExitHook = extern "C-unwind" fn(
     *const Context,
     *mut ExitData,
+    ExitReason,
     InstructionCount,
     CycleCount,
 ) -> Option<BlockFn>;
@@ -185,11 +186,12 @@ impl Hooks {
     }
 
     /// Returns the function signature for the `on_exit` hook.
-    pub(crate) fn on_exit_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
+    pub(crate) fn exit_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
         ir::Signature {
             params: vec![
                 ir::AbiParam::new(ptr_type),       // ctx
                 ir::AbiParam::new(ptr_type),       // exit data
+                ir::AbiParam::new(ir::types::I64), // exit reason
                 ir::AbiParam::new(ir::types::I16), // inst count
                 ir::AbiParam::new(ir::types::I16), // cycle count
             ],

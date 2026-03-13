@@ -5,6 +5,7 @@ use gekko::{Reg, SPR};
 use zerocopy::IntoBytes;
 
 use super::{Action, BlockBuilder};
+use crate::block::ExitReason;
 use crate::builder::InstructionInfo;
 
 /// Trait for transforming values into an IR value in a function.
@@ -95,7 +96,7 @@ impl BlockBuilder<'_> {
         InstructionInfo {
             cycles: 2,
             auto_pc: true,
-            action: Action::FlushAndPrologue,
+            action: Action::FlushAndExit(ExitReason::SYNC),
         }
     }
 

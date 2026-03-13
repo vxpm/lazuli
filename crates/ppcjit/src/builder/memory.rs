@@ -4,6 +4,7 @@ use gekko::disasm::Ins;
 use gekko::{Exception, GPR, InsExt, SPR};
 
 use super::BlockBuilder;
+use crate::block::ExitReason;
 use crate::builder::{Action, InstructionInfo, MEMFLAGS, MEMFLAGS_READONLY};
 
 pub trait ReadWriteAble {
@@ -89,7 +90,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(LOAD_INFO);
+        self.exit_with(LOAD_INFO, ExitReason::SYNC);
 
         self.switch_to_bb(continue_block);
         self.bd
@@ -118,7 +119,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(STORE_INFO);
+        self.exit_with(STORE_INFO, ExitReason::SYNC);
 
         self.bd.seal_block(continue_block);
         self.switch_to_bb(continue_block);
@@ -244,7 +245,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(LOAD_INFO);
+        self.exit_with(LOAD_INFO, ExitReason::SYNC);
 
         self.switch_to_bb(continue_block);
         (
@@ -277,7 +278,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(STORE_INFO);
+        self.exit_with(STORE_INFO, ExitReason::SYNC);
 
         self.switch_to_bb(continue_block);
         self.bd.ins().uextend(ir::types::I32, size)

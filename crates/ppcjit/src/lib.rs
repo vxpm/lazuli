@@ -29,7 +29,7 @@ use gekko::disasm::Ins;
 use gekko::{Cpu, Exception};
 use serde::{Deserialize, Serialize};
 
-use crate::block::{BlockFn, Info, LinkData, Meta, Trampoline};
+use crate::block::{BlockFn, Meta, Trampoline};
 use crate::builder::BlockBuilder;
 use crate::cache::{ArtifactKey, Cache};
 use crate::hooks::{Context, HookKind, Hooks};
@@ -137,8 +137,8 @@ impl Codegen {
     fn block_signature(&self) -> ir::Signature {
         let ptr = self.isa.pointer_type();
         ir::Signature {
-            // info, ctx, regs, fastmem
-            params: vec![ir::AbiParam::new(ptr); 4],
+            // ctx, regs, fastmem
+            params: vec![ir::AbiParam::new(ptr); 3],
             returns: vec![],
             call_conv: codegen::isa::CallConv::Tail,
         }
@@ -229,9 +229,13 @@ impl Codegen {
             NAMESPACE_EXIT_DATA => {
                 let exit_data = self.module.allocate_data(self.settings.exit_data_layout);
 
-                // initialize as None
+                // zero initialize
                 unsafe {
-                    exit_data.as_ptr().cast::<Option<LinkData>>().write(None);
+                    std::ptr::write_bytes(
+                        exit_data.as_ptr().as_ptr().cast::<u8>(),
+                        0,
+                        self.settings.exit_data_layout.size(),
+                    );
                 }
 
                 let addr = unsafe { exit_data.as_ptr().addr().get() };
@@ -491,7 +495,7 @@ impl Jit {
     ///
     /// # Safety
     /// `ctx` must match the type expected by the hooks of this JIT context.
-    pub unsafe fn call(&mut self, ctx: *mut Context, block: BlockFn) -> Info {
+    pub unsafe fn call(&mut self, ctx: *mut Context, block: BlockFn) {
         // SAFETY: the exclusive reference to the context guarantees the allocator is not being
         // used, keeping the allocations safe
         unsafe { self.trampoline.call(ctx, block) }

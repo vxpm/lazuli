@@ -1,28 +1,48 @@
 use std::ffi::c_void;
 use std::ptr::NonNull;
 
+use bitos::bitos;
 use jitalloc::{Allocation, ReadExec};
 
 use crate::Sequence;
 use crate::hooks::Context;
 
-#[derive(Debug)]
-#[repr(C)]
-pub struct LinkData {
-    /// Linked block
-    pub block: BlockFn,
-    /// Information regarding the pattern of the linked block
-    pub pattern: Pattern,
+/// Metadata regarding a branch exit.
+#[bitos(35)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchMeta {
+    /// Whether the target address is relative to the branch address.
+    #[bits(0)]
+    pub relative: bool,
+    /// Whether the branch is conditional.
+    #[bits(1)]
+    pub conditional: bool,
+    /// Whether the branch is indirect (i.e. not encoded directly in the branch instruction).
+    #[bits(2)]
+    pub indirect: bool,
+    /// Address of the branch.
+    #[bits(3..35)]
+    pub address: u32,
 }
 
-/// Information about block execution.
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct Info {
-    /// How many instructions have been executed already. Updated on block exits only.
-    pub instructions: u32,
-    /// How many cycles have been executed already. Updated on block exits only.
-    pub cycles: u32,
+#[bitos(1)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExitKind {
+    Sync   = 0b0,
+    Branch = 0b1,
+}
+
+#[bitos(64)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExitReason {
+    #[bits(0)]
+    pub kind: ExitKind,
+    #[bits(1..36)]
+    pub branch: BranchMeta,
+}
+
+impl ExitReason {
+    pub const SYNC: Self = Self(0);
 }
 
 /// Information regarding a block's execution.
@@ -100,7 +120,7 @@ impl Block {
 /// A trampoline that allows calling blocks produced by a [`Jit`](super::Jit) compiler.
 pub(super) struct Trampoline(pub(super) Allocation<ReadExec>);
 
-type TrampolineFn = extern "C-unwind" fn(*mut Info, *mut Context, BlockFn);
+type TrampolineFn = extern "C-unwind" fn(*mut Context, BlockFn);
 
 impl Trampoline {
     /// Calls the given block using this trampoline.
@@ -108,15 +128,8 @@ impl Trampoline {
     /// # Safety
     /// The allocator used for this trampoline and the block must not be used while the block is
     /// being called (i.e. this function is being executed).
-    pub unsafe fn call(&self, ctx: *mut Context, block: BlockFn) -> Info {
-        let mut info = Info {
-            instructions: 0,
-            cycles: 0,
-        };
-
+    pub unsafe fn call(&self, ctx: *mut Context, block: BlockFn) {
         let trampoline: TrampolineFn = unsafe { std::mem::transmute(self.0.as_ptr().cast::<u8>()) };
-        trampoline(&raw mut info, ctx, block);
-
-        info
+        trampoline(ctx, block);
     }
 }
