@@ -95,7 +95,7 @@ impl BlockBuilder<'_> {
         InstructionInfo {
             cycles: 2,
             auto_pc: true,
-            action: Action::FlushAndPrologue,
+            action: Action::FlushAndExit,
         }
     }
 

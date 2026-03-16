@@ -89,7 +89,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(LOAD_INFO);
+        self.exit_with(LOAD_INFO);
 
         self.switch_to_bb(continue_block);
         self.bd
@@ -118,7 +118,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(STORE_INFO);
+        self.exit_with(STORE_INFO);
 
         self.bd.seal_block(continue_block);
         self.switch_to_bb(continue_block);
@@ -244,7 +244,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(LOAD_INFO);
+        self.exit_with(LOAD_INFO);
 
         self.switch_to_bb(continue_block);
         (
@@ -277,7 +277,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         self.set(SPR::DAR, addr);
         self.raise_exception(Exception::DSI);
-        self.prologue_with(STORE_INFO);
+        self.exit_with(STORE_INFO);
 
         self.switch_to_bb(continue_block);
         self.bd.ins().uextend(ir::types::I32, size)

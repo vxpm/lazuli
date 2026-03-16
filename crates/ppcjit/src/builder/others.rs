@@ -46,13 +46,13 @@ const DCACHE_INFO: InstructionInfo = InstructionInfo {
 const INV_ICACHE_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: true,
-    action: Action::FlushAndPrologue,
+    action: Action::FlushAndExit,
 };
 
 const SYNC_ICACHE_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: true,
-    action: Action::FlushAndPrologue,
+    action: Action::FlushAndExit,
 };
 
 fn generate_mask(control: u8) -> u32 {

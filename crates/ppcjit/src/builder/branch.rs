@@ -13,7 +13,7 @@ use crate::builder::{Action, InstructionInfo, MEMFLAGS};
 const UNCONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::Finish,
+    action: Action::RawExit,
 };
 
 const CONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
@@ -94,7 +94,7 @@ impl BlockBuilder<'_> {
 
         // => dont follow link, exit
         self.switch_to_bb(exit);
-        self.prologue();
+        self.exit();
 
         // => follow link
         self.switch_to_bb(follow_link);
@@ -166,7 +166,7 @@ impl BlockBuilder<'_> {
 
         // => link failure
         self.switch_to_bb(link_failure);
-        self.prologue();
+        self.exit();
     }
 
     fn jump(&mut self, relative: bool, link_register: bool, block_link: bool, data: ir::Value) {
@@ -190,7 +190,7 @@ impl BlockBuilder<'_> {
         } else {
             self.set(Reg::PC, destination);
             self.flush();
-            self.prologue();
+            self.exit();
         }
 
         self.executed_instructions -= 1;

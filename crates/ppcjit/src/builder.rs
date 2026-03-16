@@ -70,12 +70,12 @@ pub enum BuilderError {
 pub enum Action {
     /// Continue emitting instructions.
     Continue,
-    /// Flush registers and emit the prologue (returns).
-    FlushAndPrologue,
-    /// Just emit the prologue (returns).
-    Prologue,
-    /// Just return, no need to do anything else.
-    Finish,
+    /// Flush registers and exit the block.
+    FlushAndExit,
+    /// Exit the block.
+    Exit,
+    /// Exit the block without calling the prologue.
+    RawExit,
 }
 
 #[derive(Clone, Copy)]
@@ -484,10 +484,8 @@ impl<'ctx> BlockBuilder<'ctx> {
         self.bd.ins().call(hook, &[self.consts.ctx_ptr]);
     }
 
-    /// Emits the prologue:
-    /// - Call BAT hooks if they were changed
-    /// - Returns
-    fn prologue(&mut self) {
+    /// Exits the block.
+    fn exit(&mut self) {
         self.update_info();
 
         if self.dbat_changed {
@@ -503,12 +501,12 @@ impl<'ctx> BlockBuilder<'ctx> {
             .set_srcloc(ir::SourceLoc::new(self.executed_instructions));
     }
 
-    /// Calls [`prologue`] as if an instruction with `info` had been executed.
-    fn prologue_with(&mut self, info: InstructionInfo) {
+    /// Calls [`exit`] as if an instruction with `info` had been executed.
+    fn exit_with(&mut self, info: InstructionInfo) {
         self.executed_instructions += 1;
         self.executed_cycles += info.cycles as u32;
 
-        self.prologue();
+        self.exit();
 
         self.executed_instructions -= 1;
         self.executed_cycles -= info.cycles as u32;
@@ -719,7 +717,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Subfic => self.subfic(ins),
             Opcode::Subfme => self.subfme(ins),
             Opcode::Subfze => self.subfze(ins),
-            Opcode::Sync => self.nop(Action::FlushAndPrologue),
+            Opcode::Sync => self.nop(Action::FlushAndExit),
             Opcode::Tlbie => self.nop(Action::Continue),
             Opcode::Tlbsync => self.nop(Action::Continue),
             Opcode::Xor => self.xor(ins),
@@ -762,7 +760,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             let Some(ins) = instructions.next() else {
                 self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                 self.flush();
-                self.prologue();
+                self.exit();
                 self.bd.finalize();
                 break;
             };
@@ -771,20 +769,20 @@ impl<'ctx> BlockBuilder<'ctx> {
 
             match self.emit(ins)? {
                 Action::Continue => (),
-                Action::FlushAndPrologue => {
+                Action::FlushAndExit => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.flush();
-                    self.prologue();
+                    self.exit();
                     self.bd.finalize();
                     break;
                 }
-                Action::Prologue => {
+                Action::Exit => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
-                    self.prologue();
+                    self.exit();
                     self.bd.finalize();
                     break;
                 }
-                Action::Finish => {
+                Action::RawExit => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.bd.finalize();
                     break;
