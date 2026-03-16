@@ -446,7 +446,7 @@ impl<'ctx> BlockBuilder<'ctx> {
     }
 
     /// Emits the prologue and exits the block.
-    fn exit(&mut self, reason: ExitReason) {
+    fn exit(&mut self, reason: impl IntoIrValue) {
         if self.dbat_changed {
             self.call_generic_hook(self.hooks.dbat_changed);
         }
@@ -456,7 +456,7 @@ impl<'ctx> BlockBuilder<'ctx> {
         }
 
         let exit_data_ptr = self.create_exit_data();
-        let reason = self.ir_value(reason.to_bits());
+        let reason = self.ir_value(reason);
         let inst_count = self.ir_value(self.executed_instructions);
         let cycle_count = self.ir_value(self.executed_cycles);
 

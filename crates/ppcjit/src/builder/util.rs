@@ -73,6 +73,12 @@ impl IntoIrValue for f64 {
     }
 }
 
+impl IntoIrValue for ExitReason {
+    fn into_value(self, bd: &mut FunctionBuilder<'_>) -> ir::Value {
+        bd.ins().iconst(ir::types::I64, self.to_bits() as i64)
+    }
+}
+
 impl BlockBuilder<'_> {
     /// NOP instruction - does absolutely nothing on purpose.
     pub fn nop(&mut self, action: Action) -> InstructionInfo {

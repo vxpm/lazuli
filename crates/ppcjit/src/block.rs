@@ -8,8 +8,8 @@ use crate::Sequence;
 use crate::hooks::Context;
 
 /// Metadata regarding a branch exit.
-#[bitos(35)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[bitos(3)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BranchMeta {
     /// Whether the target address is relative to the branch address.
     #[bits(0)]
@@ -20,9 +20,6 @@ pub struct BranchMeta {
     /// Whether the branch is indirect (i.e. not encoded directly in the branch instruction).
     #[bits(2)]
     pub indirect: bool,
-    /// Address of the branch.
-    #[bits(3..35)]
-    pub address: u32,
 }
 
 #[bitos(1)]
@@ -37,12 +34,20 @@ pub enum ExitKind {
 pub struct ExitReason {
     #[bits(0)]
     pub kind: ExitKind,
-    #[bits(1..36)]
+    #[bits(1..4)]
     pub branch: BranchMeta,
+    #[bits(4..36)]
+    pub address: u32,
 }
 
 impl ExitReason {
     pub const SYNC: Self = Self(0);
+
+    pub fn from_branch(branch: BranchMeta) -> Self {
+        Self::from_bits(0)
+            .with_kind(ExitKind::Branch)
+            .with_branch(branch)
+    }
 }
 
 /// Information regarding a block's execution.
