@@ -102,7 +102,7 @@ impl BlockBuilder<'_> {
         InstructionInfo {
             cycles: 2,
             auto_pc: true,
-            action: Action::FlushAndExit(ExitReason::SYNC),
+            action: Action::FlushAndSync,
         }
     }
 

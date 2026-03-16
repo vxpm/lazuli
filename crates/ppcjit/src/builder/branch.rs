@@ -1,26 +1,14 @@
 use bitos::bitos;
 use bitos::integer::u5;
 use cranelift::codegen::ir;
-use cranelift::prelude::{Imm64, InstBuilder};
+use cranelift::prelude::InstBuilder;
 use gekko::disasm::Ins;
 use gekko::{Reg, SPR};
 
-use super::BlockBuilder;
+use super::{Action, BlockBuilder};
 use crate::block::{BranchMeta, ExitReason};
+use crate::builder::InstructionInfo;
 use crate::builder::util::IntoIrValue;
-use crate::builder::{Action, InstructionInfo, MEMFLAGS};
-
-const UNCONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
-    cycles: 2,
-    auto_pc: false,
-    action: Action::Finish,
-};
-
-const CONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
-    cycles: 2,
-    auto_pc: true,
-    action: Action::Continue,
-};
 
 #[bitos(1)]
 #[derive(Debug, Clone, Copy)]
@@ -51,124 +39,7 @@ impl BranchOptions {
 }
 
 impl BlockBuilder<'_> {
-    // fn jump_with_block_link(&mut self, destination: ir::Value) {
-    //     let link_data_name =
-    //         self.bd
-    //             .func
-    //             .declare_imported_user_function(ir::UserExternalName::new(
-    //                 NAMESPACE_EXIT_DATA,
-    //                 self.exit_index,
-    //             ));
-    //
-    //     self.exit_index += 1;
-    //
-    //     let link_data = self.bd.create_global_value(ir::GlobalValueData::Symbol {
-    //         name: ir::ExternalName::User(link_data_name),
-    //         offset: Imm64::new(0),
-    //         colocated: false,
-    //         tls: false,
-    //     });
-    //
-    //     self.update_info();
-    //     self.flush();
-    //
-    //     let link_data_ptr = self.bd.ins().global_value(self.consts.ptr_type, link_data);
-    //     let inst = self.bd.ins().call(
-    //         self.hooks.follow_link,
-    //         &[self.consts.info_ptr, self.consts.ctx_ptr, link_data_ptr],
-    //     );
-    //
-    //     self.store_reg(Reg::PC, destination);
-    //
-    //     let should_follow_link = self.bd.inst_results(inst)[0];
-    //     let follow_link = self.bd.create_block();
-    //     let exit = self.bd.create_block();
-    //
-    //     self.bd
-    //         .ins()
-    //         .brif(should_follow_link, follow_link, &[], exit, &[]);
-    //
-    //     self.bd.seal_block(follow_link);
-    //     self.bd.seal_block(exit);
-    //     self.bd.set_cold_block(exit);
-    //
-    //     // => dont follow link, exit
-    //     self.switch_to_bb(exit);
-    //     self.exit();
-    //
-    //     // => follow link
-    //     self.switch_to_bb(follow_link);
-    //
-    //     // do we need to link?
-    //     let stored_link = self
-    //         .bd
-    //         .ins()
-    //         .load(self.consts.ptr_type, MEMFLAGS, link_data_ptr, 0);
-    //
-    //     let call_linked = self.bd.create_block();
-    //     let need_to_link = self.bd.create_block();
-    //     let link_failure = self.bd.create_block();
-    //     self.bd.set_cold_block(need_to_link);
-    //     self.bd.set_cold_block(link_failure);
-    //
-    //     self.bd
-    //         .append_block_param(call_linked, self.consts.ptr_type);
-    //
-    //     self.bd.ins().brif(
-    //         stored_link,
-    //         call_linked,
-    //         &[ir::BlockArg::Value(stored_link)],
-    //         need_to_link,
-    //         &[],
-    //     );
-    //
-    //     self.bd.seal_block(need_to_link);
-    //
-    //     // => need to link
-    //     self.switch_to_bb(need_to_link);
-    //
-    //     // call try link hook
-    //     self.bd.ins().call(
-    //         self.hooks.try_link,
-    //         &[self.consts.ctx_ptr, destination, link_data_ptr],
-    //     );
-    //
-    //     // was the link successful?
-    //     let stored_link = self
-    //         .bd
-    //         .ins()
-    //         .load(self.consts.ptr_type, MEMFLAGS, link_data_ptr, 0);
-    //
-    //     self.bd.ins().brif(
-    //         stored_link,
-    //         call_linked,
-    //         &[ir::BlockArg::Value(stored_link)],
-    //         link_failure,
-    //         &[],
-    //     );
-    //
-    //     self.bd.seal_block(call_linked);
-    //     self.bd.seal_block(link_failure);
-    //
-    //     // => call linked
-    //     self.switch_to_bb(call_linked);
-    //     let link = self.bd.block_params(call_linked)[0];
-    //     self.bd.ins().return_call_indirect(
-    //         self.consts.signatures.block,
-    //         link,
-    //         &[
-    //             self.consts.info_ptr,
-    //             self.consts.ctx_ptr,
-    //             self.consts.regs_ptr,
-    //             self.consts.fmem_ptr,
-    //         ],
-    //     );
-    //
-    //     // => link failure
-    //     self.switch_to_bb(link_failure);
-    //     self.exit();
-    // }
-
+    /// Jumps to `target` and returns an `ExitReason` for the branch.
     fn jump(
         &mut self,
         relative: bool,
@@ -176,7 +47,7 @@ impl BlockBuilder<'_> {
         indirect: bool,
         link_register: bool,
         target: ir::Value,
-    ) {
+    ) -> ir::Value {
         let current_pc = self.get(Reg::PC);
         let destination = if relative {
             self.bd.ins().iadd(current_pc, target)
@@ -200,14 +71,18 @@ impl BlockBuilder<'_> {
         let reason = self.bd.ins().bor_imm(current_pc, reason.to_bits() as i64);
 
         self.set(Reg::PC, destination);
-        self.flush();
-        self.exit(reason);
+        reason
     }
 
     pub fn b(&mut self, ins: Ins) -> InstructionInfo {
         let destination = self.ir_value(ins.field_li());
-        self.jump(!ins.field_aa(), false, false, ins.field_lk(), destination);
-        UNCONDITIONAL_BRANCH_INFO
+        let reason = self.jump(!ins.field_aa(), false, false, ins.field_lk(), destination);
+
+        InstructionInfo {
+            cycles: 2,
+            auto_pc: false,
+            action: Action::FlushAndBranch(reason),
+        }
     }
 
     fn branch(
@@ -221,8 +96,12 @@ impl BlockBuilder<'_> {
         let target = self.ir_value(target);
 
         if options.is_unconditional() {
-            self.jump(relative, false, indirect, ins.field_lk(), target);
-            return UNCONDITIONAL_BRANCH_INFO;
+            let reason = self.jump(relative, false, indirect, ins.field_lk(), target);
+            return InstructionInfo {
+                cycles: 2,
+                auto_pc: false,
+                action: Action::FlushAndBranch(reason),
+            };
         }
 
         let cond_bit = 31 - ins.field_bi();
@@ -275,7 +154,9 @@ impl BlockBuilder<'_> {
         // => exit (take branch)
         self.switch_to_bb(exit_block);
         let target = self.ir_value(target);
-        self.jump(relative, true, indirect, ins.field_lk(), target);
+        let reason = self.jump(relative, true, indirect, ins.field_lk(), target);
+        self.flush();
+        self.exit(reason);
 
         // => continue (do not take branch)
         self.switch_to_bb(continue_block);
@@ -283,7 +164,11 @@ impl BlockBuilder<'_> {
 
         self.set(Reg::PC, current_pc);
 
-        CONDITIONAL_BRANCH_INFO
+        InstructionInfo {
+            cycles: 2,
+            auto_pc: true,
+            action: Action::Continue,
+        }
     }
 
     pub fn bc(&mut self, ins: Ins) -> InstructionInfo {

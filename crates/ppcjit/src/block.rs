@@ -86,7 +86,7 @@ pub struct Meta {
     /// The disassembly of this block. Only available if `cfg!(debug_assertions)` is true.
     pub disasm: Option<String>,
     /// How many cycles this block executes at most.
-    pub cycles: u32,
+    pub cycles: u16,
     /// The pattern of this block.
     pub pattern: Pattern,
 }

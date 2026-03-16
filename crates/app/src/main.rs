@@ -4,6 +4,7 @@ mod cli;
 mod runner;
 mod windows;
 
+use std::alloc::Layout;
 use std::io::BufReader;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -58,9 +59,7 @@ impl App {
             let file = std::fs::File::open(path)?;
             let reader = BufReader::new(file);
             match extension {
-                "iso" => {
-                    Box::new(IsoModule(Some(reader)))
-                }
+                "iso" => Box::new(IsoModule(Some(reader))),
                 "rvz" => {
                     let rvz = Rvz::new(reader).unwrap();
                     let rvz = RvzModule::new(rvz);
@@ -132,6 +131,7 @@ impl App {
                         force_fpu: cfg.ppcjit.force_fpu,
                         ignore_unimplemented: cfg.ppcjit.ignore_unimplemented_inst,
                         round_to_single: cfg.ppcjit.round_to_single,
+                        exit_data_layout: Layout::new::<u8>(),
                     },
                     cache_path: Some(jit_cache_path),
                 },

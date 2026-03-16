@@ -284,7 +284,7 @@ pub struct Jit {
 struct Translated {
     func: ir::Function,
     sequence: Sequence,
-    cycles: u32,
+    cycles: u16,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -330,9 +330,8 @@ impl Jit {
         builder.seal_block(entry_bb);
 
         let params = builder.block_params(entry_bb);
-        let info_ptr = params[0];
-        let ctx_ptr = params[1];
-        let block_ptr = params[2];
+        let ctx_ptr = params[0];
+        let block_ptr = params[1];
         let ptr_type = codegen.isa.pointer_type();
         let default = codegen.isa.default_call_conv();
 
@@ -358,11 +357,9 @@ impl Jit {
 
         // call the block
         let block_sig = builder.import_signature(block_sig);
-        builder.ins().call_indirect(
-            block_sig,
-            block_ptr,
-            &[info_ptr, ctx_ptr, regs_ptr, fmem_ptr],
-        );
+        builder
+            .ins()
+            .call_indirect(block_sig, block_ptr, &[ctx_ptr, regs_ptr, fmem_ptr]);
 
         builder.ins().return_(&[]);
         builder.finalize();
@@ -413,6 +410,8 @@ impl Jit {
         if sequence.is_empty() {
             return Err(BuildError::EmptyBlock);
         }
+
+        println!("{}", func.display());
 
         Ok(Translated {
             func,

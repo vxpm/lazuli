@@ -5,7 +5,6 @@ use gekko::disasm::Ins;
 use gekko::{InsExt, Reg, SPR};
 
 use super::BlockBuilder;
-use crate::block::ExitReason;
 use crate::builder::{Action, InstructionInfo};
 
 const SPR_INFO: InstructionInfo = InstructionInfo {
@@ -47,13 +46,13 @@ const DCACHE_INFO: InstructionInfo = InstructionInfo {
 const INV_ICACHE_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: true,
-    action: Action::FlushAndExit(ExitReason::SYNC),
+    action: Action::FlushAndSync,
 };
 
 const SYNC_ICACHE_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: true,
-    action: Action::FlushAndExit(ExitReason::SYNC),
+    action: Action::FlushAndSync,
 };
 
 fn generate_mask(control: u8) -> u32 {

@@ -11,13 +11,13 @@ use crate::builder::{Action, InstructionInfo};
 const RFI_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::FlushAndExit(ExitReason::SYNC),
+    action: Action::FlushAndSync,
 };
 
 const EXCEPTION_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::Exit(ExitReason::SYNC),
+    action: Action::Exit,
 };
 
 pub fn raise_exception_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
@@ -72,6 +72,7 @@ impl BlockBuilder<'_> {
 
         self.switch_to_bb(exit_block);
         self.raise_exception(Exception::FloatUnavailable);
+        self.flush();
         self.exit(ExitReason::SYNC);
 
         self.switch_to_bb(continue_block);
@@ -80,7 +81,7 @@ impl BlockBuilder<'_> {
 
     pub fn sc(&mut self, _: Ins) -> InstructionInfo {
         if self.codegen.settings.nop_syscalls {
-            return self.nop(Action::FlushAndExit(ExitReason::SYNC));
+            return self.nop(Action::FlushAndSync);
         }
 
         self.raise_exception(Exception::Syscall);

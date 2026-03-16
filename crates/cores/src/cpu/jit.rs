@@ -8,7 +8,7 @@ use lazuli::gekko::{self, Cpu, DEQUANTIZATION_LUT, QUANTIZATION_LUT, QuantReg, Q
 use lazuli::system::{self, System};
 use lazuli::{Address, Cycles, Primitive};
 use mapping::Mapping;
-use ppcjit::block::{BlockFn, LinkData, Pattern};
+use ppcjit::block::{BlockFn, ExitReason, Pattern};
 use ppcjit::hooks::*;
 use ppcjit::{Block, FastmemLut};
 
@@ -21,7 +21,7 @@ pub struct BlockId(usize);
 
 pub struct StoredBlock {
     pub inner: Block,
-    pub links: Vec<*mut Option<LinkData>>,
+    // pub links: Vec<*mut Option<LinkData>>,
 }
 
 // TODO: this is problematic
@@ -101,7 +101,7 @@ impl Blocks {
 
         self.storage.push(StoredBlock {
             inner: block,
-            links: Vec::new(),
+            // links: Vec::new(),
         });
 
         self.insert_mapping(logical, addr, Mapping { id, length });
@@ -152,11 +152,11 @@ impl Blocks {
                 continue;
             };
 
-            let block = &mut self.storage[mapping.id.0];
-            for link in block.links.drain(..) {
-                let link = unsafe { link.as_mut().unwrap() };
-                *link = None;
-            }
+            // let block = &mut self.storage[mapping.id.0];
+            // for link in block.links.drain(..) {
+            //     let link = unsafe { link.as_mut().unwrap() };
+            //     *link = None;
+            // }
         }
 
         temp_deps.clear();
@@ -172,12 +172,6 @@ impl Blocks {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ExitReason {
-    None,
-    IdleLooping,
-}
-
 /// Context to be passed in for execution of JIT blocks.
 struct Context<'a> {
     /// The system state, so that the JIT block can operate on it.
@@ -186,6 +180,10 @@ struct Context<'a> {
     blocks: &'a mut Blocks,
     /// ICache
     icache: &'a mut icache::Cache,
+    /// How many cycles have been executed.
+    executed_cycles: u32,
+    /// How many instructions have been executed.
+    executed_instructions: u32,
     /// Amount of cycles we are trying to execute.
     target_cycles: u32,
     /// Maximum instructions we should execute.
@@ -194,8 +192,6 @@ struct Context<'a> {
     force_no_link: bool,
     /// Last followed link.
     last_followed_link: Option<BlockFn>,
-    /// Reason for exit.
-    exit_reason: ExitReason,
 }
 
 const CTX_HOOKS: Hooks = {
@@ -211,59 +207,71 @@ const CTX_HOOKS: Hooks = {
         }
     }
 
-    extern "C-unwind" fn follow_link(
-        info: &Info,
+    extern "C-unwind" fn exit(
         ctx: &mut Context,
-        link_data: &mut Option<LinkData>,
-    ) -> bool {
-        // if we have reached cycle or instruction limit, don't follow links, just exit.
-        if ctx.force_no_link
-            || info.cycles >= ctx.target_cycles
-            || info.instructions >= ctx.max_instructions
-        {
-            ctx.last_followed_link = None;
-            return false;
-        }
-
-        let Some(link_data) = link_data else {
-            return true;
-        };
-
-        // otherwise, detect whether we are idle looping and exit too
-        let follow = match link_data.pattern {
-            Pattern::IdleBasic | Pattern::IdleVolatileRead => {
-                if ctx.last_followed_link == Some(link_data.block) {
-                    ctx.exit_reason = ExitReason::IdleLooping;
-                    false
-                } else {
-                    true
-                }
-            }
-            _ => true,
-        };
-
-        // if not idle looping, then sure, follow link
-        ctx.last_followed_link = Some(link_data.block);
-        follow
+        data: &mut ExitData,
+        reason: ExitReason,
+        instructions: u16,
+        cycles: u16,
+    ) -> Option<BlockFn> {
+        ctx.executed_instructions += instructions as u32;
+        ctx.executed_cycles += cycles as u32;
+        None
     }
 
-    extern "C-unwind" fn try_link(
-        ctx: &mut Context,
-        addr: Address,
-        link_data: &mut Option<LinkData>,
-    ) {
-        debug_assert!(link_data.is_none());
-        let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
-        if let Some(mapping) = ctx.blocks.get_mapping(logical, addr) {
-            let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
-            *link_data = Some(LinkData {
-                block: stored.inner.as_ptr(),
-                pattern: stored.inner.meta().pattern,
-            });
-
-            stored.links.push(&raw mut *link_data);
-        }
-    }
+    // extern "C-unwind" fn follow_link(
+    //     info: &Info,
+    //     ctx: &mut Context,
+    //     link_data: &mut Option<LinkData>,
+    // ) -> bool {
+    //     // if we have reached cycle or instruction limit, don't follow links, just exit.
+    //     if ctx.force_no_link
+    //         || info.cycles >= ctx.target_cycles
+    //         || info.instructions >= ctx.max_instructions
+    //     {
+    //         ctx.last_followed_link = None;
+    //         return false;
+    //     }
+    //
+    //     let Some(link_data) = link_data else {
+    //         return true;
+    //     };
+    //
+    //     // otherwise, detect whether we are idle looping and exit too
+    //     let follow = match link_data.pattern {
+    //         Pattern::IdleBasic | Pattern::IdleVolatileRead => {
+    //             if ctx.last_followed_link == Some(link_data.block) {
+    //                 ctx.exit_reason = ExitReason::IdleLooping;
+    //                 false
+    //             } else {
+    //                 true
+    //             }
+    //         }
+    //         _ => true,
+    //     };
+    //
+    //     // if not idle looping, then sure, follow link
+    //     ctx.last_followed_link = Some(link_data.block);
+    //     follow
+    // }
+    //
+    // extern "C-unwind" fn try_link(
+    //     ctx: &mut Context,
+    //     addr: Address,
+    //     link_data: &mut Option<LinkData>,
+    // ) {
+    //     debug_assert!(link_data.is_none());
+    //     let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
+    //     if let Some(mapping) = ctx.blocks.get_mapping(logical, addr) {
+    //         let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
+    //         *link_data = Some(LinkData {
+    //             block: stored.inner.as_ptr(),
+    //             pattern: stored.inner.meta().pattern,
+    //         });
+    //
+    //         stored.links.push(&raw mut *link_data);
+    //     }
+    // }
 
     extern "C-unwind" fn read<P: Primitive>(
         ctx: &mut Context,
@@ -468,9 +476,11 @@ const CTX_HOOKS: Hooks = {
         let get_fastmem =
             transmute::<_, GetFastmemHook>(get_fastmem as extern "C-unwind" fn(_) -> _);
 
-        let follow_link =
-            transmute::<_, FollowLinkHook>(follow_link as extern "C-unwind" fn(_, _, _) -> _);
-        let try_link = transmute::<_, TryLinkHook>(try_link as extern "C-unwind" fn(_, _, _));
+        let exit = transmute::<_, ExitHook>(exit as extern "C-unwind" fn(_, _, _, _, _) -> _);
+
+        // let follow_link =
+        //     transmute::<_, FollowLinkHook>(follow_link as extern "C-unwind" fn(_, _, _) -> _);
+        // let try_link = transmute::<_, TryLinkHook>(try_link as extern "C-unwind" fn(_, _, _));
 
         let read_i8 =
             transmute::<_, ReadHook<i8>>(read::<i8> as extern "C-unwind" fn(_, _, _) -> _);
@@ -515,8 +525,7 @@ const CTX_HOOKS: Hooks = {
             get_registers,
             get_fastmem,
 
-            follow_link,
-            try_link,
+            exit,
 
             read_i8,
             write_i8,
@@ -670,29 +679,22 @@ impl Core {
             sys,
             blocks: &mut self.blocks,
             icache: &mut self.icache,
+            executed_cycles: 0,
+            executed_instructions: 0,
             target_cycles,
             max_instructions,
             force_no_link,
-
             last_followed_link: None,
-            exit_reason: ExitReason::None,
         };
 
-        let info = unsafe {
+        unsafe {
             self.compiler
                 .call(&raw mut ctx as *mut ppcjit::hooks::Context, block)
-        };
-
-        let cycles = if ctx.exit_reason == ExitReason::IdleLooping {
-            std::hint::cold_path();
-            Cycles(target_cycles as u64)
-        } else {
-            Cycles(info.cycles as u64)
-        };
+        }
 
         Executed {
-            instructions: info.instructions,
-            cycles,
+            instructions: ctx.executed_instructions,
+            cycles: Cycles(ctx.executed_cycles as u64),
             hit_breakpoint: false,
         }
     }

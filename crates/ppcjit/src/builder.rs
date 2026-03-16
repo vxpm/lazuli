@@ -69,10 +69,12 @@ pub enum BuilderError {
 pub enum Action {
     /// Continue emitting instructions.
     Continue,
-    /// Flush registers and exit the block.
-    FlushAndExit(ExitReason),
-    /// Exit the block (does not flush registers).
-    Exit(ExitReason),
+    /// Flush registers and exit the block through a sync.
+    FlushAndSync,
+    /// Flush registers and exit the block through a branch.
+    FlushAndBranch(ir::Value),
+    /// Exit the block (does not flush registers) through a sync.
+    Exit,
 }
 
 #[derive(Clone, Copy)]
@@ -158,8 +160,8 @@ pub struct BlockBuilder<'ctx> {
     hooks: HookFuncs,
     current_bb: ir::Block,
 
-    executed_cycles: u32,
-    executed_instructions: u32,
+    executed_cycles: u16,
+    executed_instructions: u16,
 
     exit_index: u32,
     ibat_changed: bool,
@@ -308,7 +310,6 @@ impl<'ctx> BlockBuilder<'ctx> {
             fmem_ptr,
 
             read_stack_slot,
-
             signatures: sigs,
         };
 
@@ -333,7 +334,7 @@ impl<'ctx> BlockBuilder<'ctx> {
     fn switch_to_bb(&mut self, bb: ir::Block) {
         self.bd.switch_to_block(bb);
         self.bd
-            .set_srcloc(ir::SourceLoc::new(self.executed_instructions));
+            .set_srcloc(ir::SourceLoc::new(self.executed_instructions as u32));
         self.current_bb = bb;
     }
 
@@ -473,24 +474,24 @@ impl<'ctx> BlockBuilder<'ctx> {
 
         self.bd.ins().return_(&[]);
         self.bd
-            .set_srcloc(ir::SourceLoc::new(self.executed_instructions));
+            .set_srcloc(ir::SourceLoc::new(self.executed_instructions as u32));
     }
 
     /// Calls [`exit`] as if an instruction with `info` had been executed.
     fn exit_with(&mut self, info: InstructionInfo, reason: ExitReason) {
         self.executed_instructions += 1;
-        self.executed_cycles += info.cycles as u32;
+        self.executed_cycles += info.cycles as u16;
 
         self.exit(reason);
 
         self.executed_instructions -= 1;
-        self.executed_cycles -= info.cycles as u32;
+        self.executed_cycles -= info.cycles as u16;
     }
 
     /// Emits the given instruction into the block.
     fn emit(&mut self, ins: Ins) -> Result<Action, BuilderError> {
         self.bd
-            .set_srcloc(ir::SourceLoc::new(self.executed_instructions));
+            .set_srcloc(ir::SourceLoc::new(self.executed_instructions as u32));
         let info: InstructionInfo = match ins.op {
             Opcode::Add => self.add(ins),
             Opcode::Addc => self.addc(ins),
@@ -692,7 +693,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Subfic => self.subfic(ins),
             Opcode::Subfme => self.subfme(ins),
             Opcode::Subfze => self.subfze(ins),
-            Opcode::Sync => self.nop(Action::FlushAndExit(ExitReason::SYNC)),
+            Opcode::Sync => self.nop(Action::FlushAndSync),
             Opcode::Tlbie => self.nop(Action::Continue),
             Opcode::Tlbsync => self.nop(Action::Continue),
             Opcode::Xor => self.xor(ins),
@@ -715,7 +716,7 @@ impl<'ctx> BlockBuilder<'ctx> {
         };
 
         self.executed_instructions += 1;
-        self.executed_cycles += info.cycles as u32;
+        self.executed_cycles += info.cycles as u16;
 
         if info.auto_pc {
             let old_pc = self.get(Reg::PC);
@@ -729,7 +730,7 @@ impl<'ctx> BlockBuilder<'ctx> {
     pub fn build(
         mut self,
         mut instructions: impl Iterator<Item = Ins>,
-    ) -> Result<(Sequence, u32), BuilderError> {
+    ) -> Result<(Sequence, u16), BuilderError> {
         let mut sequence = Sequence::default();
         loop {
             let Some(ins) = instructions.next() else {
@@ -744,16 +745,23 @@ impl<'ctx> BlockBuilder<'ctx> {
 
             match self.emit(ins)? {
                 Action::Continue => (),
-                Action::FlushAndExit(reason) => {
+                Action::FlushAndSync => {
+                    self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
+                    self.flush();
+                    self.exit(ExitReason::SYNC);
+                    self.bd.finalize();
+                    break;
+                }
+                Action::FlushAndBranch(reason) => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.flush();
                     self.exit(reason);
                     self.bd.finalize();
                     break;
                 }
-                Action::Exit(reason) => {
+                Action::Exit => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
-                    self.exit(reason);
+                    self.exit(ExitReason::SYNC);
                     self.bd.finalize();
                     break;
                 }
