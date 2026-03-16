@@ -107,8 +107,6 @@ struct Signatures {
 }
 
 struct HookFuncs {
-    follow_link: ir::FuncRef,
-    try_link: ir::FuncRef,
     read_i8: ir::FuncRef,
     read_i16: ir::FuncRef,
     read_i32: ir::FuncRef,
@@ -286,8 +284,6 @@ impl<'ctx> BlockBuilder<'ctx> {
         };
 
         let hooks = HookFuncs {
-            follow_link: hook(sigs.follow_link_hook, HookKind::FollowLink),
-            try_link: hook(sigs.try_link_hook, HookKind::TryLink),
             read_i8: hook(sigs.read_i8_hook, HookKind::ReadI8),
             read_i16: hook(sigs.read_i16_hook, HookKind::ReadI16),
             read_i32: hook(sigs.read_i32_hook, HookKind::ReadI32),

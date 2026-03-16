@@ -4,15 +4,11 @@ use gekko::{Address, Cpu, QuantReg};
 use strum::FromRepr;
 
 use crate::FastmemLut;
-use crate::block::{Info, LinkData};
 
 pub type Context = std::ffi::c_void;
 
 pub type GetRegistersHook = extern "C-unwind" fn(*mut Context) -> *mut Cpu;
 pub type GetFastmemHook = extern "C-unwind" fn(*mut Context) -> *mut FastmemLut;
-
-pub type FollowLinkHook = extern "C-unwind" fn(*const Info, *mut Context, *mut LinkData) -> bool;
-pub type TryLinkHook = extern "C-unwind" fn(*mut Context, Address, *mut LinkData);
 
 pub type ReadHook<T> = extern "C-unwind" fn(*mut Context, Address, *mut T) -> bool;
 pub type WriteHook<T> = extern "C-unwind" fn(*mut Context, Address, T) -> bool;
@@ -28,8 +24,6 @@ pub type GenericHook = extern "C-unwind" fn(*mut Context);
 pub enum HookKind {
     GetRegisters,
     GetFastmem,
-    FollowLink,
-    TryLink,
     ReadI8,
     ReadI16,
     ReadI32,
@@ -58,12 +52,6 @@ pub struct Hooks {
     pub get_registers: GetRegistersHook,
     /// Hook that returns a pointer to the fastmem LUT given the context.
     pub get_fastmem: GetFastmemHook,
-
-    /// Hook that checks whether a linked block should be followed or the execution should return.
-    pub follow_link: FollowLinkHook,
-    /// Tries to link this block to another one given the current context, the destination address
-    /// and a pointer to where the linked block function pointer should be stored.
-    pub try_link: TryLinkHook,
 
     // memory
     pub read_i8: ReadHook<i8>,

@@ -13,7 +13,6 @@ mod test;
 pub mod block;
 pub mod hooks;
 
-use std::alloc::Layout;
 use std::path::PathBuf;
 use std::ptr::NonNull;
 use std::sync::Arc;
@@ -29,7 +28,7 @@ use gekko::disasm::Ins;
 use gekko::{Cpu, Exception};
 use serde::{Deserialize, Serialize};
 
-use crate::block::{BlockFn, Info, LinkData, Meta, Trampoline};
+use crate::block::{BlockFn, Info, Meta, Trampoline};
 use crate::builder::BlockBuilder;
 use crate::cache::{ArtifactKey, Cache};
 use crate::hooks::{Context, HookKind, Hooks};
@@ -67,7 +66,7 @@ pub type FastmemLut = [Option<NonNull<u8>>; FASTMEM_LUT_COUNT];
 
 const NAMESPACE_USER_HOOKS: u32 = 0;
 const NAMESPACE_INTERNALS: u32 = 1;
-const NAMESPACE_LINK_DATA: u32 = 2;
+const NAMESPACE_EXIT_DATA: u32 = 2;
 
 const INTERNAL_RAISE_EXCEPTION: u32 = 0;
 
@@ -178,8 +177,6 @@ impl Codegen {
                 let addr = match hook_kind {
                     HookKind::GetRegisters => self.hooks.get_registers as usize,
                     HookKind::GetFastmem => self.hooks.get_fastmem as usize,
-                    HookKind::FollowLink => self.hooks.follow_link as usize,
-                    HookKind::TryLink => self.hooks.try_link as usize,
                     HookKind::ReadI8 => self.hooks.read_i8 as usize,
                     HookKind::ReadI16 => self.hooks.read_i16 as usize,
                     HookKind::ReadI32 => self.hooks.read_i32 as usize,
@@ -213,16 +210,17 @@ impl Codegen {
                 let addr = raise_exception as extern "C-unwind" fn(_, _) as usize;
                 jitclif::write_relocation(code, reloc, addr);
             }
-            NAMESPACE_LINK_DATA => {
-                let link_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
-
-                // initialize as None
-                unsafe {
-                    link_data.as_ptr().cast::<Option<LinkData>>().write(None);
-                }
-
-                let addr = unsafe { link_data.as_ptr().addr().get() };
-                jitclif::write_relocation(code, reloc, addr);
+            NAMESPACE_EXIT_DATA => {
+                todo!()
+                // let exit_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
+                //
+                // // initialize as None
+                // unsafe {
+                //     exit_data.as_ptr().cast::<Option<LinkData>>().write(None);
+                // }
+                //
+                // let addr = unsafe { exit_data.as_ptr().addr().get() };
+                // jitclif::write_relocation(code, reloc, addr);
             }
             _ => unreachable!(),
         }

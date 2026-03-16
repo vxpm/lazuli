@@ -8,7 +8,7 @@ use lazuli::gekko::{self, Cpu, DEQUANTIZATION_LUT, QUANTIZATION_LUT, QuantReg, Q
 use lazuli::system::{self, System};
 use lazuli::{Address, Cycles, Primitive};
 use mapping::Mapping;
-use ppcjit::block::{BlockFn, Info, LinkData, Pattern};
+use ppcjit::block::{BlockFn, Pattern};
 use ppcjit::hooks::*;
 use ppcjit::{Block, FastmemLut};
 
@@ -21,7 +21,7 @@ pub struct BlockId(usize);
 
 pub struct StoredBlock {
     pub inner: Block,
-    pub links: Vec<*mut Option<LinkData>>,
+    // pub links: Vec<*mut Option<LinkData>>,
 }
 
 // TODO: this is problematic
@@ -101,7 +101,7 @@ impl Blocks {
 
         self.storage.push(StoredBlock {
             inner: block,
-            links: Vec::new(),
+            // links: Vec::new(),
         });
 
         self.insert_mapping(logical, addr, Mapping { id, length });
@@ -144,19 +144,19 @@ impl Blocks {
         deps.clone_into(&mut temp_deps);
 
         for dep in temp_deps.iter() {
-            let Ok(mapping) = self.remove_mapping_if_contains(logical, *dep, target) else {
+            let Ok(_mapping) = self.remove_mapping_if_contains(logical, *dep, target) else {
                 panic!("mapping {dep} is listed as dependent on a page but it does not exist");
             };
 
-            let Some(mapping) = mapping else {
-                continue;
-            };
+            // let Some(mapping) = mapping else {
+            //     continue;
+            // };
 
-            let block = &mut self.storage[mapping.id.0];
-            for link in block.links.drain(..) {
-                let link = unsafe { link.as_mut().unwrap() };
-                *link = None;
-            }
+            // let block = &mut self.storage[mapping.id.0];
+            // for link in block.links.drain(..) {
+            //     let link = unsafe { link.as_mut().unwrap() };
+            //     *link = None;
+            // }
         }
 
         temp_deps.clear();
@@ -208,60 +208,6 @@ const CTX_HOOKS: Hooks = {
             ctx.sys.mem.data_fastmem_lut_logical()
         } else {
             ctx.sys.mem.data_fastmem_lut_physical()
-        }
-    }
-
-    extern "C-unwind" fn follow_link(
-        info: &Info,
-        ctx: &mut Context,
-        link_data: &mut Option<LinkData>,
-    ) -> bool {
-        // if we have reached cycle or instruction limit, don't follow links, just exit.
-        if ctx.force_no_link
-            || info.cycles >= ctx.target_cycles
-            || info.instructions >= ctx.max_instructions
-        {
-            ctx.last_followed_link = None;
-            return false;
-        }
-
-        let Some(link_data) = link_data else {
-            return true;
-        };
-
-        // otherwise, detect whether we are idle looping and exit too
-        let follow = match link_data.pattern {
-            Pattern::IdleBasic | Pattern::IdleVolatileRead => {
-                if ctx.last_followed_link == Some(link_data.block) {
-                    ctx.exit_reason = ExitReason::IdleLooping;
-                    false
-                } else {
-                    true
-                }
-            }
-            _ => true,
-        };
-
-        // if not idle looping, then sure, follow link
-        ctx.last_followed_link = Some(link_data.block);
-        follow
-    }
-
-    extern "C-unwind" fn try_link(
-        ctx: &mut Context,
-        addr: Address,
-        link_data: &mut Option<LinkData>,
-    ) {
-        debug_assert!(link_data.is_none());
-        let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
-        if let Some(mapping) = ctx.blocks.get_mapping(logical, addr) {
-            let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
-            *link_data = Some(LinkData {
-                block: stored.inner.as_ptr(),
-                pattern: stored.inner.meta().pattern,
-            });
-
-            stored.links.push(&raw mut *link_data);
         }
     }
 
@@ -468,10 +414,6 @@ const CTX_HOOKS: Hooks = {
         let get_fastmem =
             transmute::<_, GetFastmemHook>(get_fastmem as extern "C-unwind" fn(_) -> _);
 
-        let follow_link =
-            transmute::<_, FollowLinkHook>(follow_link as extern "C-unwind" fn(_, _, _) -> _);
-        let try_link = transmute::<_, TryLinkHook>(try_link as extern "C-unwind" fn(_, _, _));
-
         let read_i8 =
             transmute::<_, ReadHook<i8>>(read::<i8> as extern "C-unwind" fn(_, _, _) -> _);
         let write_i8 =
@@ -514,9 +456,6 @@ const CTX_HOOKS: Hooks = {
         Hooks {
             get_registers,
             get_fastmem,
-
-            follow_link,
-            try_link,
 
             read_i8,
             write_i8,

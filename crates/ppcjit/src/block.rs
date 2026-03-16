@@ -6,15 +6,6 @@ use jitalloc::{Allocation, ReadExec};
 use crate::Sequence;
 use crate::hooks::Context;
 
-#[derive(Debug)]
-#[repr(C)]
-pub struct LinkData {
-    /// Linked block
-    pub block: BlockFn,
-    /// Information regarding the pattern of the linked block
-    pub pattern: Pattern,
-}
-
 /// Information about block execution.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
