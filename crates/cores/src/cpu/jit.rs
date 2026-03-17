@@ -240,10 +240,15 @@ const CTX_HOOKS: Hooks = {
         ) && ctx.last_followed_link == data.linked
         {
             std::hint::cold_path();
-            ctx.sys
-                .scheduler
-                .advance((ctx.target_cycles - ctx.executed_cycles) as u64);
-            ctx.executed_cycles = ctx.target_cycles;
+
+            let delta = if let Some(delta) = ctx.sys.scheduler.until_next() {
+                delta
+            } else {
+                (ctx.target_cycles - ctx.executed_cycles) as u64
+            };
+
+            ctx.sys.scheduler.advance(delta);
+            ctx.executed_cycles += delta as u32;
             return None;
         }
 
