@@ -19,7 +19,7 @@ use crate::system::{Modules, System};
 /// How many DSP instructions to execute per cycle.
 const DSP_INST_PER_CYCLE: f64 = 1.0;
 /// How many DSP cycles to execute per step.
-const DSP_STEP: u32 = 64;
+const DSP_STEP: u32 = 128;
 /// How many DSP instructions to execute per step.
 const DSP_INST_PER_STEP: u32 = (DSP_STEP as f64 * DSP_INST_PER_CYCLE) as u32;
 
@@ -60,9 +60,12 @@ impl Lazuli {
 
             // execute DSP
             self.dsp_pending += executed.executed_cycles.to_dsp_cycles();
-            while self.dsp_pending >= DSP_STEP as f64 {
-                self.cores.dsp.exec(&mut self.sys, DSP_INST_PER_STEP);
-                self.dsp_pending -= DSP_STEP as f64;
+            if self.dsp_pending >= DSP_STEP as f64 {
+                self.cores.dsp.exec(
+                    &mut self.sys,
+                    (DSP_INST_PER_CYCLE * self.dsp_pending.floor()) as u32,
+                );
+                self.dsp_pending = self.dsp_pending.fract();
             }
 
             self.sys.process_events();

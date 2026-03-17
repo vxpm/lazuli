@@ -232,11 +232,11 @@ const CTX_HOOKS: Hooks = {
         ctx: &mut Context,
         data: &mut ExitData,
         reason: ExitReason,
-        executed: Executed,
+        block_executed: Executed,
     ) -> Option<BlockFn> {
-        ctx.executed_cycles += executed.cycles as u32;
-        ctx.executed_instructions += executed.instructions as u32;
-        ctx.sys.scheduler.advance(executed.cycles as u64);
+        ctx.executed_cycles += block_executed.cycles as u32;
+        ctx.executed_instructions += block_executed.instructions as u32;
+        ctx.sys.scheduler.advance(block_executed.cycles as u64);
 
         // should we exit?
         let has_pending = ctx.sys.scheduler.has_pending();
@@ -270,7 +270,7 @@ const CTX_HOOKS: Hooks = {
         let reason_kind = reason.kind();
         let reason_branch = reason.branch();
 
-        // if not idle looping, jump to linked block
+        // otherwise, try linking
         if data.linked.is_none() {
             std::hint::cold_path();
 
@@ -290,36 +290,39 @@ const CTX_HOOKS: Hooks = {
                 // indirect branching
                 (ExitKind::Branch, true) => (),
             }
+        }
 
-            // if it is a call, also push into shadow stack
-            if reason_kind == ExitKind::Branch && reason_branch.call() {
-                let target = Address(reason.address()) + 4;
-
-                if data.linked_return.is_none() {
-                    std::hint::cold_path();
-                    let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
-                    if let Some(mapping) = ctx.blocks.get_mapping(logical, target) {
-                        let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
-                        data.linked_return = Some(stored.inner.as_ptr());
-                        stored.linked_return_from.push(data);
-                    }
+        // if it is a call, also push into shadow stack
+        if reason_kind == ExitKind::Branch && reason_branch.call() {
+            let target = Address(reason.address()) + 4;
+            if data.linked_return.is_none() {
+                std::hint::cold_path();
+                let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
+                if let Some(mapping) = ctx.blocks.get_mapping(logical, target) {
+                    let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
+                    data.linked_return = Some(stored.inner.as_ptr());
+                    stored.linked_return_from.push(data);
                 }
+            }
 
-                if let Some(linked) = data.linked_return {
-                    ctx.shadow_stack.push((target, linked));
-                }
+            if let Some(linked) = data.linked_return {
+                ctx.shadow_stack.push((target, linked));
             }
         }
 
-        // try following linked or shadow stack
+        // and finally, try following linked or shadow stack
         let linked =
-            if reason_kind == ExitKind::Branch && reason_branch.indirect() && !reason_branch.call()
+            if reason_kind == ExitKind::Branch && !reason_branch.call() && reason_branch.indirect()
             {
                 std::hint::cold_path();
-                let in_stack = ctx.shadow_stack.pop();
-                in_stack
-                    .filter(|(addr, _)| *addr == ctx.sys.cpu.pc)
-                    .map(|(_, block)| block)
+                if let Some((addr, block)) = ctx.shadow_stack.pop()
+                    && addr == ctx.sys.cpu.pc
+                {
+                    Some(block)
+                } else {
+                    ctx.shadow_stack.clear();
+                    None
+                }
             } else {
                 data.linked
             };
@@ -799,25 +802,6 @@ impl Core {
     ) -> Info {
         let mut info = Info::default();
         while info.executed_cycles < cycles {
-            // detect mailbox idle loop
-            let logical = sys.cpu.supervisor.config.msr.instr_addr_translation();
-            if let Some(stored) = self.blocks.get(logical, sys.cpu.pc)
-                && stored.inner.meta().pattern == Pattern::Call
-                && let Some(dest) = stored.inner.meta().seq.is_call(sys.cpu.pc)
-            {
-                std::hint::cold_path();
-
-                if let Some(func_block) = self.blocks.get(logical, dest)
-                    && func_block.inner.meta().pattern == Pattern::GetMailboxStatusFunc
-                    && sys.dsp.cpu_mailbox.status()
-                {
-                    std::hint::cold_path();
-                    info.executed_cycles = cycles;
-                    info.executed_instructions = 1;
-                    break;
-                }
-            }
-
             let max_instructions = if BREAKPOINTS {
                 let closest_breakpoint = closest_breakpoint(sys.cpu.pc, breakpoints);
                 (closest_breakpoint.value() - sys.cpu.pc.value()) / 4
