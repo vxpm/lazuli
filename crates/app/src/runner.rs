@@ -92,7 +92,9 @@ fn worker(runner_state: Arc<Shared>) {
         {
             state.cycles_history.pop_front();
         }
-        state.cycles_history.push_back((executed.cycles, now));
+        state
+            .cycles_history
+            .push_back((executed.executed_cycles, now));
     }
 }
 

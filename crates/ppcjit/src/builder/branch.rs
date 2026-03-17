@@ -6,14 +6,9 @@ use gekko::disasm::Ins;
 use gekko::{Reg, SPR};
 
 use super::BlockBuilder;
+use crate::block::BranchMeta;
 use crate::builder::util::IntoIrValue;
 use crate::builder::{Action, InstructionInfo};
-
-const UNCONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
-    cycles: 2,
-    auto_pc: false,
-    action: Action::Exit,
-};
 
 const CONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
@@ -50,9 +45,9 @@ impl BranchOptions {
 }
 
 impl BlockBuilder<'_> {
-    fn jump(&mut self, relative: bool, link_register: bool, target: ir::Value) {
+    fn branch(&mut self, meta: BranchMeta, link_register: bool, target: ir::Value) -> ir::Value {
         let current_pc = self.get(Reg::PC);
-        let destination = if relative {
+        let destination = if meta.relative() {
             self.bd.ins().iadd(current_pc, target)
         } else {
             target
@@ -64,21 +59,47 @@ impl BlockBuilder<'_> {
         }
 
         self.set(Reg::PC, destination);
+        current_pc
     }
 
     pub fn b(&mut self, ins: Ins) -> InstructionInfo {
         let destination = self.ir_value(ins.field_li());
-        self.jump(!ins.field_aa(), ins.field_lk(), destination);
-        UNCONDITIONAL_BRANCH_INFO
+        let meta = BranchMeta::default()
+            .with_relative(!ins.field_aa())
+            .with_indirect(false)
+            .with_conditional(false);
+        let address = self.branch(meta, ins.field_lk(), destination);
+
+        InstructionInfo {
+            cycles: 2,
+            auto_pc: false,
+            action: Action::Branch { meta, address },
+        }
     }
 
-    fn branch(&mut self, ins: Ins, relative: bool, target: impl IntoIrValue) -> InstructionInfo {
+    fn conditional_branch(
+        &mut self,
+        ins: Ins,
+        relative: bool,
+        indirect: bool,
+        target: impl IntoIrValue,
+    ) -> InstructionInfo {
         let options = BranchOptions::from_bits(u5::new(ins.field_bo()));
         let target = self.ir_value(target);
+        let meta = BranchMeta::default()
+            .with_relative(relative)
+            .with_indirect(indirect)
+            .with_conditional(true);
 
         if options.is_unconditional() {
-            self.jump(relative, ins.field_lk(), target);
-            return UNCONDITIONAL_BRANCH_INFO;
+            let address = self.branch(meta, ins.field_lk(), target);
+            let meta = meta.with_conditional(false);
+
+            return InstructionInfo {
+                cycles: 2,
+                auto_pc: false,
+                action: Action::Branch { meta, address },
+            };
         }
 
         let cond_bit = 31 - ins.field_bi();
@@ -130,10 +151,13 @@ impl BlockBuilder<'_> {
 
         // => exit (take branch)
         self.switch_to_bb(exit_block);
+
         let target = self.ir_value(target);
-        self.jump(relative, ins.field_lk(), target);
+        self.branch(meta, ins.field_lk(), target);
+
         self.flush();
-        self.exit();
+        let exit_reason = self.branch_exit_reason(meta, current_pc);
+        self.exit(exit_reason);
 
         // => continue (do not take branch)
         self.switch_to_bb(continue_block);
@@ -145,16 +169,16 @@ impl BlockBuilder<'_> {
     }
 
     pub fn bc(&mut self, ins: Ins) -> InstructionInfo {
-        self.branch(ins, !ins.field_aa(), ins.field_bd() as i32)
+        self.conditional_branch(ins, !ins.field_aa(), false, ins.field_bd() as i32)
     }
 
     pub fn bclr(&mut self, ins: Ins) -> InstructionInfo {
         let lr = self.get(SPR::LR);
-        self.branch(ins, false, lr)
+        self.conditional_branch(ins, false, true, lr)
     }
 
     pub fn bcctr(&mut self, ins: Ins) -> InstructionInfo {
         let ctr = self.get(SPR::CTR);
-        self.branch(ins, false, ctr)
+        self.conditional_branch(ins, false, true, ctr)
     }
 }

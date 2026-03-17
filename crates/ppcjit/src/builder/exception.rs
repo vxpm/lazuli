@@ -5,6 +5,7 @@ use gekko::disasm::Ins;
 use gekko::{Exception, Reg, SPR};
 
 use super::BlockBuilder;
+use crate::block::ExitReason;
 use crate::builder::{Action, InstructionInfo};
 
 const RFI_INFO: InstructionInfo = InstructionInfo {
@@ -71,7 +72,7 @@ impl BlockBuilder<'_> {
 
         self.switch_to_bb(exit_block);
         self.raise_exception(Exception::FloatUnavailable);
-        self.exit();
+        self.exit(ExitReason::SYNC);
 
         self.switch_to_bb(continue_block);
         self.current_bb = continue_block;

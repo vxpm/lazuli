@@ -13,6 +13,7 @@ mod test;
 pub mod block;
 pub mod hooks;
 
+use std::alloc::Layout;
 use std::path::PathBuf;
 use std::ptr::NonNull;
 use std::sync::Arc;
@@ -28,7 +29,7 @@ use gekko::disasm::Ins;
 use gekko::{Cpu, Exception};
 use serde::{Deserialize, Serialize};
 
-use crate::block::{BlockFn, Info, Meta, Trampoline};
+use crate::block::{BlockFn, Meta, Trampoline};
 use crate::builder::BlockBuilder;
 use crate::cache::{ArtifactKey, Cache};
 use crate::hooks::{Context, HookKind, Hooks};
@@ -41,7 +42,7 @@ pub use crate::{
     sequence::Sequence,
 };
 
-#[derive(Debug, Clone, PartialEq, Default, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct CodegenSettings {
     /// Whether to treat `sc` instructions as no-ops.
     pub nop_syscalls: bool,
@@ -53,12 +54,35 @@ pub struct CodegenSettings {
     pub round_to_single: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+impl Default for CodegenSettings {
+    fn default() -> Self {
+        Self {
+            nop_syscalls: false,
+            force_fpu: false,
+            ignore_unimplemented: false,
+            round_to_single: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Settings {
     /// Codegen settings
     pub codegen: CodegenSettings,
+    /// Layout for the exit data.
+    pub exit_data_layout: Layout,
     /// Path to the block cache directory
     pub cache_path: Option<PathBuf>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            codegen: Default::default(),
+            cache_path: Default::default(),
+            exit_data_layout: Layout::new::<usize>(),
+        }
+    }
 }
 
 pub const FASTMEM_LUT_COUNT: usize = 1 << 15;
@@ -72,6 +96,7 @@ const INTERNAL_RAISE_EXCEPTION: u32 = 0;
 
 struct Codegen {
     settings: CodegenSettings,
+    exit_data_layout: Layout,
     hooks: Hooks,
     isa: Arc<dyn TargetIsa>,
     module: Module,
@@ -79,7 +104,12 @@ struct Codegen {
 }
 
 impl Codegen {
-    fn new(isa: codegen::isa::Builder, settings: CodegenSettings, hooks: Hooks) -> Self {
+    fn new(
+        isa: codegen::isa::Builder,
+        settings: CodegenSettings,
+        exit_data_layout: Layout,
+        hooks: Hooks,
+    ) -> Self {
         let verifier = if cfg!(debug_assertions) {
             "true"
         } else {
@@ -112,6 +142,7 @@ impl Codegen {
 
         Codegen {
             settings,
+            exit_data_layout,
             hooks,
             isa,
             module: Module::new(),
@@ -122,8 +153,8 @@ impl Codegen {
     fn block_signature(&self) -> ir::Signature {
         let ptr = self.isa.pointer_type();
         ir::Signature {
-            // info, ctx, regs, fastmem
-            params: vec![ir::AbiParam::new(ptr); 4],
+            // ctx, regs, fastmem
+            params: vec![ir::AbiParam::new(ptr); 3],
             returns: vec![],
             call_conv: codegen::isa::CallConv::Tail,
         }
@@ -177,6 +208,7 @@ impl Codegen {
                 let addr = match hook_kind {
                     HookKind::GetRegisters => self.hooks.get_registers as usize,
                     HookKind::GetFastmem => self.hooks.get_fastmem as usize,
+                    HookKind::Exit => self.hooks.exit as usize,
                     HookKind::ReadI8 => self.hooks.read_i8 as usize,
                     HookKind::ReadI16 => self.hooks.read_i16 as usize,
                     HookKind::ReadI32 => self.hooks.read_i32 as usize,
@@ -211,16 +243,19 @@ impl Codegen {
                 jitclif::write_relocation(code, reloc, addr);
             }
             NAMESPACE_EXIT_DATA => {
-                todo!()
-                // let exit_data = self.module.allocate_data(Layout::new::<Option<LinkData>>());
-                //
-                // // initialize as None
-                // unsafe {
-                //     exit_data.as_ptr().cast::<Option<LinkData>>().write(None);
-                // }
-                //
-                // let addr = unsafe { exit_data.as_ptr().addr().get() };
-                // jitclif::write_relocation(code, reloc, addr);
+                let exit_data = self.module.allocate_data(self.exit_data_layout);
+
+                // zero initialize
+                unsafe {
+                    std::ptr::write_bytes(
+                        exit_data.as_ptr().as_ptr().cast::<u8>(),
+                        0,
+                        self.exit_data_layout.size(),
+                    );
+                }
+
+                let addr = unsafe { exit_data.as_ptr().addr().get() };
+                jitclif::write_relocation(code, reloc, addr);
             }
             _ => unreachable!(),
         }
@@ -265,7 +300,7 @@ pub struct Jit {
 struct Translated {
     func: ir::Function,
     sequence: Sequence,
-    cycles: u32,
+    cycles: u16,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -311,9 +346,8 @@ impl Jit {
         builder.seal_block(entry_bb);
 
         let params = builder.block_params(entry_bb);
-        let info_ptr = params[0];
-        let ctx_ptr = params[1];
-        let block_ptr = params[2];
+        let ctx_ptr = params[0];
+        let block_ptr = params[1];
         let ptr_type = codegen.isa.pointer_type();
         let default = codegen.isa.default_call_conv();
 
@@ -339,11 +373,9 @@ impl Jit {
 
         // call the block
         let block_sig = builder.import_signature(block_sig);
-        builder.ins().call_indirect(
-            block_sig,
-            block_ptr,
-            &[info_ptr, ctx_ptr, regs_ptr, fmem_ptr],
-        );
+        builder
+            .ins()
+            .call_indirect(block_sig, block_ptr, &[ctx_ptr, regs_ptr, fmem_ptr]);
 
         builder.ins().return_(&[]);
         builder.finalize();
@@ -356,7 +388,7 @@ impl Jit {
 
     /// Creates a new [`Jit`] instance with the given ISA.
     pub(crate) fn with_isa(isa: codegen::isa::Builder, settings: Settings, hooks: Hooks) -> Self {
-        let mut codegen = Codegen::new(isa, settings.codegen, hooks);
+        let mut codegen = Codegen::new(isa, settings.codegen, settings.exit_data_layout, hooks);
         let mut func_ctx = frontend::FunctionBuilderContext::new();
         let cache = settings.cache_path.map(Cache::new);
         let trampoline = Self::trampoline(&mut codegen, &mut func_ctx);
@@ -476,7 +508,7 @@ impl Jit {
     ///
     /// # Safety
     /// `ctx` must match the type expected by the hooks of this JIT context.
-    pub unsafe fn call(&mut self, ctx: *mut Context, block: BlockFn) -> Info {
+    pub unsafe fn call(&mut self, ctx: *mut Context, block: BlockFn) {
         // SAFETY: the exclusive reference to the context guarantees the allocator is not being
         // used, keeping the allocations safe
         unsafe { self.trampoline.call(ctx, block) }

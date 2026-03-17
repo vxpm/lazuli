@@ -2,13 +2,16 @@ mod icache;
 mod mapping;
 mod table;
 
+use std::alloc::Layout;
+use std::path::PathBuf;
+
 use indexmap::IndexSet;
-use lazuli::cores::{CpuCore, Executed};
+use lazuli::cores::{CpuCore, Info};
 use lazuli::gekko::{self, Cpu, DEQUANTIZATION_LUT, QUANTIZATION_LUT, QuantReg, QuantizedType};
 use lazuli::system::{self, System};
 use lazuli::{Address, Cycles, Primitive};
 use mapping::Mapping;
-use ppcjit::block::{BlockFn, Pattern};
+use ppcjit::block::{BlockFn, Executed, ExitReason, Pattern};
 use ppcjit::hooks::*;
 use ppcjit::{Block, FastmemLut};
 
@@ -172,12 +175,6 @@ impl Blocks {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ExitReason {
-    None,
-    IdleLooping,
-}
-
 /// Context to be passed in for execution of JIT blocks.
 struct Context<'a> {
     /// The system state, so that the JIT block can operate on it.
@@ -186,16 +183,14 @@ struct Context<'a> {
     blocks: &'a mut Blocks,
     /// ICache
     icache: &'a mut icache::Cache,
+    /// Cycles executed.   
+    executed_cycles: u32,
+    /// Instructions executed.   
+    executed_instructions: u32,
     /// Amount of cycles we are trying to execute.
     target_cycles: u32,
     /// Maximum instructions we should execute.
     max_instructions: u32,
-    /// Whether to forcely disable following links.
-    force_no_link: bool,
-    /// Last followed link.
-    last_followed_link: Option<BlockFn>,
-    /// Reason for exit.
-    exit_reason: ExitReason,
 }
 
 const CTX_HOOKS: Hooks = {
@@ -209,6 +204,17 @@ const CTX_HOOKS: Hooks = {
         } else {
             ctx.sys.mem.data_fastmem_lut_physical()
         }
+    }
+
+    extern "C-unwind" fn exit(
+        ctx: &mut Context,
+        _: *mut ExitData,
+        reason: ExitReason,
+        executed: Executed,
+    ) -> Option<BlockFn> {
+        ctx.executed_cycles += executed.cycles as u32;
+        ctx.executed_instructions += executed.instructions as u32;
+        None
     }
 
     extern "C-unwind" fn read<P: Primitive>(
@@ -414,6 +420,8 @@ const CTX_HOOKS: Hooks = {
         let get_fastmem =
             transmute::<_, GetFastmemHook>(get_fastmem as extern "C-unwind" fn(_) -> _);
 
+        let exit = transmute::<_, ExitHook>(exit as extern "C-unwind" fn(_, _, _, _) -> _);
+
         let read_i8 =
             transmute::<_, ReadHook<i8>>(read::<i8> as extern "C-unwind" fn(_, _, _) -> _);
         let write_i8 =
@@ -457,6 +465,8 @@ const CTX_HOOKS: Hooks = {
             get_registers,
             get_fastmem,
 
+            exit,
+
             read_i8,
             write_i8,
             read_i16,
@@ -487,15 +497,17 @@ const CTX_HOOKS: Hooks = {
 };
 
 /// JIT configuration.
-pub struct Config {
+pub struct Settings {
     /// Maximum number of instructions per JIT block.
     pub instr_per_block: u32,
-    /// Code generation settings.
-    pub jit_settings: ppcjit::Settings,
+    /// Codegen settings.
+    pub codegen: ppcjit::CodegenSettings,
+    /// Path to the block cache directory.
+    pub cache_path: Option<PathBuf>,
 }
 
 pub struct Core {
-    pub config: Config,
+    pub settings: Settings,
     pub compiler: ppcjit::Jit,
     pub blocks: Blocks,
     pub icache: icache::Cache,
@@ -519,11 +531,18 @@ fn closest_breakpoint(pc: Address, breakpoints: &[Address]) -> Address {
 }
 
 impl Core {
-    pub fn new(config: Config) -> Self {
-        let compiler = ppcjit::Jit::new(config.jit_settings.clone(), CTX_HOOKS);
+    pub fn new(settings: Settings) -> Self {
+        let compiler = ppcjit::Jit::new(
+            ppcjit::Settings {
+                codegen: settings.codegen.clone(),
+                cache_path: settings.cache_path.clone(),
+                exit_data_layout: Layout::new::<u8>(),
+            },
+            CTX_HOOKS,
+        );
 
         Self {
-            config,
+            settings,
             compiler,
             blocks: Blocks::default(),
             icache: Default::default(),
@@ -586,8 +605,8 @@ impl Core {
         sys: &mut System,
         target_cycles: u32,
         max_instructions: u32,
-        force_no_link: bool,
-    ) -> Executed {
+        _force_no_link: bool,
+    ) -> Info {
         let logical = sys.cpu.supervisor.config.msr.instr_addr_translation();
         let stored = self
             .blocks
@@ -609,29 +628,20 @@ impl Core {
             sys,
             blocks: &mut self.blocks,
             icache: &mut self.icache,
+            executed_cycles: 0,
+            executed_instructions: 0,
             target_cycles,
             max_instructions,
-            force_no_link,
-
-            last_followed_link: None,
-            exit_reason: ExitReason::None,
         };
 
-        let info = unsafe {
+        unsafe {
             self.compiler
-                .call(&raw mut ctx as *mut ppcjit::hooks::Context, block)
-        };
+                .call(&raw mut ctx as *mut ppcjit::hooks::Context, block);
+        }
 
-        let cycles = if ctx.exit_reason == ExitReason::IdleLooping {
-            std::hint::cold_path();
-            Cycles(target_cycles as u64)
-        } else {
-            Cycles(info.cycles as u64)
-        };
-
-        Executed {
-            instructions: info.instructions,
-            cycles,
+        Info {
+            executed_cycles: Cycles(ctx.executed_cycles as u64),
+            executed_instructions: ctx.executed_instructions,
             hit_breakpoint: false,
         }
     }
@@ -642,7 +652,7 @@ impl Core {
         target_cycles: u32,
         max_instructions: u32,
         force_no_link: bool,
-    ) -> Executed {
+    ) -> Info {
         let logical = sys.cpu.supervisor.config.msr.instr_addr_translation();
         let block = self
             .blocks
@@ -652,9 +662,9 @@ impl Core {
         if block.is_none() {
             // avoid trying to compile unimplemented instructions in debug mode
             let instructions = if cfg!(debug_assertions) {
-                self.config.instr_per_block.min(max_instructions)
+                self.settings.instr_per_block.min(max_instructions)
             } else {
-                self.config.instr_per_block
+                self.settings.instr_per_block
             };
 
             let block = self.compile(sys, sys.cpu.pc, instructions);
@@ -669,9 +679,9 @@ impl Core {
         sys: &mut System,
         cycles: Cycles,
         breakpoints: &[Address],
-    ) -> Executed {
-        let mut executed = Executed::default();
-        while executed.cycles < cycles {
+    ) -> Info {
+        let mut executed = Info::default();
+        while executed.executed_cycles < cycles {
             // detect mailbox idle loop
             let logical = sys.cpu.supervisor.config.msr.instr_addr_translation();
             if let Some(stored) = self.blocks.get(logical, sys.cpu.pc)
@@ -685,8 +695,8 @@ impl Core {
                     && sys.dsp.cpu_mailbox.status()
                 {
                     std::hint::cold_path();
-                    executed.cycles = cycles;
-                    executed.instructions = 1;
+                    executed.executed_cycles = cycles;
+                    executed.executed_instructions = 1;
                     break;
                 }
             }
@@ -699,10 +709,10 @@ impl Core {
             };
 
             // execute
-            let target_cycles = cycles - executed.cycles;
+            let target_cycles = cycles - executed.executed_cycles;
             let e = self.cached_exec(sys, target_cycles.0 as u32, max_instructions, BREAKPOINTS);
-            executed.instructions += e.instructions;
-            executed.cycles += e.cycles;
+            executed.executed_instructions += e.executed_instructions;
+            executed.executed_cycles += e.executed_cycles;
 
             if BREAKPOINTS && breakpoints.contains(&sys.cpu.pc) {
                 executed.hit_breakpoint = true;
@@ -715,7 +725,7 @@ impl Core {
 }
 
 impl CpuCore for Core {
-    fn exec(&mut self, sys: &mut System, cycles: Cycles, breakpoints: &[Address]) -> Executed {
+    fn exec(&mut self, sys: &mut System, cycles: Cycles, breakpoints: &[Address]) -> Info {
         if breakpoints.is_empty() {
             self.exec_inner::<false>(sys, cycles, &[])
         } else {
@@ -723,7 +733,7 @@ impl CpuCore for Core {
         }
     }
 
-    fn step(&mut self, sys: &mut System) -> Executed {
+    fn step(&mut self, sys: &mut System) -> Info {
         self.uncached_exec(sys, u32::MAX, 1, true)
     }
 }

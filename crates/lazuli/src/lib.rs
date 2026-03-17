@@ -43,11 +43,11 @@ impl Lazuli {
     }
 
     /// Advances emulation by the specified number of CPU cycles.
-    pub fn exec(&mut self, cycles: Cycles, breakpoints: &[Address]) -> cores::Executed {
-        let mut total_executed = cores::Executed::default();
-        while total_executed.cycles < cycles {
+    pub fn exec(&mut self, cycles: Cycles, breakpoints: &[Address]) -> cores::Info {
+        let mut total_executed = cores::Info::default();
+        while total_executed.executed_cycles < cycles {
             // how many CPU cycles can we execute?
-            let remaining = cycles - total_executed.cycles;
+            let remaining = cycles - total_executed.executed_cycles;
             let until_next_dsp_step =
                 Cycles((6.0 * ((DSP_STEP as f64) - self.dsp_pending)).ceil() as u64);
             let until_next_event = Cycles(self.sys.scheduler.until_next().unwrap_or(u64::MAX));
@@ -55,17 +55,17 @@ impl Lazuli {
 
             // execute CPU
             let executed = self.cores.cpu.exec(&mut self.sys, can_execute, breakpoints);
-            total_executed.instructions += executed.instructions;
-            total_executed.cycles += executed.cycles;
+            total_executed.executed_instructions += executed.executed_instructions;
+            total_executed.executed_cycles += executed.executed_cycles;
 
             // execute DSP
-            self.dsp_pending += executed.cycles.to_dsp_cycles();
+            self.dsp_pending += executed.executed_cycles.to_dsp_cycles();
             while self.dsp_pending >= DSP_STEP as f64 {
                 self.cores.dsp.exec(&mut self.sys, DSP_INST_PER_STEP);
                 self.dsp_pending -= DSP_STEP as f64;
             }
 
-            self.sys.scheduler.advance(executed.cycles.0);
+            self.sys.scheduler.advance(executed.executed_cycles.0);
             self.sys.process_events();
 
             if executed.hit_breakpoint || breakpoints.contains(&self.sys.cpu.pc) {
@@ -78,10 +78,10 @@ impl Lazuli {
         total_executed
     }
 
-    pub fn step(&mut self) -> cores::Executed {
+    pub fn step(&mut self) -> cores::Info {
         // execute CPU
         let executed = self.cores.cpu.step(&mut self.sys);
-        self.dsp_pending += executed.cycles.to_dsp_cycles();
+        self.dsp_pending += executed.executed_cycles.to_dsp_cycles();
 
         // execute DSP
         while self.dsp_pending >= DSP_STEP as f64 {
@@ -90,7 +90,7 @@ impl Lazuli {
         }
 
         // process events
-        self.sys.scheduler.advance(executed.cycles.0);
+        self.sys.scheduler.advance(executed.executed_cycles.0);
         self.sys.process_events();
 
         executed

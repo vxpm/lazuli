@@ -5,6 +5,7 @@ use gekko::{Reg, SPR};
 use zerocopy::IntoBytes;
 
 use super::{Action, BlockBuilder};
+use crate::block::ExitReason;
 use crate::builder::InstructionInfo;
 
 /// Trait for transforming values into an IR value in a function.
@@ -60,6 +61,18 @@ impl IntoIrValue for u32 {
     }
 }
 
+impl IntoIrValue for i64 {
+    fn into_value(self, bd: &mut FunctionBuilder<'_>) -> ir::Value {
+        bd.ins().iconst(ir::types::I64, self)
+    }
+}
+
+impl IntoIrValue for u64 {
+    fn into_value(self, bd: &mut FunctionBuilder<'_>) -> ir::Value {
+        bd.ins().iconst(ir::types::I64, self as i64)
+    }
+}
+
 impl IntoIrValue for f32 {
     fn into_value(self, bd: &mut FunctionBuilder<'_>) -> ir::Value {
         bd.ins().f32const(self)
@@ -69,6 +82,12 @@ impl IntoIrValue for f32 {
 impl IntoIrValue for f64 {
     fn into_value(self, bd: &mut FunctionBuilder<'_>) -> ir::Value {
         bd.ins().f64const(self)
+    }
+}
+
+impl IntoIrValue for ExitReason {
+    fn into_value(self, bd: &mut FunctionBuilder<'_>) -> ir::Value {
+        self.to_bits().into_value(bd)
     }
 }
 
