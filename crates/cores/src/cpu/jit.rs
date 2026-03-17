@@ -30,7 +30,7 @@ pub struct BlockId(usize);
 
 pub struct StoredBlock {
     pub inner: Block,
-    pub deps: Vec<Address>,
+    linked_from: Vec<*mut ExitData>,
 }
 
 // TODO: this is problematic
@@ -110,7 +110,7 @@ impl Blocks {
 
         self.storage.push(StoredBlock {
             inner: block,
-            deps: Vec::new(),
+            linked_from: Vec::new(),
         });
 
         self.insert_mapping(logical, addr, Mapping { id, length });
@@ -153,19 +153,22 @@ impl Blocks {
         deps.clone_into(&mut temp_deps);
 
         for dep in temp_deps.iter() {
-            let Ok(_mapping) = self.remove_mapping_if_contains(logical, *dep, target) else {
+            let Ok(mapping) = self.remove_mapping_if_contains(logical, *dep, target) else {
                 panic!("mapping {dep} is listed as dependent on a page but it does not exist");
             };
 
-            // let Some(mapping) = mapping else {
-            //     continue;
-            // };
+            // invalidate links of blocks that depend on this block
+            let Some(mapping) = mapping else {
+                continue;
+            };
 
-            // let block = &mut self.storage[mapping.id.0];
-            // for link in block.links.drain(..) {
-            //     let link = unsafe { link.as_mut().unwrap() };
-            //     *link = None;
-            // }
+            let block = &mut self.storage[mapping.id.0];
+            for data in block.linked_from.drain(..) {
+                unsafe {
+                    (*data).linked = None;
+                    (*data).linked_pattern = Pattern::None;
+                }
+            }
         }
 
         temp_deps.clear();
@@ -264,7 +267,7 @@ const CTX_HOOKS: Hooks = {
                     let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
                     data.linked = Some(stored.inner.as_ptr());
                     data.linked_pattern = stored.inner.meta().pattern;
-                    stored.deps.push(source);
+                    stored.linked_from.push(data);
                 }
             }
         }
