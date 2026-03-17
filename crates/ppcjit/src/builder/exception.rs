@@ -5,7 +5,6 @@ use gekko::disasm::Ins;
 use gekko::{Exception, Reg, SPR};
 
 use super::BlockBuilder;
-use crate::block::ExitReason;
 use crate::builder::{Action, InstructionInfo};
 
 const RFI_INFO: InstructionInfo = InstructionInfo {
@@ -17,7 +16,7 @@ const RFI_INFO: InstructionInfo = InstructionInfo {
 const EXCEPTION_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::Exit,
+    action: Action::ExitNoFlush,
 };
 
 pub fn raise_exception_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
@@ -41,7 +40,6 @@ impl BlockBuilder<'_> {
             .iconst(ir::types::I16, exception as u64 as i64);
 
         self.flush();
-
         self.bd.ins().call(
             self.hooks.raise_exception,
             &[self.consts.regs_ptr, exception],
@@ -72,7 +70,7 @@ impl BlockBuilder<'_> {
 
         self.switch_to_bb(exit_block);
         self.raise_exception(Exception::FloatUnavailable);
-        self.exit(ExitReason::SYNC);
+        self.exit_with(EXCEPTION_INFO);
 
         self.switch_to_bb(continue_block);
         self.current_bb = continue_block;

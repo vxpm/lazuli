@@ -79,6 +79,8 @@ pub enum Action {
     },
     /// Exit the block.
     Exit,
+    /// Exit the block without flushing registers.
+    ExitNoFlush,
 }
 
 #[derive(Clone, Copy)]
@@ -762,6 +764,12 @@ impl<'ctx> BlockBuilder<'ctx> {
                 Action::Exit => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.flush();
+                    self.exit(ExitReason::SYNC);
+                    self.bd.finalize();
+                    break;
+                }
+                Action::ExitNoFlush => {
+                    self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.exit(ExitReason::SYNC);
                     self.bd.finalize();
                     break;
