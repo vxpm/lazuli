@@ -45,7 +45,7 @@ impl BranchOptions {
 }
 
 impl BlockBuilder<'_> {
-    fn branch(&mut self, meta: BranchMeta, link_register: bool, target: ir::Value) -> ir::Value {
+    fn branch(&mut self, meta: BranchMeta, target: ir::Value) -> ir::Value {
         let current_pc = self.get(Reg::PC);
         let destination = if meta.relative() {
             self.bd.ins().iadd(current_pc, target)
@@ -53,7 +53,7 @@ impl BlockBuilder<'_> {
             target
         };
 
-        if link_register {
+        if meta.call() {
             let ret_addr = self.bd.ins().iadd_imm(current_pc, 4);
             self.set(SPR::LR, ret_addr);
         }
@@ -64,12 +64,14 @@ impl BlockBuilder<'_> {
 
     pub fn b(&mut self, ins: Ins) -> InstructionInfo {
         let destination = self.ir_value(ins.field_li());
+        let link_register = ins.field_lk();
         let meta = BranchMeta::default()
             .with_relative(!ins.field_aa())
             .with_indirect(false)
-            .with_conditional(false);
-        let address = self.branch(meta, ins.field_lk(), destination);
+            .with_conditional(false)
+            .with_call(link_register);
 
+        let address = self.branch(meta, destination);
         InstructionInfo {
             cycles: 2,
             auto_pc: false,
@@ -86,13 +88,15 @@ impl BlockBuilder<'_> {
     ) -> InstructionInfo {
         let options = BranchOptions::from_bits(u5::new(ins.field_bo()));
         let target = self.ir_value(target);
+        let link_register = ins.field_lk();
         let meta = BranchMeta::default()
             .with_relative(relative)
             .with_indirect(indirect)
-            .with_conditional(true);
+            .with_conditional(true)
+            .with_call(link_register);
 
         if options.is_unconditional() {
-            let address = self.branch(meta, ins.field_lk(), target);
+            let address = self.branch(meta, target);
             let meta = meta.with_conditional(false);
 
             return InstructionInfo {
@@ -153,7 +157,7 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
 
         let target = self.ir_value(target);
-        self.branch(meta, ins.field_lk(), target);
+        self.branch(meta, target);
 
         self.flush();
         let exit_reason = self.branch_exit_reason(meta, current_pc);

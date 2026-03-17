@@ -8,7 +8,7 @@ use crate::Sequence;
 use crate::hooks::Context;
 
 /// Metadata regarding a branch exit.
-#[bitos(3)]
+#[bitos(4)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BranchMeta {
     /// Whether the target address is relative to the branch address.
@@ -20,6 +20,9 @@ pub struct BranchMeta {
     /// Whether the branch is indirect (i.e. not encoded directly in the branch instruction).
     #[bits(2)]
     pub indirect: bool,
+    /// Whether the branch is a call (i.e. changes the link register).
+    #[bits(3)]
+    pub call: bool,
 }
 
 impl BranchMeta {
@@ -42,7 +45,7 @@ pub struct ExitReason {
     pub address: u32,
     #[bits(32)]
     pub kind: ExitKind,
-    #[bits(33..36)]
+    #[bits(33..37)]
     pub branch: BranchMeta,
 }
 
