@@ -70,12 +70,8 @@ pub enum BuilderError {
 pub enum Action {
     /// Continue emitting instructions.
     Continue,
-    /// Flush registers and exit the block.
-    FlushAndExit,
     /// Exit the block.
     Exit,
-    /// Exit the block without calling the prologue.
-    RawExit,
 }
 
 #[derive(Clone, Copy)]
@@ -88,8 +84,6 @@ pub(crate) struct InstructionInfo {
 struct Signatures {
     block: ir::SigRef,
 
-    follow_link_hook: ir::SigRef,
-    try_link_hook: ir::SigRef,
     read_i8_hook: ir::SigRef,
     read_i16_hook: ir::SigRef,
     read_i32_hook: ir::SigRef,
@@ -165,7 +159,6 @@ pub struct BlockBuilder<'ctx> {
     executed_cycles: u32,
     executed_instructions: u32,
 
-    link_index: u32,
     last_updated_cycles: u32,
     last_updated_instructions: u32,
 
@@ -198,8 +191,6 @@ impl<'ctx> BlockBuilder<'ctx> {
         let sigs = Signatures {
             block: builder.import_signature(builder.func.signature.clone()),
 
-            follow_link_hook: builder.import_signature(Hooks::follow_link_sig(ptr_type, default)),
-            try_link_hook: builder.import_signature(Hooks::try_link_sig(ptr_type, default)),
             read_i8_hook: builder.import_signature(Hooks::read_sig(
                 ptr_type,
                 ir::types::I8,
@@ -328,7 +319,6 @@ impl<'ctx> BlockBuilder<'ctx> {
             hooks,
             current_bb: entry_bb,
 
-            link_index: 0,
             executed_cycles: 0,
             executed_instructions: 0,
 
@@ -713,7 +703,7 @@ impl<'ctx> BlockBuilder<'ctx> {
             Opcode::Subfic => self.subfic(ins),
             Opcode::Subfme => self.subfme(ins),
             Opcode::Subfze => self.subfze(ins),
-            Opcode::Sync => self.nop(Action::FlushAndExit),
+            Opcode::Sync => self.nop(Action::Exit),
             Opcode::Tlbie => self.nop(Action::Continue),
             Opcode::Tlbsync => self.nop(Action::Continue),
             Opcode::Xor => self.xor(ins),
@@ -765,21 +755,10 @@ impl<'ctx> BlockBuilder<'ctx> {
 
             match self.emit(ins)? {
                 Action::Continue => (),
-                Action::FlushAndExit => {
+                Action::Exit => {
                     self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.flush();
                     self.exit();
-                    self.bd.finalize();
-                    break;
-                }
-                Action::Exit => {
-                    self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
-                    self.exit();
-                    self.bd.finalize();
-                    break;
-                }
-                Action::RawExit => {
-                    self.bd.set_srcloc(ir::SourceLoc::new(u32::MAX));
                     self.bd.finalize();
                     break;
                 }

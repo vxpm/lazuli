@@ -149,32 +149,6 @@ impl Hooks {
         }
     }
 
-    /// Returns the function signature for the `follow_link` hook.
-    pub(crate) fn follow_link_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
-        ir::Signature {
-            params: vec![
-                ir::AbiParam::new(ptr_type), // info
-                ir::AbiParam::new(ptr_type), // ctx
-                ir::AbiParam::new(ptr_type), // lnk data
-            ],
-            returns: vec![ir::AbiParam::new(ir::types::I8)], // follow?
-            call_conv,
-        }
-    }
-
-    /// Returns the function signature for the `try_link` hook.
-    pub(crate) fn try_link_sig(ptr_type: ir::Type, call_conv: CallConv) -> ir::Signature {
-        ir::Signature {
-            params: vec![
-                ir::AbiParam::new(ptr_type),       // ctx
-                ir::AbiParam::new(ir::types::I32), // address to link to
-                ir::AbiParam::new(ptr_type),       // link ptr storage
-            ],
-            returns: vec![],
-            call_conv,
-        }
-    }
-
     /// Returns the function signature for a memory read hook.
     pub(crate) fn read_sig(
         ptr_type: ir::Type,

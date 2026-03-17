@@ -46,13 +46,13 @@ const DCACHE_INFO: InstructionInfo = InstructionInfo {
 const INV_ICACHE_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: true,
-    action: Action::FlushAndExit,
+    action: Action::Exit,
 };
 
 const SYNC_ICACHE_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: true,
-    action: Action::FlushAndExit,
+    action: Action::Exit,
 };
 
 fn generate_mask(control: u8) -> u32 {
@@ -424,6 +424,7 @@ impl BlockBuilder<'_> {
             self.bd.ins().iadd(ra, rb)
         };
 
+        self.flush();
         self.bd
             .ins()
             .call(self.hooks.inv_icache, &[self.consts.ctx_ptr, addr]);
@@ -432,6 +433,7 @@ impl BlockBuilder<'_> {
     }
 
     pub fn isync(&mut self, _: Ins) -> InstructionInfo {
+        self.flush();
         self.bd
             .ins()
             .call(self.hooks.clear_icache, &[self.consts.ctx_ptr]);

@@ -10,7 +10,7 @@ use crate::builder::{Action, InstructionInfo};
 const RFI_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::FlushAndExit,
+    action: Action::Exit,
 };
 
 const EXCEPTION_INFO: InstructionInfo = InstructionInfo {
@@ -79,7 +79,7 @@ impl BlockBuilder<'_> {
 
     pub fn sc(&mut self, _: Ins) -> InstructionInfo {
         if self.codegen.settings.nop_syscalls {
-            return self.nop(Action::FlushAndExit);
+            return self.nop(Action::Exit);
         }
 
         self.raise_exception(Exception::Syscall);
@@ -105,6 +105,7 @@ impl BlockBuilder<'_> {
         self.set(Reg::PC, new_pc);
         self.set(Reg::MSR, new_msr);
 
+        self.flush();
         self.call_generic_hook(self.hooks.msr_changed);
 
         RFI_INFO

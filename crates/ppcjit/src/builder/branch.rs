@@ -12,7 +12,7 @@ use crate::builder::{Action, InstructionInfo};
 const UNCONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
     cycles: 2,
     auto_pc: false,
-    action: Action::RawExit,
+    action: Action::Exit,
 };
 
 const CONDITIONAL_BRANCH_INFO: InstructionInfo = InstructionInfo {
@@ -63,15 +63,7 @@ impl BlockBuilder<'_> {
             self.set(SPR::LR, ret_addr);
         }
 
-        self.executed_instructions += 1;
-        self.executed_cycles += 2;
-
         self.set(Reg::PC, destination);
-        self.flush();
-        self.exit();
-
-        self.executed_instructions -= 1;
-        self.executed_cycles -= 2;
     }
 
     pub fn b(&mut self, ins: Ins) -> InstructionInfo {
@@ -140,6 +132,8 @@ impl BlockBuilder<'_> {
         self.switch_to_bb(exit_block);
         let target = self.ir_value(target);
         self.jump(relative, ins.field_lk(), target);
+        self.flush();
+        self.exit();
 
         // => continue (do not take branch)
         self.switch_to_bb(continue_block);

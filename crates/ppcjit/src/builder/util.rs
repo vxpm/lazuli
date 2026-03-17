@@ -83,7 +83,7 @@ impl BlockBuilder<'_> {
         }
     }
 
-    /// Stub instruction - does absolutely nothing as a temporary implementation.
+    /// Stub instruction - flushes and exits as a temporary implementation.
     #[allow(dead_code)]
     pub fn stub(&mut self, ins: Ins) -> InstructionInfo {
         let mut parsed = ParsedIns::new();
@@ -91,11 +91,10 @@ impl BlockBuilder<'_> {
 
         tracing::warn!("emitting stubbed instruction ({parsed})");
 
-        self.bd.ins().nop();
         InstructionInfo {
             cycles: 2,
             auto_pc: true,
-            action: Action::FlushAndExit,
+            action: Action::Exit,
         }
     }
 
