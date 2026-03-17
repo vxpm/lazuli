@@ -11,12 +11,18 @@ use lazuli::gekko::{self, Cpu, DEQUANTIZATION_LUT, QUANTIZATION_LUT, QuantReg, Q
 use lazuli::system::{self, System};
 use lazuli::{Address, Cycles, Primitive};
 use mapping::Mapping;
-use ppcjit::block::{BlockFn, Executed, ExitReason, Pattern};
+use ppcjit::block::{BlockFn, Executed, ExitKind, ExitReason, Pattern};
 use ppcjit::hooks::*;
 use ppcjit::{Block, FastmemLut};
 
 #[rustfmt::skip]
 pub use ppcjit;
+
+#[repr(C)]
+struct ExitData {
+    pub linked: Option<BlockFn>,
+    pub linked_pattern: Pattern,
+}
 
 /// Identifier for a block in a [`Blocks`] storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,7 +30,7 @@ pub struct BlockId(usize);
 
 pub struct StoredBlock {
     pub inner: Block,
-    // pub links: Vec<*mut Option<LinkData>>,
+    pub deps: Vec<Address>,
 }
 
 // TODO: this is problematic
@@ -104,7 +110,7 @@ impl Blocks {
 
         self.storage.push(StoredBlock {
             inner: block,
-            // links: Vec::new(),
+            deps: Vec::new(),
         });
 
         self.insert_mapping(logical, addr, Mapping { id, length });
@@ -191,6 +197,7 @@ struct Context<'a> {
     target_cycles: u32,
     /// Maximum instructions we should execute.
     max_instructions: u32,
+    last_followed_link: Option<BlockFn>,
 }
 
 const CTX_HOOKS: Hooks = {
@@ -208,15 +215,57 @@ const CTX_HOOKS: Hooks = {
 
     extern "C-unwind" fn exit(
         ctx: &mut Context,
-        _: *mut ExitData,
-        _reason: ExitReason,
+        data: &mut ExitData,
+        reason: ExitReason,
         executed: Executed,
     ) -> Option<BlockFn> {
         ctx.executed_cycles += executed.cycles as u32;
         ctx.executed_instructions += executed.instructions as u32;
         ctx.sys.scheduler.advance(executed.cycles as u64);
 
-        None
+        // should we exit?
+        let has_pending = ctx.sys.scheduler.has_pending();
+        let limits_reached = ctx.executed_cycles >= ctx.target_cycles
+            || ctx.executed_instructions >= ctx.max_instructions;
+
+        if has_pending || limits_reached {
+            std::hint::cold_path();
+            return None;
+        }
+
+        // if not, first try detecting idle loops
+        if matches!(
+            data.linked_pattern,
+            Pattern::IdleBasic | Pattern::IdleVolatileRead
+        ) && ctx.last_followed_link == data.linked
+        {
+            std::hint::cold_path();
+            ctx.sys
+                .scheduler
+                .advance((ctx.target_cycles - ctx.executed_cycles) as u64);
+            ctx.executed_cycles = ctx.target_cycles;
+            return None;
+        }
+
+        // if not idle looping, jump to linked block
+        if data.linked.is_none() {
+            // try linking
+            std::hint::cold_path();
+            if !(reason.kind() == ExitKind::Branch && reason.branch().indirect()) {
+                let source = ctx.sys.cpu.pc;
+                let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
+
+                if let Some(mapping) = ctx.blocks.get_mapping(logical, source) {
+                    let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
+                    data.linked = Some(stored.inner.as_ptr());
+                    data.linked_pattern = stored.inner.meta().pattern;
+                    stored.deps.push(source);
+                }
+            }
+        }
+
+        ctx.last_followed_link = data.linked;
+        data.linked
     }
 
     extern "C-unwind" fn read<P: Primitive>(
@@ -538,7 +587,7 @@ impl Core {
             ppcjit::Settings {
                 codegen: settings.codegen.clone(),
                 cache_path: settings.cache_path.clone(),
-                exit_data_layout: Layout::new::<u8>(),
+                exit_data_layout: Layout::new::<ExitData>(),
             },
             CTX_HOOKS,
         );
@@ -636,6 +685,7 @@ impl Core {
             executed_instructions: 0,
             target_cycles,
             max_instructions,
+            last_followed_link: None,
         };
 
         unsafe {

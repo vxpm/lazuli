@@ -22,6 +22,12 @@ pub struct BranchMeta {
     pub indirect: bool,
 }
 
+impl BranchMeta {
+    pub fn fixed_target(&self) -> bool {
+        !self.indirect()
+    }
+}
+
 #[bitos(1)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitKind {

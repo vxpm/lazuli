@@ -47,6 +47,7 @@ pub struct ScheduledEvent {
 
 pub struct Scheduler {
     elapsed: u64,
+    soonest: u64,
     scheduled: VecDeque<ScheduledEvent>,
 }
 
@@ -63,6 +64,7 @@ impl Default for Scheduler {
     fn default() -> Self {
         Self {
             elapsed: 0,
+            soonest: u64::MAX,
             scheduled: VecDeque::with_capacity(16),
         }
     }
@@ -70,8 +72,15 @@ impl Default for Scheduler {
 
 impl Scheduler {
     #[inline(always)]
+    fn soonest(&self) -> u64 {
+        self.scheduled.front().map(|e| e.cycle).unwrap_or(u64::MAX)
+    }
+
+    #[inline(always)]
     pub fn schedule(&mut self, after: u64, handler: BasicHandler) {
         let cycle = self.elapsed + after;
+        self.soonest = self.soonest.min(cycle);
+
         let index = self.scheduled.partition_point(|e| e.cycle <= cycle);
         self.scheduled.insert(
             index,
@@ -90,6 +99,8 @@ impl Scheduler {
     #[inline(always)]
     pub fn schedule_full(&mut self, after: u64, handler: FullHandler) {
         let cycle = self.elapsed + after;
+        self.soonest = self.soonest.min(cycle);
+
         let index = self.scheduled.partition_point(|e| e.cycle <= cycle);
         self.scheduled.insert(
             index,
@@ -104,12 +115,14 @@ impl Scheduler {
     pub fn cancel(&mut self, handler: BasicHandler) {
         let handler = Handler::Basic(handler);
         self.scheduled.retain(|e| e.handler != handler);
+        self.soonest = self.soonest();
     }
 
     #[inline(always)]
     pub fn cancel_full(&mut self, handler: FullHandler) {
         let handler = Handler::Full(handler);
         self.scheduled.retain(|e| e.handler != handler);
+        self.soonest = self.soonest();
     }
 
     #[inline(always)]
@@ -135,8 +148,15 @@ impl Scheduler {
     }
 
     #[inline(always)]
+    pub fn has_pending(&self) -> bool {
+        self.soonest <= self.elapsed
+    }
+
+    #[inline(always)]
     pub fn pop(&mut self) -> Option<ScheduledEvent> {
-        self.scheduled.pop_front_if(|e| e.cycle <= self.elapsed)
+        self.scheduled
+            .pop_front_if(|e| e.cycle <= self.elapsed)
+            .inspect(|_| self.soonest = self.soonest())
     }
 
     #[inline(always)]
