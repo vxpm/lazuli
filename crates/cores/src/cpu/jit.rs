@@ -267,12 +267,15 @@ const CTX_HOOKS: Hooks = {
             return None;
         }
 
+        let reason_kind = reason.kind();
+        let reason_branch = reason.branch();
+
         // if not idle looping, jump to linked block
         if data.linked.is_none() {
             std::hint::cold_path();
 
             // try linking
-            match (reason.kind(), reason.branch().indirect()) {
+            match (reason_kind, reason_branch.indirect()) {
                 // fixed address branching
                 (ExitKind::Sync, _) | (ExitKind::Branch, false) => {
                     let source = ctx.sys.cpu.pc;
@@ -289,7 +292,7 @@ const CTX_HOOKS: Hooks = {
             }
 
             // if it is a call, also push into shadow stack
-            if reason.kind() == ExitKind::Branch && reason.branch().call() {
+            if reason_kind == ExitKind::Branch && reason_branch.call() {
                 let target = Address(reason.address()) + 4;
 
                 if data.linked_return.is_none() {
@@ -309,13 +312,17 @@ const CTX_HOOKS: Hooks = {
         }
 
         // try following linked or shadow stack
-        let linked = if reason.branch().indirect() && !reason.branch().call() {
-            // follow shadow stack
-            let in_stack = ctx.shadow_stack.pop();
-            in_stack.filter(|x| x.0 == ctx.sys.cpu.pc).map(|x| x.1)
-        } else {
-            data.linked
-        };
+        let linked =
+            if reason_kind == ExitKind::Branch && reason_branch.indirect() && !reason_branch.call()
+            {
+                std::hint::cold_path();
+                let in_stack = ctx.shadow_stack.pop();
+                in_stack
+                    .filter(|(addr, _)| *addr == ctx.sys.cpu.pc)
+                    .map(|(_, block)| block)
+            } else {
+                data.linked
+            };
 
         ctx.last_followed_link = linked;
         linked
@@ -790,8 +797,8 @@ impl Core {
         cycles: Cycles,
         breakpoints: &[Address],
     ) -> Info {
-        let mut executed = Info::default();
-        while executed.executed_cycles < cycles {
+        let mut info = Info::default();
+        while info.executed_cycles < cycles {
             // detect mailbox idle loop
             let logical = sys.cpu.supervisor.config.msr.instr_addr_translation();
             if let Some(stored) = self.blocks.get(logical, sys.cpu.pc)
@@ -805,8 +812,8 @@ impl Core {
                     && sys.dsp.cpu_mailbox.status()
                 {
                     std::hint::cold_path();
-                    executed.executed_cycles = cycles;
-                    executed.executed_instructions = 1;
+                    info.executed_cycles = cycles;
+                    info.executed_instructions = 1;
                     break;
                 }
             }
@@ -819,18 +826,18 @@ impl Core {
             };
 
             // execute
-            let target_cycles = cycles - executed.executed_cycles;
+            let target_cycles = cycles - info.executed_cycles;
             let e = self.cached_exec(sys, target_cycles.0 as u32, max_instructions, BREAKPOINTS);
-            executed.executed_instructions += e.executed_instructions;
-            executed.executed_cycles += e.executed_cycles;
+            info.executed_instructions += e.executed_instructions;
+            info.executed_cycles += e.executed_cycles;
 
             if BREAKPOINTS && breakpoints.contains(&sys.cpu.pc) {
-                executed.hit_breakpoint = true;
+                info.hit_breakpoint = true;
                 break;
             }
         }
 
-        executed
+        info
     }
 }
 
