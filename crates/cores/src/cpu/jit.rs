@@ -22,6 +22,7 @@ pub use ppcjit;
 struct ExitData {
     pub linked: Option<BlockFn>,
     pub linked_pattern: Pattern,
+    pub linked_return: Option<BlockFn>,
 }
 
 /// Identifier for a block in a [`Blocks`] storage.
@@ -31,6 +32,7 @@ pub struct BlockId(usize);
 pub struct StoredBlock {
     pub inner: Block,
     linked_from: Vec<*mut ExitData>,
+    linked_return_from: Vec<*mut ExitData>,
 }
 
 // TODO: this is problematic
@@ -111,6 +113,7 @@ impl Blocks {
         self.storage.push(StoredBlock {
             inner: block,
             linked_from: Vec::new(),
+            linked_return_from: Vec::new(),
         });
 
         self.insert_mapping(logical, addr, Mapping { id, length });
@@ -169,6 +172,12 @@ impl Blocks {
                     (*data).linked_pattern = Pattern::None;
                 }
             }
+
+            for data in block.linked_return_from.drain(..) {
+                unsafe {
+                    (*data).linked_return = None;
+                }
+            }
         }
 
         temp_deps.clear();
@@ -192,6 +201,8 @@ struct Context<'a> {
     blocks: &'a mut Blocks,
     /// ICache
     icache: &'a mut icache::Cache,
+    /// A shadow stack for calls and returns.
+    shadow_stack: &'a mut Vec<(Address, BlockFn)>,
     /// Cycles executed.   
     executed_cycles: u32,
     /// Instructions executed.   
@@ -200,6 +211,7 @@ struct Context<'a> {
     target_cycles: u32,
     /// Maximum instructions we should execute.
     max_instructions: u32,
+    /// Last followed link, if any.
     last_followed_link: Option<BlockFn>,
 }
 
@@ -257,23 +269,56 @@ const CTX_HOOKS: Hooks = {
 
         // if not idle looping, jump to linked block
         if data.linked.is_none() {
-            // try linking
             std::hint::cold_path();
-            if !(reason.kind() == ExitKind::Branch && reason.branch().indirect()) {
-                let source = ctx.sys.cpu.pc;
-                let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
 
-                if let Some(mapping) = ctx.blocks.get_mapping(logical, source) {
-                    let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
-                    data.linked = Some(stored.inner.as_ptr());
-                    data.linked_pattern = stored.inner.meta().pattern;
-                    stored.linked_from.push(data);
+            // try linking
+            match (reason.kind(), reason.branch().indirect()) {
+                // fixed address branching
+                (ExitKind::Sync, _) | (ExitKind::Branch, false) => {
+                    let source = ctx.sys.cpu.pc;
+                    let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
+                    if let Some(mapping) = ctx.blocks.get_mapping(logical, source) {
+                        let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
+                        data.linked = Some(stored.inner.as_ptr());
+                        data.linked_pattern = stored.inner.meta().pattern;
+                        stored.linked_from.push(data);
+                    }
+                }
+                // indirect branching
+                (ExitKind::Branch, true) => (),
+            }
+
+            // if it is a call, also push into shadow stack
+            if reason.kind() == ExitKind::Branch && reason.branch().call() {
+                let target = Address(reason.address()) + 4;
+
+                if data.linked_return.is_none() {
+                    std::hint::cold_path();
+                    let logical = ctx.sys.cpu.supervisor.config.msr.instr_addr_translation();
+                    if let Some(mapping) = ctx.blocks.get_mapping(logical, target) {
+                        let stored = ctx.blocks.storage.get_mut(mapping.id.0).unwrap();
+                        data.linked_return = Some(stored.inner.as_ptr());
+                        stored.linked_return_from.push(data);
+                    }
+                }
+
+                if let Some(linked) = data.linked_return {
+                    ctx.shadow_stack.push((target, linked));
                 }
             }
         }
 
-        ctx.last_followed_link = data.linked;
-        data.linked
+        // try following linked or shadow stack
+        let linked = if reason.branch().indirect() && !reason.branch().call() {
+            // follow shadow stack
+            let in_stack = ctx.shadow_stack.pop();
+            in_stack.filter(|x| x.0 == ctx.sys.cpu.pc).map(|x| x.1)
+        } else {
+            data.linked
+        };
+
+        ctx.last_followed_link = linked;
+        linked
     }
 
     extern "C-unwind" fn read<P: Primitive>(
@@ -570,6 +615,7 @@ pub struct Core {
     pub compiler: ppcjit::Jit,
     pub blocks: Blocks,
     pub icache: icache::Cache,
+    pub shadow_stack: Vec<(Address, BlockFn)>,
 }
 
 fn closest_breakpoint(pc: Address, breakpoints: &[Address]) -> Address {
@@ -605,6 +651,7 @@ impl Core {
             compiler,
             blocks: Blocks::default(),
             icache: Default::default(),
+            shadow_stack: Vec::new(),
         }
     }
 
@@ -689,6 +736,7 @@ impl Core {
             sys,
             blocks: &mut self.blocks,
             icache: &mut self.icache,
+            shadow_stack: &mut self.shadow_stack,
             executed_cycles: 0,
             executed_instructions: 0,
             target_cycles,

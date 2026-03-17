@@ -113,6 +113,8 @@ pub struct Block {
 #[repr(transparent)]
 pub struct BlockFn(NonNull<c_void>);
 
+unsafe impl Send for BlockFn {}
+
 impl Block {
     pub(crate) fn new(code: Allocation<ReadExec>, meta: Meta) -> Self {
         Self { code, meta }
