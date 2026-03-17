@@ -209,11 +209,13 @@ const CTX_HOOKS: Hooks = {
     extern "C-unwind" fn exit(
         ctx: &mut Context,
         _: *mut ExitData,
-        reason: ExitReason,
+        _reason: ExitReason,
         executed: Executed,
     ) -> Option<BlockFn> {
         ctx.executed_cycles += executed.cycles as u32;
         ctx.executed_instructions += executed.instructions as u32;
+        ctx.sys.scheduler.advance(executed.cycles as u64);
+
         None
     }
 

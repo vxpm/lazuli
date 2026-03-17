@@ -65,7 +65,6 @@ impl Lazuli {
                 self.dsp_pending -= DSP_STEP as f64;
             }
 
-            self.sys.scheduler.advance(executed.executed_cycles.0);
             self.sys.process_events();
 
             if executed.hit_breakpoint || breakpoints.contains(&self.sys.cpu.pc) {
@@ -90,7 +89,6 @@ impl Lazuli {
         }
 
         // process events
-        self.sys.scheduler.advance(executed.executed_cycles.0);
         self.sys.process_events();
 
         executed

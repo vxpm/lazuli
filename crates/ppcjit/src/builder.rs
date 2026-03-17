@@ -475,12 +475,44 @@ impl<'ctx> BlockBuilder<'ctx> {
             .with_bits(16, 32, self.executed_cycles as u32);
         let executed = self.ir_value(executed);
 
-        self.bd.ins().call(
+        let inst = self.bd.ins().call(
             self.hooks.exit,
             &[self.consts.ctx_ptr, exit_data_ptr, reason, executed],
         );
 
+        let next = self.bd.inst_results(inst)[0];
+        let has_next = self
+            .bd
+            .ins()
+            .icmp_imm(ir::condcodes::IntCC::NotEqual, next, 0);
+
+        let continue_block = self.bd.create_block();
+        let exit_block = self.bd.create_block();
+        self.bd.set_cold_block(exit_block);
+
+        self.bd
+            .ins()
+            .brif(has_next, continue_block, &[], exit_block, &[]);
+
+        self.bd.seal_block(continue_block);
+        self.bd.seal_block(exit_block);
+
+        // continue
+        self.switch_to_bb(continue_block);
+        self.bd.ins().return_call_indirect(
+            self.consts.signatures.block,
+            next,
+            &[
+                self.consts.ctx_ptr,
+                self.consts.regs_ptr,
+                self.consts.fmem_ptr,
+            ],
+        );
+
+        // exit
+        self.switch_to_bb(exit_block);
         self.bd.ins().return_(&[]);
+
         self.bd
             .set_srcloc(ir::SourceLoc::new(self.executed_instructions as u32));
     }
