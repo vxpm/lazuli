@@ -185,12 +185,10 @@ impl System {
             Mmio::DspSendMailbox => ne!(self.dsp.cpu_mailbox.as_bytes()),
             Mmio::DspRecvMailbox => {
                 let data = ne!(self.dsp.dsp_mailbox.as_bytes());
-                let status = self.dsp.dsp_mailbox.status();
-
-                if range_overlap(mmio_range.clone(), 0..2) && status {
-                    tracing::debug!(
+                if range_overlap(mmio_range.clone(), 0..2) {
+                    println!(
                         "received from DSP mailbox: 0x{:08X}",
-                        self.dsp.dsp_mailbox.data().value()
+                        self.dsp.dsp_mailbox.to_bits()
                     );
 
                     self.dsp.dsp_mailbox.set_status(false);

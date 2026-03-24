@@ -260,7 +260,8 @@ const CTX_HOOKS: Hooks = {
                 delta
             } else {
                 (ctx.target_cycles - ctx.executed_cycles) as u64
-            };
+            }
+            .min(ctx.target_cycles as u64);
 
             ctx.sys.scheduler.advance(delta);
             ctx.executed_cycles += delta as u32;
@@ -815,6 +816,9 @@ impl Core {
             info.executed_instructions += e.executed_instructions;
             info.executed_cycles += e.executed_cycles;
 
+            // process events
+            sys.process_events();
+
             if BREAKPOINTS && breakpoints.contains(&sys.cpu.pc) {
                 info.hit_breakpoint = true;
                 break;
@@ -835,6 +839,9 @@ impl CpuCore for Core {
     }
 
     fn step(&mut self, sys: &mut System) -> Info {
-        self.uncached_exec(sys, u32::MAX, 1, true)
+        let info = self.uncached_exec(sys, u32::MAX, 1, true);
+        sys.process_events();
+
+        info
     }
 }

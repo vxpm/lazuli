@@ -547,6 +547,9 @@ pub struct Interpreter {
     pub old_reset_high: bool,
 
     cached: Box<[Option<CachedIns>; 1 << 16]>,
+    histogram: Vec<u64>,
+    total: u64,
+    early_exit: bool,
 }
 
 impl Default for Interpreter {
@@ -558,6 +561,9 @@ impl Default for Interpreter {
             accel: Default::default(),
             old_reset_high: Default::default(),
             cached: util::boxed_array(None),
+            histogram: vec![0; u16::MAX as usize],
+            total: 0,
+            early_exit: false,
         }
     }
 }
@@ -744,6 +750,8 @@ impl Interpreter {
             std::hint::cold_path();
             tracing::warn!("DSP external interrupt raised");
             sys.dsp.control.set_interrupt(false);
+            sys.scheduler
+                .schedule(0, lazuli::system::pi::check_interrupts);
             self.raise_interrupt(Interrupt::External);
             return;
         }
@@ -1050,9 +1058,21 @@ impl Interpreter {
             Mmio::AccelInput => self.accel.input as u16,
 
             // Mailboxes
-            Mmio::DspMailboxHigh => sys.dsp.dsp_mailbox.high_and_status(),
+            Mmio::DspMailboxHigh => {
+                // if sys.dsp.dsp_mailbox.status() && self.is_waiting_for_dsp_mail() {
+                //     self.early_exit = true;
+                // }
+
+                sys.dsp.dsp_mailbox.high_and_status()
+            }
             Mmio::DspMailboxLow => sys.dsp.dsp_mailbox.low(),
-            Mmio::CpuMailboxHigh => sys.dsp.cpu_mailbox.high_and_status(),
+            Mmio::CpuMailboxHigh => {
+                // if !sys.dsp.cpu_mailbox.status() && self.is_waiting_for_cpu_mail() {
+                //     self.early_exit = true;
+                // }
+
+                sys.dsp.cpu_mailbox.high_and_status()
+            }
             Mmio::CpuMailboxLow => {
                 if sys.dsp.cpu_mailbox.status() {
                     tracing::trace!(
@@ -1289,12 +1309,13 @@ impl Interpreter {
             start,
         ];
 
+        let mut read_imem = |addr| self.try_read_imem(addr).unwrap_or(0);
         let current = [
-            self.read_imem(start),
-            self.read_imem(start.wrapping_add(1)),
-            self.read_imem(start.wrapping_add(2)),
-            self.read_imem(start.wrapping_add(3)),
-            self.read_imem(start.wrapping_add(4)),
+            read_imem(start),
+            read_imem(start.wrapping_add(1)),
+            read_imem(start.wrapping_add(2)),
+            read_imem(start.wrapping_add(3)),
+            read_imem(start.wrapping_add(4)),
         ];
 
         current == pattern_a || current == pattern_b
@@ -1342,13 +1363,21 @@ impl Interpreter {
     }
 
     pub fn exec(&mut self, sys: &mut System, instructions: u32) {
+        self.early_exit = false;
+
         let mut i = 0;
         while i < instructions {
-            if sys.dsp.control.halt() {
+            if self.early_exit || sys.dsp.control.halt() {
+                self.total += (instructions - i) as u64;
+                self.histogram[self.pc as usize] += (instructions - i) as u64;
                 std::hint::cold_path();
                 break;
             }
 
+            self.total += 1;
+            self.histogram[self.pc as usize] += 1;
+
+            self.do_dma(sys);
             self.check_loop();
             self.check_interrupts(sys);
 
@@ -1372,9 +1401,37 @@ impl Interpreter {
             self.pc = self.pc.wrapping_add(ins.len);
             i += 1;
         }
+
+        if self.is_waiting_for_dsp_mail() {
+            if sys.dsp.dsp_mailbox.status() {
+                println!("dsp is waiting :/");
+            } else {
+                println!("dsp is free");
+            }
+        }
     }
 
     pub fn step(&mut self, sys: &mut System) {
         self.exec(sys, 1);
+    }
+}
+
+impl Drop for Interpreter {
+    fn drop(&mut self) {
+        use std::fmt::Write;
+
+        let mut s = String::new();
+        for (addr, count) in self.histogram.iter().enumerate() {
+            if *count > 0 {
+                writeln!(
+                    &mut s,
+                    "{addr:04X}\t{:.04}%",
+                    100.0 * (*count as f64) / (self.total as f64)
+                )
+                .unwrap();
+            }
+        }
+
+        std::fs::write("histogram.txt", s).unwrap();
     }
 }

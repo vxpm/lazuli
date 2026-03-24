@@ -3,6 +3,7 @@ mod timer;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use lazuli::{Address, Cycles, Lazuli};
@@ -32,6 +33,7 @@ struct Shared {
     state: Mutex<State>,
     advance: AtomicBool,
     breakpoint: AtomicBool,
+    exit: AtomicBool,
 }
 
 const STEP: Duration = Duration::from_millis(1);
@@ -43,6 +45,11 @@ fn worker(runner_state: Arc<Shared>) {
     let mut emulated = Duration::ZERO;
 
     loop {
+        if runner_state.exit.load(Ordering::Relaxed) {
+            std::hint::cold_path();
+            return;
+        }
+
         if runner_state.advance.load(Ordering::Relaxed) {
             timer.resume();
         } else {
@@ -92,6 +99,7 @@ fn worker(runner_state: Arc<Shared>) {
         {
             state.cycles_history.pop_front();
         }
+
         state
             .cycles_history
             .push_back((executed.executed_cycles, now));
@@ -100,6 +108,7 @@ fn worker(runner_state: Arc<Shared>) {
 
 pub struct Runner {
     shared: Arc<Shared>,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl Runner {
@@ -112,18 +121,22 @@ impl Runner {
             }),
             advance: AtomicBool::new(false),
             breakpoint: AtomicBool::new(false),
+            exit: AtomicBool::new(false),
         };
 
-        let state = Arc::new(state);
-        std::thread::Builder::new()
+        let shared = Arc::new(state);
+        let handle = std::thread::Builder::new()
             .name("lazuli runner".into())
             .spawn({
-                let state = state.clone();
+                let state = shared.clone();
                 move || worker(state)
             })
             .unwrap();
 
-        Self { shared: state }
+        Self {
+            shared,
+            handle: Some(handle),
+        }
     }
 
     pub fn clear_breakpoint(&mut self) {
@@ -153,5 +166,12 @@ impl Runner {
 
     pub fn get(&mut self) -> MutexGuard<'_, State> {
         self.shared.state.lock().unwrap()
+    }
+}
+
+impl Drop for Runner {
+    fn drop(&mut self) {
+        self.shared.exit.store(true, Ordering::SeqCst);
+        self.handle.take().unwrap().join().unwrap();
     }
 }
