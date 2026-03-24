@@ -801,28 +801,17 @@ impl Core {
         cycles: Cycles,
         breakpoints: &[Address],
     ) -> Info {
-        let mut info = Info::default();
-        while info.executed_cycles < cycles {
-            let max_instructions = if BREAKPOINTS {
-                let closest_breakpoint = closest_breakpoint(sys.cpu.pc, breakpoints);
-                (closest_breakpoint.value() - sys.cpu.pc.value()) / 4
-            } else {
-                u32::MAX
-            };
+        let max_instructions = if BREAKPOINTS {
+            let closest_breakpoint = closest_breakpoint(sys.cpu.pc, breakpoints);
+            (closest_breakpoint.value() - sys.cpu.pc.value()) / 4
+        } else {
+            u32::MAX
+        };
 
-            // execute
-            let target_cycles = cycles - info.executed_cycles;
-            let e = self.cached_exec(sys, target_cycles.0 as u32, max_instructions, BREAKPOINTS);
-            info.executed_instructions += e.executed_instructions;
-            info.executed_cycles += e.executed_cycles;
-
-            // process events
-            sys.process_events();
-
-            if BREAKPOINTS && breakpoints.contains(&sys.cpu.pc) {
-                info.hit_breakpoint = true;
-                break;
-            }
+        // execute
+        let mut info = self.cached_exec(sys, cycles.0 as u32, max_instructions, BREAKPOINTS);
+        if BREAKPOINTS && breakpoints.contains(&sys.cpu.pc) {
+            info.hit_breakpoint = true;
         }
 
         info

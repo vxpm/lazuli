@@ -33,7 +33,7 @@ pub struct Control {
     /// The CPU->DSP interrupt (external interrupt exception in the DSP), raised by the CPU to
     /// interrupt the DSP.
     #[bits(1)]
-    pub interrupt: bool,
+    pub cpu_to_dsp_interrupt: bool,
     /// Halts the DSP (i.e. stops execution of further instructions).
     #[bits(2)]
     pub halt: bool,
@@ -49,9 +49,9 @@ pub struct Control {
     pub aram_dma_interrupt_mask: bool,
     /// The DSP->CPU interrupt, raised by the DSP to interrupt the CPU.
     #[bits(7)]
-    pub dsp_interrupt: bool,
+    pub dsp_to_cpu_interrupt: bool,
     #[bits(8)]
-    pub dsp_interrupt_mask: bool,
+    pub dsp_to_cpu_interrupt_mask: bool,
     /// Whether the ARAM DMA is in progress.
     #[bits(9)]
     pub aram_dma_ongoing: bool,
@@ -72,7 +72,7 @@ impl Control {
     pub fn any_interrupt(&self) -> bool {
         let ai = self.ai_dma_interrupt() && self.ai_dma_interrupt_mask();
         let aram = self.aram_dma_interrupt() && self.aram_dma_interrupt_mask();
-        let dsp = self.dsp_interrupt() && self.dsp_interrupt_mask();
+        let dsp = self.dsp_to_cpu_interrupt() && self.dsp_to_cpu_interrupt_mask();
         ai || aram || dsp
     }
 }
@@ -164,7 +164,9 @@ pub fn write_control(sys: &mut System, value: Control) {
     sys.dsp.control.set_halt(value.halt());
 
     // DSP external interrupt
-    sys.dsp.control.set_interrupt(value.interrupt());
+    sys.dsp
+        .control
+        .set_cpu_to_dsp_interrupt(value.cpu_to_dsp_interrupt());
 
     // PI DMA interrupts
     sys.dsp
@@ -181,12 +183,12 @@ pub fn write_control(sys: &mut System, value: Control) {
         .control
         .set_aram_dma_interrupt_mask(value.aram_dma_interrupt_mask());
 
+    sys.dsp.control.set_dsp_to_cpu_interrupt(
+        sys.dsp.control.dsp_to_cpu_interrupt() & !value.dsp_to_cpu_interrupt(),
+    );
     sys.dsp
         .control
-        .set_dsp_interrupt(sys.dsp.control.dsp_interrupt() & !value.dsp_interrupt());
-    sys.dsp
-        .control
-        .set_dsp_interrupt_mask(value.dsp_interrupt_mask());
+        .set_dsp_to_cpu_interrupt_mask(value.dsp_to_cpu_interrupt_mask());
 
     sys.dsp.control.set_unknown(value.unknown());
     sys.dsp.control.set_reset_high(value.reset_high());

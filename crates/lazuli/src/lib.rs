@@ -41,13 +41,14 @@ impl Lazuli {
         while info.executed_cycles < cycles {
             // how many CPU cycles can we execute?
             let remaining = cycles - info.executed_cycles;
-            let until_next_event = Cycles(self.sys.scheduler.until_next().unwrap_or(u64::MAX));
-            let can_execute = until_next_event.min(remaining);
 
             // execute CPU
-            let step_info = self.cores.cpu.exec(&mut self.sys, can_execute, breakpoints);
+            let step_info = self.cores.cpu.exec(&mut self.sys, remaining, breakpoints);
             info.executed_instructions += step_info.executed_instructions;
             info.executed_cycles += step_info.executed_cycles;
+
+            // process events
+            self.sys.process_events();
 
             // execute DSP
             self.dsp_pending += step_info.executed_cycles.to_dsp_cycles();

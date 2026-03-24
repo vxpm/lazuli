@@ -210,7 +210,8 @@ impl Cycles {
 
     #[inline(always)]
     pub fn to_dsp_cycles(&self) -> f64 {
-        self.0 as f64 / 6.0
+        // NOTE: should be 6.0, this is underclocked!
+        self.0 as f64 / 12.0
     }
 }
 

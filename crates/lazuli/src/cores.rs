@@ -15,7 +15,7 @@ pub struct Info {
 /// Trait for CPU cores.
 pub trait CpuCore: Send {
     /// Drives the CPU core forward by approximatedly the given number of `cycles`, stopping at any
-    /// address in `breakpoints`.
+    /// address in `breakpoints` or whenever a scheduler event is pending.
     fn exec(&mut self, sys: &mut System, cycles: Cycles, breakpoints: &[Address]) -> Info;
     /// Steps the CPU, i.e. runs exactly 1 instruction.
     fn step(&mut self, sys: &mut System) -> Info;
