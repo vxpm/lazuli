@@ -5,63 +5,100 @@ expression: disasm
   stp fp, lr, [sp, #-16]!
   unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
   mov fp, sp
-  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 32 }
+  str x28, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 16, reg: p28i }
+  stp x19, x26, [sp, #-16]!
+  unwind SaveReg { clobber_offset: 0, reg: p19i }
+  unwind SaveReg { clobber_offset: 8, reg: p26i }
   sub sp, sp, #16
   unwind StackAlloc { size: 16 }
 block0:
-  ldr w5, [x4, #680]
-  mov x6, x4
-  lsr w4, w5, #13
-  tbnz x4, #0, label2 ; b label1
-block2:
-  mov x0, x6
-  ldr q23, [x0, #152]
-  ldr q24, [x0, #168]
-  ldr w7, [x0, #652]
-  ldr w9, [x0, #648]
-  ldr w8, [x0]
-  and w10, w9, #268435455
-  fcmp d23, d24
-  cset x9, mi
+  mov x19, x2
+  mov x26, x4
+  mov x28, x3
+  ldr w13, [x3, #680]
+  lsr w13, w13, #13
+  tbnz x13, #0, label4 ; b label1
+block3:
+  mov x2, x19
+  mov x3, x28
+  mov x4, x26
+  return_call_ind x1 new_stack_arg_size:0 x2=x2 x3=x3 x4=x4
+block4:
+  mov x3, x28
+  ldr q3, [x3, #152]
+  ldr q4, [x3, #168]
+  ldr w4, [x3, #652]
+  ldr w6, [x3, #648]
+  ldr w5, [x3]
+  and w7, w6, #268435455
+  fcmp d3, d4
+  cset x6, mi
+  uxtb w6, w6
+  fcmp d3, d4
+  cset x8, gt
+  uxtb w8, w8
+  lsl w9, w8, #30
+  orr w10, w9, w6, LSL 31
+  fcmp d3, d4
+  cset x9, eq
   uxtb w9, w9
-  fcmp d23, d24
-  cset x11, gt
-  uxtb w11, w11
-  lsl w12, w11, #30
-  orr w13, w12, w9, LSL 31
-  fcmp d23, d24
-  cset x12, eq
-  uxtb w12, w12
-  orr w14, w13, w12, LSL 29
-  fcmp d23, d24
-  cset x13, vs
-  uxtb w13, w13
-  orr w14, w14, w13, LSL 28
-  orr w14, w10, w14
-  str w14, [x0, #648]
-  add w14, w8, #4
-  str w14, [x0]
-  and w14, w7, #4294840319
-  lsl w15, w11, #14
-  orr w15, w15, w9, LSL 15
-  orr w15, w15, w12, LSL 13
-  orr w13, w15, w13, LSL 12
-  orr w13, w14, w13
-  str w13, [x0, #652]
-  ldr w14, [x2]
-  add w14, w14, #1
-  str w14, [x2]
-  ldr w15, [x2, #4]
-  add w15, w15, #2
-  str w15, [x2, #4]
-  add sp, sp, #16
-  ldp fp, lr, [sp], #16
-  ret
+  orr w11, w10, w9, LSL 29
+  fcmp d3, d4
+  cset x10, vs
+  uxtb w10, w10
+  orr w11, w11, w10, LSL 28
+  orr w7, w7, w11
+  str w7, [x3, #648]
+  add w11, w5, #4
+  str w11, [x3]
+  and w11, w4, #4294840319
+  lsl w12, w8, #14
+  orr w12, w12, w6, LSL 15
+  orr w9, w12, w9, LSL 13
+  orr w9, w9, w10, LSL 12
+  orr w9, w11, w9
+  str w9, [x3, #652]
+  load_ext_name_far x1, User(userextname23)+0
+  movz x2, #0
+  movz w3, #1
+  movk w3, w3, #2, LSL #16
+  load_ext_name_far x10, User(userextname1)+0
+  mov x0, x19
+  blr x10
+  subs xzr, x0, #0
+  mov x1, x0
+  b.ne label6 ; b label5
+block6:
+  mov x2, x19
+  mov x3, x28
+  mov x4, x26
+  return_call_ind x1 new_stack_arg_size:0 x2=x2 x3=x3 x4=x4
 block1:
   movz w1, #2048
-  load_ext_name_far x5, User(userextname0)+0
-  mov x0, x6
-  blr x5
+  load_ext_name_far x14, User(userextname0)+0
+  mov x0, x28
+  blr x14
+  load_ext_name_far x1, User(userextname22)+0
+  movz x2, #0
+  movz w3, #1
+  movk w3, w3, #2, LSL #16
+  load_ext_name_far x15, User(userextname1)+0
+  mov x0, x19
+  blr x15
+  subs xzr, x0, #0
+  mov x1, x0
+  b.ne label3 ; b label2
+block2:
   add sp, sp, #16
+  ldp x19, x26, [sp], #16
+  ldr x28, [sp], #16
+  ldp fp, lr, [sp], #16
+  ret
+block5:
+  add sp, sp, #16
+  ldp x19, x26, [sp], #16
+  ldr x28, [sp], #16
   ldp fp, lr, [sp], #16
   ret

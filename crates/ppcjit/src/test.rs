@@ -1,3 +1,5 @@
+use std::alloc::Layout;
+
 use cranelift::codegen::isa;
 
 use crate::block::Meta;
@@ -67,6 +69,7 @@ fn compile_sequence(isa: isa::Builder, sequence: Sequence) -> (Artifact, Meta) {
                 round_to_single: false,
             },
             cache_path: None,
+            exit_data_layout: Layout::new::<u8>(),
         },
         unsafe { Hooks::stub() },
     );

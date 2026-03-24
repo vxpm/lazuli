@@ -20,329 +20,329 @@ expression: disasm
 block0:
   movq %rdi, <offset:1>+8(%rsp)
   movq %rsi, <offset:1>+0x10(%rsp)
-  movl 0x2a8(%rdx), %r9d
   movq %rdx, <offset:1>+0x18(%rsp)
-  shrl $0xd, %r9d
-  testb $0x1, %r9b
-  jnz     label2; j label1
-block2:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x84(%rdi), %r12d
-  movq %r12, %rax
-  shrl $0x11, %eax
-  movq (%rcx, %rax, 8), %rax
-  movq %rcx, %r15
-  testq %rax, %rax
-  jnz     label6; j label3
-block5:
-  movl <offset:1>+(%rsp), %r14d
-  movq <offset:1>+0x18(%rsp), %rdi
-  jmp     label7
-block6:
-  movq %r12, %rcx
-  andl $0x1ffff, %ecx
-  movl (%rax, %rcx), %r14d
-  bswapl %r14d
-  movq <offset:1>+0x18(%rsp), %rdi
-  jmp     label7
-block7:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl (%rdi), %ebx
-  leal 4(%r12), %ecx
-  shrl $0x11, %ecx
-  movq %r15, %rdi
-  movq (%rdi, %rcx, 8), %rdx
-  testq %rdx, %rdx
-  jnz     label11; j label8
-block10:
-  movl <offset:1>+(%rsp), %r13d
-  movq <offset:1>+0x18(%rsp), %rdi
-  jmp     label12
-block11:
-  leal 4(%r12), %r9d
-  andl $0x1ffff, %r9d
-  movl (%rdx, %r9), %r13d
-  bswapl %r13d
-  movq <offset:1>+0x18(%rsp), %rdi
-  jmp     label12
-block12:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x14(%rdi), %r12d
-  movl 0x368(%rdi), %edx
-  movq %rdx, %r15
-  leal 8(%r12), %esi
-  movd %r14d, %xmm7
-  uninit  %xmm0
-  xorpd %xmm0, %xmm0
-  cvtss2sd %xmm7, %xmm0
-  pshufd $0x44, %xmm0, %xmm6
-  movdqu %xmm6, <offset:1>+0x68(%rsp)
-  load_ext_name userextname12+0, %r11
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x68(%rsp), %xmm0
-  call    *%r11
-  testb %al, %al
-  jnz     label14; j label13
-block14:
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movzbl %al, %esi
-  leal 8(%r12, %rsi), %r14d
-  pshufd $0xee, %xmm6, %xmm0
-  movdqu %xmm0, <offset:1>+0x28(%rsp)
-  load_ext_name userextname12+0, %rax
-  movq %r15, %rdx
-  movq %r14, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
-  call    *%rax
-  testb %al, %al
-  jnz     label16; j label15
-block16:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x368(%rdi), %edx
-  movq %rdx, %r14
-  leal 0x18(%r12), %esi
-  load_ext_name userextname12+0, %r11
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x68(%rsp), %xmm0
-  call    *%r11
-  testb %al, %al
-  jnz     label18; j label17
-block18:
-  movzbl %al, %edi
-  leal 0x18(%r12, %rdi), %r15d
-  load_ext_name userextname12+0, %rax
-  movq %r14, %rdx
-  movq %r15, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x28(%rsp), %xmm0
-  call    *%rax
-  testb %al, %al
-  jnz     label20; j label19
-block20:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x368(%rdi), %edx
-  movq %rdx, %r15
-  leal 0x20(%r12), %esi
-  load_ext_name userextname12+0, %rax
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x68(%rsp), %xmm0
-  call    *%rax
-  testb %al, %al
-  jnz     label22; j label21
-block22:
-  movzbl %al, %edx
-  leal 0x20(%r12, %rdx), %r14d
-  load_ext_name userextname12+0, %r8
-  movq %r15, %rdx
-  movdqu <offset:1>+0x28(%rsp), %xmm0
-  movq %r14, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
-  call    *%r8
-  testb %al, %al
-  jnz     label24; j label23
-block24:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x368(%rdi), %edx
-  movq %rdx, %r14
-  leal 0x10(%r12), %esi
-  movd %r13d, %xmm3
-  uninit  %xmm4
-  xorpd %xmm4, %xmm4
-  cvtss2sd %xmm3, %xmm4
-  pshufd $0x44, %xmm4, %xmm4
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movdqa %xmm6, %xmm3
-  shufps $0xe4, %xmm4, %xmm3
-  movdqu %xmm4, <offset:1>+0x48(%rsp)
-  movdqu %xmm3, <offset:1>+0x58(%rsp)
-  load_ext_name userextname12+0, %r8
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x58(%rsp), %xmm0
-  call    *%r8
-  testb %al, %al
-  jnz     label26; j label25
-block26:
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movzbl %al, %r11d
-  leal 0x10(%r12, %r11), %r13d
-  pshufd $0xee, %xmm3, %xmm0
-  load_ext_name userextname12+0, %r11
-  movq %r14, %rdx
-  movq %r13, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
-  call    *%r11
-  testb %al, %al
-  jnz     label28; j label27
-block28:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x368(%rdi), %edx
-  movq %rdx, %r13
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movdqa %xmm4, %xmm1
-  shufps $0x4e, %xmm6, %xmm1
-  movdqu %xmm1, <offset:1>+0x38(%rsp)
-  load_ext_name userextname12+0, %rax
-  movq %r12, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x38(%rsp), %xmm0
-  call    *%rax
-  testb %al, %al
-  jnz     label30; j label29
-block30:
-  movdqu <offset:1>+0x38(%rsp), %xmm1
-  movzbl %al, %ecx
-  leal (%r12, %rcx), %r15d
-  pshufd $0xee, %xmm1, %xmm0
-  movdqu %xmm0, <offset:1>+0x28(%rsp)
-  load_ext_name userextname12+0, %rcx
-  movq %r13, %rdx
-  movq %r15, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
-  call    *%rcx
-  testb %al, %al
-  jnz     label32; j label31
-block32:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl 0x368(%rdi), %edx
-  movq %rdx, %r13
-  leal 0x28(%r12), %esi
-  load_ext_name userextname12+0, %r8
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x38(%rsp), %xmm0
-  call    *%r8
-  testb %al, %al
-  jnz     label34; j label33
-block34:
-  movzbl %al, %r10d
-  leal 0x28(%r12, %r10), %r12d
-  load_ext_name userextname12+0, %r10
-  movq %r13, %rdx
-  movq <offset:1>+0x10(%rsp), %rdi
-  movdqu <offset:1>+0x28(%rsp), %xmm0
-  movq %r12, %rsi
-  call    *%r10
-  testb %al, %al
-  jnz     label36; j label35
-block36:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x28(%rbx), %esi
-  movl %esi, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  movdqu <offset:1>+0x38(%rsp), %xmm1
-  movupd %xmm1, 0xb8(%rdi)
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block1:
-  movl $0x800, %esi
-  load_ext_name userextname0+0, %rax
-  movq <offset:1>+0x18(%rsp), %rdi
-  call    *%rax
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
+  movl 0x2a8(%rsi), %esi
+  shrl $0xd, %esi
+  testb $0x1, %sil
+  jnz     label4; j label1
 block3:
-  leaq <offset:1>+(%rsp), %rdx
-  load_ext_name userextname5+0, %r8
-  movq %r12, %rsi
-  movq <offset:1>+0x10(%rsp), %rdi
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block4:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x84(%rsi), %r15d
+  movq %r15, %r10
+  shrl $0x11, %r10d
+  movq (%rdx, %r10, 8), %r10
+  testq %r10, %r10
+  jnz     label10; j label5
+block8:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block9:
+  movl <offset:1>+(%rsp), %ebx
+  movq <offset:1>+0x10(%rsp), %rsi
+  jmp     label11
+block10:
+  movq %r15, %r11
+  andl $0x1ffff, %r11d
+  movl (%r10, %r11), %ebx
+  bswapl %ebx
+  movq <offset:1>+0x10(%rsp), %rsi
+  jmp     label11
+block11:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl (%rsi), %edi
+  movq %rdi, <offset:1>+0x78(%rsp)
+  leal 4(%r15), %r11d
+  shrl $0x11, %r11d
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq (%rdx, %r11, 8), %rsi
+  testq %rsi, %rsi
+  jnz     label17; j label12
+block15:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block16:
+  movl <offset:1>+(%rsp), %r13d
+  movq <offset:1>+0x10(%rsp), %rsi
+  jmp     label18
+block17:
+  leal 4(%r15), %eax
+  andl $0x1ffff, %eax
+  movl (%rsi, %rax), %r13d
+  bswapl %r13d
+  movq <offset:1>+0x10(%rsp), %rsi
+  jmp     label18
+block18:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x14(%rsi), %r14d
+  movl 0x368(%rsi), %edx
+  movq %rdx, %r12
+  leal 8(%r14), %esi
+  movd %ebx, %xmm0
+  uninit  %xmm1
+  xorpd %xmm1, %xmm1
+  cvtss2sd %xmm0, %xmm1
+  pshufd $0x44, %xmm1, %xmm2
+  movdqu %xmm2, <offset:1>+0x68(%rsp)
+  load_ext_name userextname11+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x68(%rsp), %xmm0
   call    *%r8
   testb %al, %al
-  jnz     label5; j label4
-block4:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r12d, 0x360(%rdi)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %r10
-  call    *%r10
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x1, (%r8)
-  addl $0x2, 4(%r8)
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block8:
-  leal 4(%r12), %esi
-  leaq <offset:1>+(%rsp), %rdx
-  load_ext_name userextname5+0, %r9
-  movq <offset:1>+0x10(%rsp), %rdi
+  jnz     label22; j label19
+block21:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block22:
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movzbl %al, %r8d
+  leal 8(%r14, %r8), %r15d
+  pshufd $0xee, %xmm2, %xmm0
+  movdqu %xmm0, <offset:1>+0x28(%rsp)
+  load_ext_name userextname11+0, %r8
+  movq %r12, %rdx
+  movq %r15, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testb %al, %al
+  jnz     label26; j label23
+block25:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block26:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x368(%rsi), %edx
+  movq %rdx, %rbx
+  leal 0x18(%r14), %esi
+  load_ext_name userextname11+0, %r9
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x68(%rsp), %xmm0
   call    *%r9
   testb %al, %al
-  jnz     label10; j label9
-block9:
-  leal 4(%r12), %r11d
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r11d, 0x360(%rdi)
-  movd %r14d, %xmm7
-  uninit  %xmm0
-  xorpd %xmm0, %xmm0
-  cvtss2sd %xmm7, %xmm0
-  pshufd $0x44, %xmm0, %xmm7
-  movupd %xmm7, 0x88(%rdi)
-  leal 4(%rbx), %edi
-  movq <offset:1>+0x18(%rsp), %r8
-  movl %edi, (%r8)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %rax
-  movq <offset:1>+0x18(%rsp), %rdi
+  jnz     label30; j label27
+block29:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block30:
+  movzbl %al, %r11d
+  leal 0x18(%r14, %r11), %r15d
+  load_ext_name userextname11+0, %r11
+  movq %rbx, %rdx
+  movq %r15, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x28(%rsp), %xmm0
+  call    *%r11
+  testb %al, %al
+  jnz     label34; j label31
+block33:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block34:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x368(%rsi), %edx
+  movq %rdx, %r12
+  leal 0x20(%r14), %esi
+  load_ext_name userextname11+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x68(%rsp), %xmm0
   call    *%rax
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x1, (%r8)
-  addl $0x2, 4(%r8)
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block13:
-  leal 8(%r12), %edi
-  movq <offset:1>+0x18(%rsp), %rsi
-  movl %edi, 0x360(%rsi)
+  testb %al, %al
+  jnz     label38; j label35
+block37:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block38:
+  movzbl %al, %edx
+  leal 0x20(%r14, %rdx), %r15d
+  load_ext_name userextname11+0, %r8
+  movq %r12, %rdx
+  movdqu <offset:1>+0x28(%rsp), %xmm0
+  movq %r15, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testb %al, %al
+  jnz     label42; j label39
+block41:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block42:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x368(%rsi), %edx
+  movq %rdx, %r15
+  leal 0x10(%r14), %esi
   movd %r13d, %xmm2
   uninit  %xmm3
   xorpd %xmm3, %xmm3
   cvtss2sd %xmm2, %xmm3
-  pshufd $0x44, %xmm3, %xmm2
-  movq <offset:1>+0x18(%rsp), %rdi
-  movupd %xmm2, 0x98(%rdi)
-  leal 8(%rbx), %ecx
-  movl %ecx, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %r8
+  pshufd $0x44, %xmm3, %xmm4
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  shufps $0xe4, %xmm4, %xmm2
+  movdqu %xmm4, <offset:1>+0x48(%rsp)
+  movdqu %xmm2, <offset:1>+0x58(%rsp)
+  load_ext_name userextname11+0, %r10
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x58(%rsp), %xmm0
+  call    *%r10
+  testb %al, %al
+  jnz     label46; j label43
+block45:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block46:
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movzbl %al, %edi
+  leal 0x10(%r14, %rdi), %r12d
+  pshufd $0xee, %xmm2, %xmm0
+  load_ext_name userextname11+0, %rax
+  movq %r15, %rdx
+  movq %r12, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testb %al, %al
+  jnz     label50; j label47
+block49:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block50:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x368(%rsi), %edx
+  movq %rdx, %r13
+  movdqu <offset:1>+0x68(%rsp), %xmm1
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movdqa %xmm4, %xmm2
+  shufps $0x4e, %xmm1, %xmm2
+  movdqu %xmm2, <offset:1>+0x38(%rsp)
+  load_ext_name userextname11+0, %r8
+  movq %r14, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x38(%rsp), %xmm0
   call    *%r8
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x1, (%r8)
-  addl $0x2, 4(%r8)
+  testb %al, %al
+  jnz     label54; j label51
+block53:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block54:
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movzbl %al, %r10d
+  leal (%r14, %r10), %ebx
+  pshufd $0xee, %xmm2, %xmm0
+  movdqu %xmm0, <offset:1>+0x28(%rsp)
+  load_ext_name userextname11+0, %r10
+  movq %r13, %rdx
+  movq %rbx, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r10
+  testb %al, %al
+  jnz     label58; j label55
+block57:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block58:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl 0x368(%rsi), %edx
+  movq %rdx, %rbx
+  leal 0x28(%r14), %esi
+  load_ext_name userextname11+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  movdqu <offset:1>+0x38(%rsp), %xmm0
+  call    *%rax
+  testb %al, %al
+  jnz     label62; j label59
+block61:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block62:
+  movzbl %al, %edx
+  leal 0x28(%r14, %rdx), %r15d
+  load_ext_name userextname11+0, %r8
+  movq %rbx, %rdx
+  movdqu <offset:1>+0x28(%rsp), %xmm0
+  movq %r15, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testb %al, %al
+  jnz     label66; j label63
+block65:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block66:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x28(%rdi), %r11d
+  movl %r11d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movupd %xmm2, 0xb8(%rsi)
+  load_ext_name userextname37+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x14000a, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label68; j label67
+block68:
+  movq <offset:1>+0x18(%rsp), %rdx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  return_call_unknown %r10 (0) tmp=%r11 %rdi=%rdi %rsi=%rsi %rdx=%rdx
+block1:
+  movl $0x800, %esi
+  load_ext_name userextname0+0, %rcx
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rcx
+  load_ext_name userextname22+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x20001, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label3; j label2
+block2:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -352,22 +352,32 @@ block13:
   movq %rbp, %rsp
   popq %rbp
   retq
-block15:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r14d, 0x360(%rdi)
-  movd %r13d, %xmm4
-  uninit  %xmm5
-  xorpd %xmm5, %xmm5
-  cvtss2sd %xmm4, %xmm5
-  pshufd $0x44, %xmm5, %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 8(%rbx), %edx
-  movl %edx, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
+block5:
+  leaq <offset:1>+(%rsp), %rdx
+  load_ext_name userextname4+0, %rax
+  movq %r15, %rsi
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testb %al, %al
+  jnz     label9; j label6
+block6:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r15d, 0x360(%rsi)
   movl $0x300, %esi
-  load_ext_name userextname0+0, %r9
-  call    *%r9
+  load_ext_name userextname0+0, %rcx
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rcx
+  load_ext_name userextname23+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x20001, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label8; j label7
+block7:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -377,30 +387,42 @@ block15:
   movq %rbp, %rsp
   popq %rbp
   retq
-block17:
-  leal 0x18(%r12), %edi
-  movq <offset:1>+0x18(%rsp), %rax
-  movl %edi, 0x360(%rax)
-  movd %r13d, %xmm4
-  uninit  %xmm5
-  xorpd %xmm5, %xmm5
-  cvtss2sd %xmm4, %xmm5
-  pshufd $0x44, %xmm5, %xmm4
-  movq <offset:1>+0x18(%rsp), %rdi
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x10(%rbx), %ecx
-  movl %ecx, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  shufps $0xe4, %xmm4, %xmm6
-  movdqu %xmm6, <offset:1>+0x68(%rsp)
-  movupd %xmm6, 0xa8(%rdi)
+block12:
+  leal 4(%r15), %esi
+  leaq <offset:1>+(%rsp), %rdx
+  load_ext_name userextname4+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testb %al, %al
+  jnz     label16; j label13
+block13:
+  leal 4(%r15), %edx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %edx, 0x360(%rsi)
+  movd %ebx, %xmm0
+  uninit  %xmm1
+  xorpd %xmm1, %xmm1
+  cvtss2sd %xmm0, %xmm1
+  pshufd $0x44, %xmm1, %xmm0
+  movupd %xmm0, 0x88(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 4(%rdi), %r9d
+  movl %r9d, (%rsi)
   movl $0x300, %esi
-  load_ext_name userextname0+0, %r9
-  call    *%r9
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x2, (%r8)
-  addl $0x4, 4(%r8)
+  load_ext_name userextname0+0, %r10
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%r10
+  load_ext_name userextname24+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x40002, %ecx
+  load_ext_name userextname1+0, %r11
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r11
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label15; j label14
+block14:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -411,58 +433,35 @@ block17:
   popq %rbp
   retq
 block19:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r15d, 0x360(%rdi)
-  movd %r13d, %xmm7
-  uninit  %xmm0
-  xorpd %xmm0, %xmm0
-  cvtss2sd %xmm7, %xmm0
-  pshufd $0x44, %xmm0, %xmm7
-  movupd %xmm7, 0x98(%rdi)
-  leal 0x10(%rbx), %r8d
-  movl %r8d, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  shufps $0xe4, %xmm7, %xmm6
-  movdqu %xmm6, <offset:1>+0x68(%rsp)
-  movupd %xmm6, 0xa8(%rdi)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %r11
-  call    *%r11
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block21:
-  leal 0x20(%r12), %ecx
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %ecx, 0x360(%rdi)
-  movd %r13d, %xmm0
-  uninit  %xmm1
-  xorpd %xmm1, %xmm1
-  cvtss2sd %xmm0, %xmm1
-  pshufd $0x44, %xmm1, %xmm5
-  movupd %xmm5, 0x98(%rdi)
-  leal 0x18(%rbx), %r8d
-  movl %r8d, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqa %xmm6, %xmm3
-  shufps $0xe4, %xmm5, %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  shufps $0x4e, %xmm6, %xmm5
-  movupd %xmm5, 0xb8(%rdi)
+  leal 8(%r14), %r9d
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r9d, 0x360(%rsi)
+  movd %r13d, %xmm3
+  uninit  %xmm4
+  xorpd %xmm4, %xmm4
+  cvtss2sd %xmm3, %xmm4
+  pshufd $0x44, %xmm4, %xmm3
+  movupd %xmm3, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 8(%rdi), %r11d
+  movl %r11d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
   movl $0x300, %esi
   load_ext_name userextname0+0, %rax
+  movq <offset:1>+0x10(%rsp), %rdi
   call    *%rax
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x2, (%r8)
-  addl $0x4, 4(%r8)
+  load_ext_name userextname25+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x60003, %ecx
+  load_ext_name userextname1+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label21; j label20
+block20:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -473,55 +472,36 @@ block21:
   popq %rbp
   retq
 block23:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r14d, 0x360(%rdi)
-  movd %r13d, %xmm4
-  uninit  %xmm5
-  xorpd %xmm5, %xmm5
-  cvtss2sd %xmm4, %xmm5
-  pshufd $0x44, %xmm5, %xmm1
-  movupd %xmm1, 0x98(%rdi)
-  leal 0x18(%rbx), %r11d
-  movl %r11d, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqa %xmm6, %xmm7
-  shufps $0xe4, %xmm1, %xmm7
-  movupd %xmm7, 0xa8(%rdi)
-  shufps $0x4e, %xmm6, %xmm1
-  movupd %xmm1, 0xb8(%rdi)
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r15d, 0x360(%rsi)
+  movd %r13d, %xmm5
+  uninit  %xmm6
+  xorpd %xmm6, %xmm6
+  cvtss2sd %xmm5, %xmm6
+  pshufd $0x44, %xmm6, %xmm5
+  movupd %xmm5, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 8(%rdi), %esi
+  movq <offset:1>+0x10(%rsp), %rcx
+  movl %esi, (%rcx)
+  movq <offset:1>+0x10(%rsp), %rsi
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
   movl $0x300, %esi
-  load_ext_name userextname0+0, %rcx
-  call    *%rcx
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block25:
-  leal 0x10(%r12), %r10d
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r10d, 0x360(%rdi)
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x1c(%rbx), %esi
-  movl %esi, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  shufps $0x4e, %xmm6, %xmm4
-  movupd %xmm4, 0xb8(%rdi)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %rdx
-  call    *%rdx
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x1, (%r8)
-  addl $0x2, 4(%r8)
+  load_ext_name userextname0+0, %rax
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rax
+  load_ext_name userextname26+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x60003, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label25; j label24
+block24:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -532,50 +512,38 @@ block25:
   popq %rbp
   retq
 block27:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r13d, 0x360(%rdi)
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x1c(%rbx), %ecx
-  movl %ecx, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  shufps $0x4e, %xmm6, %xmm4
-  movdqu %xmm4, <offset:1>+0x48(%rsp)
-  movupd %xmm4, 0xb8(%rdi)
+  leal 0x18(%r14), %r11d
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r11d, 0x360(%rsi)
+  movd %r13d, %xmm7
+  uninit  %xmm0
+  xorpd %xmm0, %xmm0
+  cvtss2sd %xmm7, %xmm0
+  pshufd $0x44, %xmm0, %xmm7
+  movupd %xmm7, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x10(%rdi), %edi
+  movl %edi, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  shufps $0xe4, %xmm7, %xmm2
+  movdqu %xmm2, <offset:1>+0x68(%rsp)
+  movupd %xmm2, 0xa8(%rsi)
   movl $0x300, %esi
-  load_ext_name userextname0+0, %r10
-  call    *%r10
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block29:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r12d, 0x360(%rdi)
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x20(%rbx), %edx
-  movl %edx, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  movdqu <offset:1>+0x38(%rsp), %xmm1
-  movupd %xmm1, 0xb8(%rdi)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %r11
-  call    *%r11
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x1, (%r8)
-  addl $0x2, 4(%r8)
+  load_ext_name userextname0+0, %rdx
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rdx
+  load_ext_name userextname27+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0xa0005, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label29; j label28
+block28:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -586,50 +554,39 @@ block29:
   popq %rbp
   retq
 block31:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r15d, 0x360(%rdi)
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x20(%rbx), %r10d
-  movl %r10d, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  movdqu <offset:1>+0x38(%rsp), %xmm1
-  movupd %xmm1, 0xb8(%rdi)
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r15d, 0x360(%rsi)
+  movd %r13d, %xmm2
+  uninit  %xmm3
+  xorpd %xmm3, %xmm3
+  cvtss2sd %xmm2, %xmm3
+  pshufd $0x44, %xmm3, %xmm2
+  movupd %xmm2, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x10(%rdi), %ecx
+  movl %ecx, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm0
+  movupd %xmm0, 0x88(%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm3
+  shufps $0xe4, %xmm2, %xmm3
+  movdqa %xmm3, %xmm2
+  movdqu %xmm3, <offset:1>+0x68(%rsp)
+  movupd %xmm2, 0xa8(%rsi)
   movl $0x300, %esi
-  load_ext_name userextname0+0, %rax
-  call    *%rax
-  movq 0x80(%rsp), %rbx
-  movq 0x88(%rsp), %r12
-  movq 0x90(%rsp), %r13
-  movq 0x98(%rsp), %r14
-  movq 0xa0(%rsp), %r15
-  addq $0xb0, %rsp
-  movq %rbp, %rsp
-  popq %rbp
-  retq
-block33:
-  leal 0x28(%r12), %r9d
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r9d, 0x360(%rdi)
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x24(%rbx), %r11d
-  movl %r11d, (%rdi)
-  movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  movdqu <offset:1>+0x38(%rsp), %xmm1
-  movupd %xmm1, 0xb8(%rdi)
-  movl $0x300, %esi
-  load_ext_name userextname0+0, %rcx
-  call    *%rcx
-  movq <offset:1>+8(%rsp), %r8
-  addl $0x1, (%r8)
-  addl $0x2, 4(%r8)
+  load_ext_name userextname0+0, %r9
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%r9
+  load_ext_name userextname28+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0xa0005, %ecx
+  load_ext_name userextname1+0, %r10
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r10
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label33; j label32
+block32:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
@@ -640,21 +597,329 @@ block33:
   popq %rbp
   retq
 block35:
-  movq <offset:1>+0x18(%rsp), %rdi
-  movl %r12d, 0x360(%rdi)
-  movdqu <offset:1>+0x48(%rsp), %xmm4
-  movupd %xmm4, 0x98(%rdi)
-  leal 0x24(%rbx), %eax
-  movl %eax, (%rdi)
+  leal 0x20(%r14), %ecx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %ecx, 0x360(%rsi)
+  movd %r13d, %xmm5
+  uninit  %xmm6
+  xorpd %xmm6, %xmm6
+  cvtss2sd %xmm5, %xmm6
+  pshufd $0x44, %xmm6, %xmm2
+  movupd %xmm2, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x18(%rdi), %r8d
+  movl %r8d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm4
+  movupd %xmm4, 0x88(%rsi)
   movdqu <offset:1>+0x68(%rsp), %xmm6
-  movupd %xmm6, 0x88(%rdi)
-  movdqu <offset:1>+0x58(%rsp), %xmm3
-  movupd %xmm3, 0xa8(%rdi)
-  movdqu <offset:1>+0x38(%rsp), %xmm1
-  movupd %xmm1, 0xb8(%rdi)
+  movdqa %xmm6, %xmm0
+  shufps $0xe4, %xmm2, %xmm0
+  movupd %xmm0, 0xa8(%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm1
+  shufps $0x4e, %xmm1, %xmm2
+  movupd %xmm2, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rax
+  load_ext_name userextname29+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0xe0007, %ecx
+  load_ext_name userextname1+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label37; j label36
+block36:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block39:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r15d, 0x360(%rsi)
+  movd %r13d, %xmm1
+  uninit  %xmm2
+  xorpd %xmm2, %xmm2
+  cvtss2sd %xmm1, %xmm2
+  pshufd $0x44, %xmm2, %xmm6
+  movupd %xmm6, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x18(%rdi), %r11d
+  movl %r11d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqa %xmm2, %xmm4
+  shufps $0xe4, %xmm6, %xmm4
+  movupd %xmm4, 0xa8(%rsi)
+  shufps $0x4e, %xmm2, %xmm6
+  movupd %xmm6, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rcx
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rcx
+  load_ext_name userextname30+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0xe0007, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label41; j label40
+block40:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block43:
+  leal 0x10(%r14), %esi
+  movq <offset:1>+0x10(%rsp), %rdx
+  movl %esi, 0x360(%rdx)
+  movq <offset:1>+0x10(%rsp), %rsi
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x1c(%rdi), %eax
+  movl %eax, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  shufps $0x4e, %xmm2, %xmm4
+  movupd %xmm4, 0xb8(%rsi)
   movl $0x300, %esi
   load_ext_name userextname0+0, %r9
+  movq <offset:1>+0x10(%rsp), %rdi
   call    *%r9
+  load_ext_name userextname31+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x100008, %ecx
+  load_ext_name userextname1+0, %r10
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r10
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label45; j label44
+block44:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block47:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r12d, 0x360(%rsi)
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x1c(%rdi), %r8d
+  movl %r8d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  shufps $0x4e, %xmm2, %xmm4
+  movdqu %xmm4, <offset:1>+0x48(%rsp)
+  movupd %xmm4, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rax
+  load_ext_name userextname32+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x100008, %ecx
+  load_ext_name userextname1+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label49; j label48
+block48:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block51:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r14d, 0x360(%rsi)
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x20(%rdi), %r11d
+  movl %r11d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movupd %xmm2, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rcx
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rcx
+  load_ext_name userextname33+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x120009, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label53; j label52
+block52:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block55:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %ebx, 0x360(%rsi)
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x20(%rdi), %eax
+  movl %eax, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movupd %xmm2, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %r9
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%r9
+  load_ext_name userextname34+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x120009, %ecx
+  load_ext_name userextname1+0, %r10
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r10
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label57; j label56
+block56:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block59:
+  leal 0x28(%r14), %ecx
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %ecx, 0x360(%rsi)
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x24(%rdi), %r8d
+  movl %r8d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movupd %xmm2, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rax
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rax
+  load_ext_name userextname35+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x14000a, %ecx
+  load_ext_name userextname1+0, %rax
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%rax
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label61; j label60
+block60:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block63:
+  movq <offset:1>+0x10(%rsp), %rsi
+  movl %r15d, 0x360(%rsi)
+  movdqu <offset:1>+0x48(%rsp), %xmm4
+  movupd %xmm4, 0x98(%rsi)
+  movq <offset:1>+0x78(%rsp), %rdi
+  leal 0x24(%rdi), %r11d
+  movl %r11d, (%rsi)
+  movdqu <offset:1>+0x68(%rsp), %xmm2
+  movupd %xmm2, 0x88(%rsi)
+  movdqu <offset:1>+0x58(%rsp), %xmm2
+  movupd %xmm2, 0xa8(%rsi)
+  movdqu <offset:1>+0x38(%rsp), %xmm2
+  movupd %xmm2, 0xb8(%rsi)
+  movl $0x300, %esi
+  load_ext_name userextname0+0, %rcx
+  movq <offset:1>+0x10(%rsp), %rdi
+  call    *%rcx
+  load_ext_name userextname36+0, %rsi
+  uninit  %rdx
+  xorq %rdx, %rdx
+  movl $0x14000a, %ecx
+  load_ext_name userextname1+0, %r8
+  movq <offset:1>+8(%rsp), %rdi
+  call    *%r8
+  testq %rax, %rax
+  movq %rax, %r10
+  jnz     label65; j label64
+block64:
+  movq 0x80(%rsp), %rbx
+  movq 0x88(%rsp), %r12
+  movq 0x90(%rsp), %r13
+  movq 0x98(%rsp), %r14
+  movq 0xa0(%rsp), %r15
+  addq $0xb0, %rsp
+  movq %rbp, %rsp
+  popq %rbp
+  retq
+block67:
   movq 0x80(%rsp), %rbx
   movq 0x88(%rsp), %r12
   movq 0x90(%rsp), %r13
