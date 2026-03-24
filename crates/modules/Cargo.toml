@@ -15,9 +15,9 @@ seq-macro.workspace = true
 
 gilrs = "0.11"
 cpal = "0.17"
-resampler = "0.4"
+resampler = "0.5"
 hound = "3.5"
-addr2line = { version = "0.25", features = [
+addr2line = { version = "0.26", features = [
     "cpp_demangle",
     "loader",
 ], default-features = false }

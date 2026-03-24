@@ -9,4 +9,4 @@ license = "MIT"
 workspace = true
 
 [dependencies]
-numtoa = "0.3"
+numtoa = "1.0"
