@@ -11,57 +11,57 @@ block1:
   subs wzr, w8, w6
   b.lo label3 ; b label2
 block3:
-  ldrb w9, [x2]
-  strb w9, [x4, #128]
-  ldur x10, [x2, #1]
-  str x10, [x4, #96]
-  ldr q19, [x3]
-  ldr q20, [const(3)]
-  tbl v19.16b, { v19.16b }, v20.16b
-  sshr v19.4s, v19.4s, #16
-  scvtf v19.4s, v19.4s
-  fmov v20.4s, #1
-  fmul v19.4s, v19.4s, v20.4s
-  str s19, [x4, #104]
-  mov s20, v19.s[1]
-  str s20, [x4, #108]
-  mov s21, v19.s[2]
-  str s21, [x4, #112]
-  ldr q22, [x3, #6]
-  mvni v23.4s, #254, MSL #8
-  tbl v22.16b, { v22.16b }, v23.16b
-  ldr q23, [const(2)]
-  mul v22.4s, v22.4s, v23.4s
-  ushr v22.4s, v22.4s, #11
-  ldr q23, [const(1)]
-  and v22.16b, v22.16b, v23.16b
-  ucvtf v22.4s, v22.4s
-  ldr q23, [const(0)]
-  fmul v20.4s, v22.4s, v23.4s
-  fmov s22, #1
-  mov v20.s[3], v20.s[3], v22.s[0]
-  str q20, [x4, #64]
+  ldrb w0, [x2]
+  strb w0, [x4, #128]
+  ldur x0, [x2, #1]
+  str x0, [x4, #96]
+  ldr q0, [x3]
+  ldr q1, [const(3)]
+  tbl v0.16b, { v0.16b }, v1.16b
+  sshr v0.4s, v0.4s, #16
+  scvtf v0.4s, v0.4s
+  fmov v1.4s, #1
+  fmul v0.4s, v0.4s, v1.4s
+  str s0, [x4, #104]
+  mov s1, v0.s[1]
+  str s1, [x4, #108]
+  mov s0, v0.s[2]
+  str s0, [x4, #112]
+  ldr q0, [x3, #6]
+  mvni v1.4s, #254, MSL #8
+  tbl v0.16b, { v0.16b }, v1.16b
+  ldr q1, [const(2)]
+  mul v0.4s, v0.4s, v1.4s
+  ushr v0.4s, v0.4s, #11
+  ldr q1, [const(1)]
+  and v0.16b, v0.16b, v1.16b
+  ucvtf v0.4s, v0.4s
+  ldr q1, [const(0)]
+  fmul v0.4s, v0.4s, v1.4s
+  fmov s1, #1
+  mov v0.s[3], v0.s[3], v1.s[0]
+  str q0, [x4, #64]
   add x3, x3, #8
   add x4, x4, #132
   add w8, w8, #1
   b label1
 block2:
-  ldr q7, [x5]
-  movz x7, #0
-  fmov d16, x7
-  movz x7, #1
-  ldrb w8, [x2]
-  lsl x9, x7, x8
-  fmov d17, x9
-  orr v16.16b, v16.16b, v17.16b
+  ldr q0, [x5]
+  movz x0, #0
+  fmov d1, x0
+  movz x0, #1
+  ldrb w1, [x2]
+  lsl x2, x0, x1
+  fmov d2, x2
+  orr v1.16b, v1.16b, v2.16b
   movi v2.16b, #0
-  uxtb w8, w8
-  and x8, x8, #31
-  add x8, x8, #64
-  lsl x7, x7, x8
-  mov v2.d[1], v2.d[1], x7
-  orr v16.16b, v16.16b, v2.16b
-  orr v7.16b, v7.16b, v16.16b
-  str q7, [x5]
+  uxtb w1, w1
+  and x1, x1, #31
+  add x1, x1, #64
+  lsl x0, x0, x1
+  mov v2.d[1], v2.d[1], x0
+  orr v1.16b, v1.16b, v2.16b
+  orr v0.16b, v0.16b, v1.16b
+  str q0, [x5]
   ldp fp, lr, [sp], #16
   ret

@@ -5,78 +5,78 @@ expression: disasm
   pushq %rbp
   movq %rsp, %rbp
 block0:
-  movq <offset:0>+-0x10(%rbp), %r10
-  uninit  %rsi
-  xorl %esi, %esi
+  movq <offset:0>+-0x10(%rbp), %rsi
+  uninit  %r10
+  xorl %r10d, %r10d
   jmp     label1
 block1:
-  cmpl %r10d, %esi
+  cmpl %esi, %r10d
   jb      label3; j label2
 block3:
   movzbq (%rdx), %r11
   movb %r11b, 0x80(%r8)
-  movq 1(%rdx), %rdi
-  movq %rdi, 0x60(%r8)
-  vmovdqu (%rcx), %xmm1
-  vmovdqu (%rip), %xmm2
-  vpaddusb (%rip), %xmm2, %xmm0
-  vpshufb %xmm0, %xmm1, %xmm2
-  vpsrad $0x10, %xmm2, %xmm1
+  movq 1(%rdx), %r11
+  movq %r11, 0x60(%r8)
+  vmovdqu (%rcx), %xmm0
+  vmovdqu (%rip), %xmm1
+  vpaddusb (%rip), %xmm1, %xmm1
+  vpshufb %xmm1, %xmm0, %xmm0
+  vpsrad $0x10, %xmm0, %xmm0
+  vcvtdq2ps %xmm0, %xmm0
+  vmovups (%rip), %xmm1
+  vmulps %xmm1, %xmm0, %xmm0
+  vmovss %xmm0, 0x68(%r8)
+  vpshufd $0x1, %xmm0, %xmm1
+  vmovss %xmm1, 0x6c(%r8)
+  vpshufd $0x2, %xmm0, %xmm0
+  vmovss %xmm0, 0x70(%r8)
+  vmovdqu 6(%rcx), %xmm0
+  vmovdqu (%rip), %xmm1
+  vpaddusb (%rip), %xmm1, %xmm1
+  vpshufb %xmm1, %xmm0, %xmm0
+  vmovdqu (%rip), %xmm1
+  vpmulld %xmm1, %xmm0, %xmm0
+  vpsrld $0xb, %xmm0, %xmm0
+  vmovdqu (%rip), %xmm1
+  vpand %xmm1, %xmm0, %xmm0
+  vpslld $0x10, %xmm0, %xmm6
+  vpsrld $0x10, %xmm6, %xmm2
+  vpsubd %xmm2, %xmm0, %xmm1
+  vcvtdq2ps %xmm2, %xmm0
+  vpsrld $0x1, %xmm1, %xmm1
   vcvtdq2ps %xmm1, %xmm1
-  vmovups (%rip), %xmm2
-  vmulps %xmm2, %xmm1, %xmm1
-  vmovss %xmm1, 0x68(%r8)
-  vpshufd $0x1, %xmm1, %xmm2
-  vmovss %xmm2, 0x6c(%r8)
-  vpshufd $0x2, %xmm1, %xmm3
-  vmovss %xmm3, 0x70(%r8)
-  vmovdqu 6(%rcx), %xmm4
-  vmovdqu (%rip), %xmm5
-  vpaddusb (%rip), %xmm5, %xmm3
-  vpshufb %xmm3, %xmm4, %xmm5
-  vmovdqu (%rip), %xmm4
-  vpmulld %xmm4, %xmm5, %xmm4
-  vpsrld $0xb, %xmm4, %xmm4
-  vmovdqu (%rip), %xmm5
-  vpand %xmm5, %xmm4, %xmm4
-  vpslld $0x10, %xmm4, %xmm5
-  vpsrld $0x10, %xmm5, %xmm7
-  vpsubd %xmm7, %xmm4, %xmm1
-  vcvtdq2ps %xmm7, %xmm3
-  vpsrld $0x1, %xmm1, %xmm5
-  vcvtdq2ps %xmm5, %xmm7
-  vaddps %xmm7, %xmm7, %xmm1
-  vaddps %xmm3, %xmm1, %xmm3
-  vmovups (%rip), %xmm4
-  vmulps %xmm4, %xmm3, %xmm4
-  movl $0x3f800000, %r11d
-  vmovd %r11d, %xmm5
-  vinsertps $0x30, %xmm5, %xmm4, %xmm4
-  vmovups %xmm4, 0x40(%r8)
+  vaddps %xmm1, %xmm1, %xmm1
+  vaddps %xmm0, %xmm1, %xmm0
+  vmovups (%rip), %xmm1
+  vmulps %xmm1, %xmm0, %xmm0
+  movl $0x3f800000, %eax
+  vmovd %eax, %xmm1
+  vinsertps $0x30, %xmm1, %xmm0, %xmm0
+  vmovups %xmm0, 0x40(%r8)
   leaq 8(%rcx), %rcx
   leaq 0x84(%r8), %r8
-  leal 1(%rsi), %esi
+  leal 1(%r10), %r10d
   jmp     label1
 block2:
-  vmovdqu (%r9), %xmm5
-  uninit  %r10
-  xorq %r10, %r10
-  vmovq %r10, %xmm6
-  movl $0x1, %r10d
-  movzbq (%rdx), %r11
-  shlxq %r11, %r10, %rsi
+  vmovdqu (%r9), %xmm6
+  uninit  %rsi
+  xorq %rsi, %rsi
   vmovq %rsi, %xmm7
+  movl $0x1, %esi
+  movzbq (%rdx), %rdi
+  shlxq %rdi, %rsi, %r8
+  vmovq %r8, %xmm0
+  vpor %xmm0, %xmm7, %xmm7
+  uninit  %xmm5
+  vpxor %xmm5, %xmm5, %xmm0
+  movzbq %dil, %rdi
+  andq $0x1f, %rdi
+  leaq 0x40(%rdi), %rdi
+  shlxq %rdi, %rsi, %rsi
+  vpinsrq $0x1, %rsi, %xmm0, %xmm0
+  vpor %xmm0, %xmm7, %xmm7
   vpor %xmm7, %xmm6, %xmm6
-  uninit  %xmm4
-  vpxor %xmm4, %xmm4, %xmm7
-  movzbq %r11b, %r8
-  andq $0x1f, %r8
-  leaq 0x40(%r8), %r11
-  shlxq %r11, %r10, %r10
-  vpinsrq $0x1, %r10, %xmm7, %xmm7
-  vpor %xmm7, %xmm6, %xmm6
-  vpor %xmm6, %xmm5, %xmm5
-  vmovdqu %xmm5, (%r9)
+  vmovdqu %xmm6, (%r9)
   movq %rbp, %rsp
   popq %rbp
   retq
