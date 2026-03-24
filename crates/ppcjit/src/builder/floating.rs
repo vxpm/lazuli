@@ -17,7 +17,10 @@ impl BlockBuilder<'_> {
         self.check_floats();
 
         let fpr_b = self.get(ins.fpr_b());
-        self.set(ins.fpr_d(), fpr_b);
+        let fpr_d = self.get(ins.fpr_d());
+        let value = self.ps_merge(fpr_b, fpr_d, false, true);
+
+        self.set(ins.fpr_d(), value);
 
         if ins.field_rc() {
             self.update_cr1_float();
@@ -119,6 +122,7 @@ impl BlockBuilder<'_> {
         let one = self.bd.ins().splat(ir::types::F64X2, one);
         let sqrt = self.bd.ins().sqrt(fpr_b);
         let value = self.bd.ins().fdiv(one, sqrt);
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -135,6 +139,7 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
 
         let value = self.bd.ins().fabs(fpr_b);
+        let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
         if ins.field_rc() {
@@ -352,6 +357,7 @@ impl BlockBuilder<'_> {
             .ins()
             .fcmp(FloatCC::GreaterThanOrEqual, fpr_a_ps0, zero);
         let value = self.bd.ins().select(cond, fpr_c, fpr_b);
+        let value = self.copy_ps0_to_ps1(value);
 
         self.set(ins.fpr_d(), value);
 
