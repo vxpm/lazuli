@@ -10,9 +10,9 @@ use zerocopy::IntoBytes;
 
 use crate::Primitive;
 use crate::stream::{BinRingBuffer, BinaryStream};
-use crate::system::System;
 use crate::system::gx::cmd::attributes::{AttributeDescriptor, AttributeMode};
 use crate::system::gx::{self, Gpu, Reg as GxReg, Topology};
+use crate::system::{System, pi};
 
 /// A command processor register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
@@ -104,23 +104,23 @@ impl Reg {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Operation {
     #[default]
-    NOP               = 0b0_0000,
-    SetCP             = 0b0_0001,
-    SetXF             = 0b0_0010,
-    IndexedSetXFA     = 0b0_0100,
-    IndexedSetXFB     = 0b0_0101,
-    IndexedSetXFC     = 0b0_0110,
-    IndexedSetXFD     = 0b0_0111,
-    Call              = 0b0_1000,
-    InvalidateVertexCache = 0b0_1001,
-    SetBP             = 0b0_1100,
-    DrawQuadList      = 0b1_0000,
-    DrawTriangleList  = 0b1_0010,
-    DrawTriangleStrip = 0b1_0011,
-    DrawTriangleFan   = 0b1_0100,
-    DrawLineList      = 0b1_0101,
-    DrawLineStrip     = 0b1_0110,
-    DrawPointList     = 0b1_0111,
+    NOP                = 0b0_0000,
+    SetCP              = 0b0_0001,
+    SetXF              = 0b0_0010,
+    IndexedSetXFA      = 0b0_0100,
+    IndexedSetXFB      = 0b0_0101,
+    IndexedSetXFC      = 0b0_0110,
+    IndexedSetXFD      = 0b0_0111,
+    Call               = 0b0_1000,
+    InvalidateVtxCache = 0b0_1001,
+    SetBP              = 0b0_1100,
+    DrawQuadList       = 0b1_0000,
+    DrawTriangleList   = 0b1_0010,
+    DrawTriangleStrip  = 0b1_0011,
+    DrawTriangleFan    = 0b1_0100,
+    DrawLineList       = 0b1_0101,
+    DrawLineStrip      = 0b1_0110,
+    DrawPointList      = 0b1_0111,
 }
 
 #[bitos(8)]
@@ -135,7 +135,7 @@ pub struct Opcode {
 #[derive(Debug)]
 pub enum Command {
     Nop,
-    InvalidateVertexCache,
+    InvalidateVtxCache,
     Call {
         address: Address,
         length: u32,
@@ -183,15 +183,15 @@ pub enum Command {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Status {
     #[bits(0)]
-    pub fifo_overflow: bool,
+    pub overflow: bool,
     #[bits(1)]
-    pub fifo_underflow: bool,
+    pub underflow: bool,
     #[bits(2)]
     pub read_idle: bool,
     #[bits(3)]
     pub write_idle: bool,
     #[bits(4)]
-    pub breakpoint_interrupt: bool,
+    pub breakpoint: bool,
 }
 
 /// CP control register
@@ -199,17 +199,17 @@ pub struct Status {
 #[derive(Debug, Clone, Copy)]
 pub struct Control {
     #[bits(0)]
-    pub fifo_read_enable: bool,
+    pub read_enable: bool,
     #[bits(1)]
-    pub fifo_breakpoint_enable: bool,
+    pub breakpoint_enable: bool,
     #[bits(2)]
-    pub fifo_overflow_interrupt_enable: bool,
+    pub overflow_interrupt_enable: bool,
     #[bits(3)]
-    pub fifo_underflow_interrupt_enable: bool,
+    pub underflow_interrupt_enable: bool,
     #[bits(4)]
     pub linked_mode: bool,
     #[bits(5)]
-    pub fifo_breakpoint_interrupt_enable: bool,
+    pub breakpoint_interrupt_enable: bool,
 }
 
 impl Default for Control {
@@ -221,21 +221,26 @@ impl Default for Control {
 #[derive(Debug, Clone, Default)]
 pub struct Fifo {
     pub start: Address,
-    pub end: Address,
+    pub end_inclusive: Address,
     pub high_mark: u32,
     pub low_mark: u32,
     pub write_ptr: Address,
     pub read_ptr: Address,
+    pub breakpoint_ptr: Address,
 }
 
 impl Fifo {
+    pub fn end_exclusive(&self) -> Address {
+        self.end_inclusive + 4
+    }
+
     /// The FIFO count.
     pub fn count(&self) -> u32 {
         let count = if self.write_ptr >= self.read_ptr {
             self.write_ptr - self.read_ptr
         } else {
             let start = self.write_ptr - self.start;
-            let end = self.end - self.read_ptr;
+            let end = self.end_exclusive() - self.read_ptr;
             start + end
         };
 
@@ -243,7 +248,7 @@ impl Fifo {
             count >= 0,
             "start: {}, end: {}; write: {}, read: {}",
             self.start,
-            self.end,
+            self.end_exclusive(),
             self.write_ptr,
             self.read_ptr,
         );
@@ -390,14 +395,21 @@ pub struct Interface {
 }
 
 impl Interface {
+    pub fn any_interrupt(&self) -> bool {
+        let overflow = self.control.overflow_interrupt_enable() && self.status.overflow();
+        let underflow = self.control.underflow_interrupt_enable() && self.status.underflow();
+        let breakpoint = self.control.breakpoint_interrupt_enable() && self.status.breakpoint();
+        overflow || underflow || breakpoint
+    }
+
     /// Write a value to the clear register.
     pub fn write_clear(&mut self, value: u16) {
         if value.bit(0) {
-            self.status.set_fifo_overflow(false);
+            self.status.set_overflow(false);
         }
 
         if value.bit(1) {
-            self.status.set_fifo_underflow(false);
+            self.status.set_underflow(false);
         }
     }
 }
@@ -492,7 +504,7 @@ impl Gpu {
 
                 Command::Call { address, length }
             }
-            Operation::InvalidateVertexCache => Command::InvalidateVertexCache,
+            Operation::InvalidateVtxCache => Command::InvalidateVtxCache,
             Operation::SetBP => {
                 let register = reader.read_be::<u8>()?;
                 let value = u32::from_be_bytes([
@@ -648,7 +660,8 @@ fn fifo_pop(sys: &mut System) -> u8 {
 
     let data = sys.read_phys_slow::<u8>(sys.gpu.cmd.fifo.read_ptr);
     sys.gpu.cmd.fifo.read_ptr += 1;
-    if sys.gpu.cmd.fifo.read_ptr > sys.gpu.cmd.fifo.end {
+
+    if sys.gpu.cmd.fifo.read_ptr >= sys.gpu.cmd.fifo.end_exclusive() {
         std::hint::cold_path();
         sys.gpu.cmd.fifo.read_ptr = sys.gpu.cmd.fifo.start;
     }
@@ -658,14 +671,25 @@ fn fifo_pop(sys: &mut System) -> u8 {
 
 /// Consumes commands available in the CP FIFO.
 pub fn consume(sys: &mut System) {
-    if !sys.gpu.cmd.control.fifo_read_enable() {
+    if !sys.gpu.cmd.control.read_enable() {
         return;
     }
 
     while sys.gpu.cmd.fifo.count() > 0 {
         let data = self::fifo_pop(sys);
         sys.gpu.cmd.queue.push_be(data);
+
+        if sys.gpu.cmd.control.breakpoint_enable()
+            && sys.gpu.cmd.fifo.read_ptr == sys.gpu.cmd.fifo.breakpoint_ptr
+        {
+            sys.gpu.cmd.status.set_breakpoint(true);
+            sys.gpu.cmd.control.set_read_enable(false);
+            sys.scheduler.schedule_now(pi::check_interrupts);
+            break;
+        }
     }
+
+    sys.scheduler.schedule(512, gx::cmd::consume);
 }
 
 /// Process consumed CP commands until the queue is either empty or incomplete.
@@ -689,13 +713,13 @@ pub fn process(sys: &mut System) {
             break;
         };
 
-        if !matches!(cmd, Command::Nop | Command::InvalidateVertexCache) {
+        if !matches!(cmd, Command::Nop | Command::InvalidateVtxCache) {
             tracing::debug!("processing {:02X?}", cmd);
         }
 
         match cmd {
             Command::Nop => (),
-            Command::InvalidateVertexCache => (),
+            Command::InvalidateVtxCache => (),
             Command::Call { address, length } => gx::call(sys, address, length),
             Command::SetCP { register, value } => self::set_register(sys, register, value),
             Command::SetBP { register, value } => gx::set_register(sys, register, value),
@@ -751,6 +775,6 @@ pub fn process(sys: &mut System) {
 /// Synchronizes the CP fifo to the PI fifo.
 pub fn sync_to_pi(sys: &mut System) {
     sys.gpu.cmd.fifo.start = sys.processor.fifo_start;
-    sys.gpu.cmd.fifo.end = sys.processor.fifo_end;
+    sys.gpu.cmd.fifo.end_inclusive = sys.processor.fifo_end_inclusive;
     sys.gpu.cmd.fifo.write_ptr = sys.processor.fifo_current.address();
 }

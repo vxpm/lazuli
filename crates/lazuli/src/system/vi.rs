@@ -379,6 +379,13 @@ impl Interface {
         const { assert!(N < 4) };
         self.interrupts[N] = new.with_status(self.interrupts[N].status() && new.status());
     }
+
+    pub fn any_interrupt(&self) -> bool {
+        self.interrupts
+            .iter()
+            .map(|x| x.enable() && x.status())
+            .any(std::convert::identity)
+    }
 }
 
 pub fn update_display_interrupts(sys: &mut System) {

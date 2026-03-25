@@ -48,22 +48,22 @@ mmio! {
     0x0000, 2, CpStatus;
     0x0002, 2, CpControl;
     0x0004, 2, CpClear;
-    0x0020, 2, CpFifoStartLow;
-    0x0022, 2, CpFifoStartHigh;
-    0x0024, 2, CpFifoEndLow;
-    0x0026, 2, CpFifoEndHigh;
-    0x0028, 2, CpHighWatermarkLow;
-    0x002A, 2, CpHighWatermarkHigh;
-    0x002C, 2, CpLowWatermarkLow;
-    0x002E, 2, CpLowWatermarkHigh;
-    0x0030, 2, CpFifoCountLow;
-    0x0032, 2, CpFifoCountHigh;
-    0x0034, 2, CpFifoWritePtrLow;
-    0x0036, 2, CpFifoWritePtrHigh;
-    0x0038, 2, CpFifoReadPtrLow;
-    0x003A, 2, CpFifoReadPtrHigh;
-    0x003C, 2, CpFifoBreakpointLow;
-    0x003E, 2, CpFifoBreakpointHigh;
+    0x0020, 2, CpStartLow;
+    0x0022, 2, CpStartHigh;
+    0x0024, 2, CpEndLow;
+    0x0026, 2, CpEndHigh;
+    0x0028, 2, CpHighMarkLow;
+    0x002A, 2, CpHighMarkHigh;
+    0x002C, 2, CpLowMarkLow;
+    0x002E, 2, CpLowMarkHigh;
+    0x0030, 2, CpCountLow;
+    0x0032, 2, CpCountHigh;
+    0x0034, 2, CpWritePtrLow;
+    0x0036, 2, CpWritePtrHigh;
+    0x0038, 2, CpReadPtrLow;
+    0x003A, 2, CpReadPtrHigh;
+    0x003C, 2, CpBreakpointLow;
+    0x003E, 2, CpBreakpointHigh;
 
     // === Pixel Engine ===
     0x100A, 2, PixelInterruptStatus;

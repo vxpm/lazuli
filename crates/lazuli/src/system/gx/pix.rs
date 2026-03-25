@@ -417,4 +417,12 @@ impl Interface {
         self.interrupt
             .set_finish(self.interrupt.finish() & !status.bit(3));
     }
+
+    pub fn token_interrupt(&self) -> bool {
+        self.interrupt.token_enabled() && self.interrupt.token()
+    }
+
+    pub fn finish_interrupt(&self) -> bool {
+        self.interrupt.finish_enabled() && self.interrupt.finish()
+    }
 }

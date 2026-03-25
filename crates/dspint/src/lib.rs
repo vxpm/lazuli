@@ -1119,7 +1119,7 @@ impl Interpreter {
                 if value > 0 {
                     sys.dsp.control.set_dsp_to_cpu_interrupt(true);
                     sys.scheduler
-                        .schedule(0, lazuli::system::pi::check_interrupts);
+                        .schedule_now(lazuli::system::pi::check_interrupts);
                 } else {
                     tracing::warn!("weird DSP interrupt request write of zero, ignoring")
                 }

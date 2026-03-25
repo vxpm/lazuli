@@ -10,7 +10,7 @@ use crate::system::{System, gx};
 #[derive(Default, Clone, Copy)]
 pub struct InterruptSources {
     #[bits(0)]
-    pub gp_error: bool,
+    pub gx_error: bool,
     #[bits(1)]
     pub reset: bool,
     #[bits(2)]
@@ -28,9 +28,9 @@ pub struct InterruptSources {
     #[bits(8)]
     pub video_interface: bool,
     #[bits(9)]
-    pub pe_token: bool,
+    pub pixel_token: bool,
     #[bits(10)]
-    pub pe_finish: bool,
+    pub pixel_finish: bool,
     #[bits(11)]
     pub command_processor: bool,
     #[bits(12)]
@@ -53,7 +53,7 @@ impl std::fmt::Debug for InterruptSources {
         }
 
         debug! {
-            gp_error,
+            gx_error,
             reset,
             dvd_interface,
             serial_interface,
@@ -62,8 +62,8 @@ impl std::fmt::Debug for InterruptSources {
             dsp_interface,
             memory_interface,
             video_interface,
-            pe_token,
-            pe_finish,
+            pixel_token,
+            pixel_finish,
             command_processor,
             debug,
             high_speed_port
@@ -105,7 +105,7 @@ pub struct Interface {
 
     // fifo
     pub fifo_start: Address,
-    pub fifo_end: Address,
+    pub fifo_end_inclusive: Address,
     pub fifo_current: FifoCurrent,
 
     fifo_queue: [u8; 36],
@@ -117,7 +117,7 @@ impl Default for Interface {
         Self {
             mask: Default::default(),
             fifo_start: Default::default(),
-            fifo_end: Default::default(),
+            fifo_end_inclusive: Default::default(),
             fifo_current: Default::default(),
 
             fifo_queue: [0; 36],
@@ -126,34 +126,24 @@ impl Default for Interface {
     }
 }
 
+impl Interface {
+    pub fn fifo_end_exclusive(&self) -> Address {
+        self.fifo_end_inclusive + 4
+    }
+}
+
 /// Returns which interrupt sources are active (i.e. triggered but maybe masked).
 pub fn get_active_interrupts(sys: &System) -> InterruptSources {
     let mut sources = InterruptSources::default();
 
-    // VI
-    let mut video = false;
-    for i in &sys.video.interrupts {
-        video |= i.enable() && i.status();
-    }
-    sources.set_video_interface(video);
-
-    // PE
-    sources.set_pe_token(sys.gpu.pix.interrupt.token() && sys.gpu.pix.interrupt.token_enabled());
-    sources.set_pe_finish(sys.gpu.pix.interrupt.finish() && sys.gpu.pix.interrupt.finish_enabled());
-
-    // AI
-    sources.set_audio_interface(
-        sys.audio.control.interrupt() && sys.audio.control.interrupt_enabled(),
-    );
-
-    // DSP
-    sources.set_dsp_interface(sys.dsp.control.any_interrupt());
-
-    // DI
     sources.set_dvd_interface(sys.disk.status.any_interrupt());
-
-    // SI
     sources.set_serial_interface(sys.serial.any_interrupt());
+    sources.set_audio_interface(sys.audio.any_interrupt());
+    sources.set_dsp_interface(sys.dsp.control.any_interrupt());
+    sources.set_video_interface(sys.video.any_interrupt());
+    sources.set_pixel_token(sys.gpu.pix.token_interrupt());
+    sources.set_pixel_finish(sys.gpu.pix.finish_interrupt());
+    sources.set_command_processor(sys.gpu.cmd.any_interrupt());
 
     sources
 }
@@ -182,11 +172,11 @@ pub fn check_interrupts(sys: &mut System) {
 /// Pushes a value into the PI FIFO. Values are queued up until 32 bytes are available, then
 /// written all at once.
 pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
-    value.write_be_bytes(
-        &mut sys.processor.fifo_queue[sys.processor.fifo_queue_index..][..size_of::<P>()],
-    );
-    sys.processor.fifo_queue_index += size_of::<P>();
+    let queue = &mut sys.processor.fifo_queue;
+    let queue_slice = &mut queue[sys.processor.fifo_queue_index..][..size_of::<P>()];
+    value.write_be_bytes(queue_slice);
 
+    sys.processor.fifo_queue_index += size_of::<P>();
     if sys.processor.fifo_queue_index < 32 {
         return;
     }
@@ -198,7 +188,8 @@ pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
         let current = sys.processor.fifo_current.address();
         sys.write_phys_slow(current, byte);
         sys.processor.fifo_current.set_address(current + 1);
-        if sys.processor.fifo_current.address() > sys.processor.fifo_end {
+
+        if sys.processor.fifo_current.address() >= sys.processor.fifo_end_exclusive() {
             std::hint::cold_path();
             sys.processor.fifo_current.set_wrapped(true);
             sys.processor
@@ -214,6 +205,5 @@ pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
 
     if sys.gpu.cmd.control.linked_mode() {
         gx::cmd::sync_to_pi(sys);
-        gx::cmd::consume(sys);
     }
 }

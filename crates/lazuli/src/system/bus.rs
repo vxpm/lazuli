@@ -106,25 +106,23 @@ impl System {
 
         let value = match reg {
             // === Command Processor ===
-            Mmio::CpStatus => {
-                ne!(self.gpu.cmd.status.as_bytes())
-            }
+            Mmio::CpStatus => ne!(self.gpu.cmd.status.as_bytes()),
             Mmio::CpControl => ne!(self.gpu.cmd.control.as_bytes()),
             Mmio::CpClear => ne!(&[0, 0]),
-            Mmio::CpFifoStartLow => ne!(self.gpu.cmd.fifo.start.as_bytes()[0..2]),
-            Mmio::CpFifoStartHigh => ne!(self.gpu.cmd.fifo.start.as_bytes()[2..4]),
-            Mmio::CpFifoEndLow => ne!(self.gpu.cmd.fifo.end.as_bytes()[0..2]),
-            Mmio::CpFifoEndHigh => ne!(self.gpu.cmd.fifo.end.as_bytes()[2..4]),
-            Mmio::CpHighWatermarkLow => ne!(self.gpu.cmd.fifo.high_mark.as_bytes()[0..2]),
-            Mmio::CpHighWatermarkHigh => ne!(self.gpu.cmd.fifo.high_mark.as_bytes()[2..4]),
-            Mmio::CpLowWatermarkLow => ne!(self.gpu.cmd.fifo.low_mark.as_bytes()[0..2]),
-            Mmio::CpLowWatermarkHigh => ne!(self.gpu.cmd.fifo.low_mark.as_bytes()[2..4]),
-            Mmio::CpFifoCountLow => ne!(self.gpu.cmd.fifo.count().as_bytes()[0..2]),
-            Mmio::CpFifoCountHigh => ne!(self.gpu.cmd.fifo.count().as_bytes()[2..4]),
-            Mmio::CpFifoWritePtrLow => ne!(self.gpu.cmd.fifo.write_ptr.as_bytes()[0..2]),
-            Mmio::CpFifoWritePtrHigh => ne!(self.gpu.cmd.fifo.write_ptr.as_bytes()[2..4]),
-            Mmio::CpFifoReadPtrLow => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[0..2]),
-            Mmio::CpFifoReadPtrHigh => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[2..4]),
+            Mmio::CpStartLow => ne!(self.gpu.cmd.fifo.start.as_bytes()[0..2]),
+            Mmio::CpStartHigh => ne!(self.gpu.cmd.fifo.start.as_bytes()[2..4]),
+            Mmio::CpEndLow => ne!(self.gpu.cmd.fifo.end_inclusive.as_bytes()[0..2]),
+            Mmio::CpEndHigh => ne!(self.gpu.cmd.fifo.end_inclusive.as_bytes()[2..4]),
+            Mmio::CpHighMarkLow => ne!(self.gpu.cmd.fifo.high_mark.as_bytes()[0..2]),
+            Mmio::CpHighMarkHigh => ne!(self.gpu.cmd.fifo.high_mark.as_bytes()[2..4]),
+            Mmio::CpLowMarkLow => ne!(self.gpu.cmd.fifo.low_mark.as_bytes()[0..2]),
+            Mmio::CpLowMarkHigh => ne!(self.gpu.cmd.fifo.low_mark.as_bytes()[2..4]),
+            Mmio::CpCountLow => ne!(self.gpu.cmd.fifo.count().as_bytes()[0..2]),
+            Mmio::CpCountHigh => ne!(self.gpu.cmd.fifo.count().as_bytes()[2..4]),
+            Mmio::CpWritePtrLow => ne!(self.gpu.cmd.fifo.write_ptr.as_bytes()[0..2]),
+            Mmio::CpWritePtrHigh => ne!(self.gpu.cmd.fifo.write_ptr.as_bytes()[2..4]),
+            Mmio::CpReadPtrLow => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[0..2]),
+            Mmio::CpReadPtrHigh => ne!(self.gpu.cmd.fifo.read_ptr.as_bytes()[2..4]),
 
             // === Pixel Engine ===
             Mmio::PixelInterruptStatus => {
@@ -139,9 +137,7 @@ impl System {
             Mmio::VideoDisplayConfig => ne!(self.video.display_config.as_bytes()),
             Mmio::VideoHorizontalTiming => ne!(self.video.horizontal_timing.as_bytes()),
             Mmio::VideoOddVerticalTiming => ne!(self.video.top_vertical_timing.as_bytes()),
-            Mmio::VideoEvenVerticalTiming => {
-                ne!(self.video.bottom_vertical_timing.as_bytes())
-            }
+            Mmio::VideoEvenVerticalTiming => ne!(self.video.bottom_vertical_timing.as_bytes()),
             Mmio::VideoTopBaseLeft => ne!(self.video.top_base_left.as_bytes()),
             Mmio::VideoTopBaseRight => ne!(self.video.top_base_right.as_bytes()),
             Mmio::VideoBottomBaseLeft => ne!(self.video.bottom_base_left.as_bytes()),
@@ -172,13 +168,14 @@ impl System {
             // === Processor Interface ===
             // Interrupts
             Mmio::ProcessorInterruptCause => {
-                ne!((pi::get_raised_interrupts(self).to_bits().value() as u32).as_bytes())
+                let cause = pi::get_raised_interrupts(self).to_bits().value() as u32;
+                ne!(cause.as_bytes())
             }
             Mmio::ProcessorInterruptMask => ne!(self.processor.mask.as_bytes()),
 
             // FIFO
             Mmio::ProcessorFifoStart => ne!(self.processor.fifo_start.as_bytes()),
-            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end.as_bytes()),
+            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end_inclusive.as_bytes()),
             Mmio::ProcessorFifoCurrent => ne!(self.processor.fifo_current.as_bytes()),
 
             // === DSP Interface ===
@@ -205,9 +202,7 @@ impl System {
             Mmio::AudioDmaBase => ne!(self.audio.dma_base.as_bytes()),
             Mmio::AudioDmaControl => ne!(self.audio.dma_control.as_bytes()),
             Mmio::AudioDmaRemaining => {
-                let remaining = 32
-                    * (self.audio.dma_control.length_by_32().value()
-                        - self.audio.current_dma_block);
+                let remaining = self.audio.dma_remaining();
                 ne!(remaining.as_bytes())
             }
 
@@ -370,8 +365,16 @@ impl System {
             Mmio::CpStatus => ne!(self.gpu.cmd.status.as_mut_bytes()),
             Mmio::CpControl => {
                 ne!(self.gpu.cmd.control.as_mut_bytes());
+
                 if self.gpu.cmd.control.linked_mode() {
                     gx::cmd::sync_to_pi(self);
+                }
+
+                if self.gpu.cmd.control.read_enable() && !self.scheduler.contains(gx::cmd::consume)
+                {
+                    self.scheduler.schedule(512, gx::cmd::consume);
+                } else {
+                    self.scheduler.cancel(gx::cmd::consume);
                 }
             }
             Mmio::CpClear => {
@@ -379,56 +382,22 @@ impl System {
                 ne!(written.as_mut_bytes());
                 self.gpu.cmd.write_clear(written);
             }
-            Mmio::CpFifoStartLow => {
-                ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpFifoStartHigh => {
-                ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpFifoEndLow => {
-                ne!(self.gpu.cmd.fifo.end.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpFifoEndHigh => {
-                ne!(self.gpu.cmd.fifo.end.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpHighWatermarkLow => {
-                ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpHighWatermarkHigh => {
-                ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpLowWatermarkLow => {
-                ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpLowWatermarkHigh => {
-                ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
-            }
-            // Mmio::CpFifoCountLow => ne!(self.gpu.command.fifo.count().as_mut_bytes()[0..2]),
-            // Mmio::CpFifoCountHigh => ne!(self.gpu.command.fifo.count().as_mut_bytes()[2..4]),
-            Mmio::CpFifoWritePtrLow => {
-                ne!(self.gpu.cmd.fifo.write_ptr.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpFifoWritePtrHigh => {
-                ne!(self.gpu.cmd.fifo.write_ptr.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpFifoReadPtrLow => {
-                ne!(self.gpu.cmd.fifo.read_ptr.as_mut_bytes()[0..2]);
-                gx::cmd::consume(self);
-            }
-            Mmio::CpFifoReadPtrHigh => {
-                ne!(self.gpu.cmd.fifo.read_ptr.as_mut_bytes()[2..4]);
-                gx::cmd::consume(self);
-            }
+            Mmio::CpStartLow => ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[0..2]),
+            Mmio::CpStartHigh => ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[2..4]),
+            Mmio::CpEndLow => ne!(self.gpu.cmd.fifo.end_inclusive.as_mut_bytes()[0..2]),
+            Mmio::CpEndHigh => ne!(self.gpu.cmd.fifo.end_inclusive.as_mut_bytes()[2..4]),
+            Mmio::CpHighMarkLow => ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[0..2]),
+            Mmio::CpHighMarkHigh => ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[2..4]),
+            Mmio::CpLowMarkLow => ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[0..2]),
+            Mmio::CpLowMarkHigh => ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[2..4]),
+            // Mmio::CpCountLow => panic!("shouldn't be writing to fifo count"),
+            // Mmio::CpCountHigh => panic!("shouldn't be writing to fifo count"),
+            Mmio::CpWritePtrLow => ne!(self.gpu.cmd.fifo.write_ptr.as_mut_bytes()[0..2]),
+            Mmio::CpWritePtrHigh => ne!(self.gpu.cmd.fifo.write_ptr.as_mut_bytes()[2..4]),
+            Mmio::CpReadPtrLow => ne!(self.gpu.cmd.fifo.read_ptr.as_mut_bytes()[0..2]),
+            Mmio::CpReadPtrHigh => ne!(self.gpu.cmd.fifo.read_ptr.as_mut_bytes()[2..4]),
+            Mmio::CpBreakpointLow => ne!(self.gpu.cmd.fifo.breakpoint_ptr.as_mut_bytes()[0..2]),
+            Mmio::CpBreakpointHigh => ne!(self.gpu.cmd.fifo.breakpoint_ptr.as_mut_bytes()[2..4]),
 
             // === Pixel Engine ===
             Mmio::PixelInterruptStatus => {
@@ -443,15 +412,10 @@ impl System {
                 ne!(self.video.display_config.as_mut_bytes());
                 vi::update(self);
             }
-            Mmio::VideoHorizontalTiming => {
-                ne!(self.video.horizontal_timing.as_mut_bytes())
-            }
-            Mmio::VideoOddVerticalTiming => {
-                ne!(self.video.top_vertical_timing.as_mut_bytes())
-            }
-            Mmio::VideoEvenVerticalTiming => {
-                ne!(self.video.bottom_vertical_timing.as_mut_bytes())
-            }
+            Mmio::VideoHorizontalTiming => ne!(self.video.horizontal_timing.as_mut_bytes()),
+            Mmio::VideoOddVerticalTiming => ne!(self.video.top_vertical_timing.as_mut_bytes()),
+            Mmio::VideoEvenVerticalTiming => ne!(self.video.bottom_vertical_timing.as_mut_bytes()),
+
             Mmio::VideoTopBaseLeft => ne!(self.video.top_base_left.as_mut_bytes()),
             Mmio::VideoTopBaseRight => ne!(self.video.top_base_right.as_mut_bytes()),
             Mmio::VideoBottomBaseLeft => ne!(self.video.bottom_base_left.as_mut_bytes()),
@@ -479,12 +443,8 @@ impl System {
                 self.video.write_interrupt::<3>(written);
             }
 
-            Mmio::VideoExternalFramebufferWidth => {
-                ne!(self.video.xfb_width.as_mut_bytes())
-            }
-            Mmio::VideoHorizontalScaling => {
-                ne!(self.video.horizontal_scaling.as_mut_bytes())
-            }
+            Mmio::VideoExternalFramebufferWidth => ne!(self.video.xfb_width.as_mut_bytes()),
+            Mmio::VideoHorizontalScaling => ne!(self.video.horizontal_scaling.as_mut_bytes()),
 
             // Filter Coefficient Table
             Mmio::VideoFilterCoeff0
@@ -506,10 +466,7 @@ impl System {
 
             // FIFO
             Mmio::ProcessorFifoStart => ne!(self.processor.fifo_start.as_mut_bytes()),
-            Mmio::ProcessorFifoEnd => {
-                ne!(self.processor.fifo_end.as_mut_bytes());
-                self.processor.fifo_end += 4;
-            }
+            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end_inclusive.as_mut_bytes()),
             Mmio::ProcessorFifoCurrent => ne!(self.processor.fifo_current.as_mut_bytes()),
             Mmio::ProcessorDvdReset => {
                 let mut value = 0u32;
@@ -582,9 +539,7 @@ impl System {
                 ne!(written.as_mut_bytes());
                 di::write_control(self, written);
             }
-            Mmio::DiskConfiguration => {
-                ne!(self.disk.config.as_mut_bytes());
-            }
+            Mmio::DiskConfiguration => ne!(self.disk.config.as_mut_bytes()),
 
             // === Serial Interface ===
             Mmio::SerialOutputBuf0 => {
