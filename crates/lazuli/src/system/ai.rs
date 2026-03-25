@@ -85,6 +85,15 @@ impl Interface {
 
         self.control.set_dsp_sample_rate(value.dsp_sample_rate());
     }
+
+    pub fn any_interrupt(&self) -> bool {
+        self.control.interrupt_enabled() && self.control.interrupt()
+    }
+
+    /// How many DMA bytes are remaining to be transferred.
+    pub fn dma_remaining(&self) -> u16 {
+        32 * (self.dma_control.length_by_32().value() - self.current_dma_block)
+    }
 }
 
 fn push_streaming_frame(sys: &mut System, ctx: HandlerCtx) {

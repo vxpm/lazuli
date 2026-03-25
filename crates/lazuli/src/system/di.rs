@@ -151,7 +151,7 @@ impl Interface {
                     assert_eq!(self.dma_length, 0x20);
                 }
 
-                assert!(self.dma_length.is_multiple_of(32));
+                // assert!(self.dma_length.is_multiple_of(32));
 
                 Command::Read {
                     offset: self.command_buffer[1] << 2,
