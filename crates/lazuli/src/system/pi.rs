@@ -105,7 +105,7 @@ pub struct Interface {
 
     // fifo
     pub fifo_start: Address,
-    pub fifo_end_inclusive: Address,
+    pub fifo_end_minus_4: Address,
     pub fifo_current: FifoCurrent,
 
     fifo_queue: [u8; 36],
@@ -117,7 +117,7 @@ impl Default for Interface {
         Self {
             mask: Default::default(),
             fifo_start: Default::default(),
-            fifo_end_inclusive: Default::default(),
+            fifo_end_minus_4: Default::default(),
             fifo_current: Default::default(),
 
             fifo_queue: [0; 36],
@@ -127,8 +127,8 @@ impl Default for Interface {
 }
 
 impl Interface {
-    pub fn fifo_end_exclusive(&self) -> Address {
-        self.fifo_end_inclusive + 4
+    pub fn fifo_end(&self) -> Address {
+        self.fifo_end_minus_4 + 4
     }
 }
 
@@ -189,7 +189,7 @@ pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
         sys.write_phys_slow(current, byte);
         sys.processor.fifo_current.set_address(current + 1);
 
-        if sys.processor.fifo_current.address() >= sys.processor.fifo_end_exclusive() {
+        if sys.processor.fifo_current.address() >= sys.processor.fifo_end() {
             std::hint::cold_path();
             sys.processor.fifo_current.set_wrapped(true);
             sys.processor
