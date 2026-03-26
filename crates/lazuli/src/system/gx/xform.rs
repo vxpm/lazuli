@@ -528,23 +528,19 @@ pub fn write(sys: &mut System, addr: u16, value: u32) {
             sys.gpu.xform.internal.stages_dirty = true;
         }
         0x0600..0x0680 => {
-            if matches!(
-                addr,
-                0x603 | 0x613 | 0x623 | 0x633 | 0x643 | 0x653 | 0x663 | 0x673
-            ) {
+            let offset = addr - 0x0600;
+            if offset % 0x10 == 0x03 {
                 sys.gpu.xform.ram[addr as usize] = value;
             } else {
                 sys.gpu.xform.ram[addr as usize] = value.with_bits(0, 12, 0);
             }
 
-            if let Some(light_offset) = addr.checked_sub(0x0600) {
-                let index = light_offset / 0x10;
-                if index < 7 {
-                    sys.modules.render.exec(render::Action::SetLight(
-                        index as u8,
-                        *sys.gpu.xform.light(index as u8),
-                    ));
-                }
+            let index = offset / 0x10;
+            if index < 8 {
+                sys.modules.render.exec(render::Action::SetLight(
+                    index as u8,
+                    *sys.gpu.xform.light(index as u8),
+                ));
             }
         }
         0x1000..=0x1057 => {
