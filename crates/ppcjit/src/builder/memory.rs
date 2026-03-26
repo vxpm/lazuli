@@ -1250,9 +1250,9 @@ impl BlockBuilder<'_> {
             self.bd.ins().iadd(ra, rb)
         };
 
-        let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
+        let gqr = self.get(SPR::GQR[ins.field_ps_ix() as usize]);
         let (ps0, size) = self.mem_load_quant(addr, gqr);
-        let ps1 = if ins.field_ps_w() == 0 {
+        let ps1 = if ins.field_ps_wx() == 0 {
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_load_quant(addr, gqr).0
         } else {
@@ -1277,9 +1277,9 @@ impl BlockBuilder<'_> {
             self.bd.ins().iadd(ra, rb)
         };
 
-        let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
+        let gqr = self.get(SPR::GQR[ins.field_ps_ix() as usize]);
         let (ps0, size) = self.mem_load_quant(addr, gqr);
-        let ps1 = if ins.field_ps_w() == 0 {
+        let ps1 = if ins.field_ps_wx() == 0 {
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_load_quant(addr, gqr).0
         } else {
@@ -1357,10 +1357,10 @@ impl BlockBuilder<'_> {
 
         let fpr_s = self.get(ins.fpr_s());
         let ps0 = self.bd.ins().extractlane(fpr_s, 0);
-        let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
+        let gqr = self.get(SPR::GQR[ins.field_ps_ix() as usize]);
 
         let size = self.mem_store_quant(addr, gqr, ps0);
-        if ins.field_ps_w() == 0 {
+        if ins.field_ps_wx() == 0 {
             let ps1 = self.bd.ins().extractlane(fpr_s, 1);
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_store_quant(addr, gqr, ps1);
@@ -1382,10 +1382,10 @@ impl BlockBuilder<'_> {
 
         let fpr_s = self.get(ins.fpr_s());
         let ps0 = self.bd.ins().extractlane(fpr_s, 0);
-        let gqr = self.get(SPR::GQR[ins.field_ps_i() as usize]);
+        let gqr = self.get(SPR::GQR[ins.field_ps_ix() as usize]);
 
         let size = self.mem_store_quant(addr, gqr, ps0);
-        if ins.field_ps_w() == 0 {
+        if ins.field_ps_wx() == 0 {
             let ps1 = self.bd.ins().extractlane(fpr_s, 1);
             let addr = self.bd.ins().iadd(addr, size);
             self.mem_store_quant(addr, gqr, ps1);
