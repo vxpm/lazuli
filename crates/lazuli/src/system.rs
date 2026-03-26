@@ -242,13 +242,10 @@ impl System {
     }
 
     pub fn new(modules: Modules, mut config: Config) -> Self {
-        let mut scheduler = Scheduler::default();
-        scheduler.schedule(1 << 16, gx::cmd::process);
-
         let ipl = Ipl::new(config.ipl.take().unwrap_or_else(|| vec![0; mem::IPL_LEN]));
 
         let mut system = System {
-            scheduler,
+            scheduler: Scheduler::default(),
             cpu: Cpu::default(),
             gpu: Gpu::default(),
             dsp: Dsp::new(),

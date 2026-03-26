@@ -39,7 +39,7 @@ impl AppWindow for Window {
 
             ui.label("FIFO");
             mmio_dbg(ui, "FIFO start", &self.fifo.start);
-            mmio_dbg(ui, "FIFO end", &self.fifo.end_inclusive);
+            mmio_dbg(ui, "FIFO end", &self.fifo.end_minus_4);
             mmio_dbg(ui, "FIFO high watermark", &self.fifo.high_mark);
             mmio_dbg(ui, "FIFO low watermark", &self.fifo.low_mark);
             mmio_dbg(ui, "FIFO count", &self.fifo.count());

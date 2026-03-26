@@ -111,8 +111,8 @@ impl System {
             Mmio::CpClear => ne!(&[0, 0]),
             Mmio::CpStartLow => ne!(self.gpu.cmd.fifo.start.as_bytes()[0..2]),
             Mmio::CpStartHigh => ne!(self.gpu.cmd.fifo.start.as_bytes()[2..4]),
-            Mmio::CpEndLow => ne!(self.gpu.cmd.fifo.end_inclusive.as_bytes()[0..2]),
-            Mmio::CpEndHigh => ne!(self.gpu.cmd.fifo.end_inclusive.as_bytes()[2..4]),
+            Mmio::CpEndLow => ne!(self.gpu.cmd.fifo.end_minus_4.as_bytes()[0..2]),
+            Mmio::CpEndHigh => ne!(self.gpu.cmd.fifo.end_minus_4.as_bytes()[2..4]),
             Mmio::CpHighMarkLow => ne!(self.gpu.cmd.fifo.high_mark.as_bytes()[0..2]),
             Mmio::CpHighMarkHigh => ne!(self.gpu.cmd.fifo.high_mark.as_bytes()[2..4]),
             Mmio::CpLowMarkLow => ne!(self.gpu.cmd.fifo.low_mark.as_bytes()[0..2]),
@@ -175,7 +175,7 @@ impl System {
 
             // FIFO
             Mmio::ProcessorFifoStart => ne!(self.processor.fifo_start.as_bytes()),
-            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end_inclusive.as_bytes()),
+            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end_minus_4.as_bytes()),
             Mmio::ProcessorFifoCurrent => ne!(self.processor.fifo_current.as_bytes()),
 
             // === DSP Interface ===
@@ -370,11 +370,11 @@ impl System {
                     gx::cmd::sync_to_pi(self);
                 }
 
-                if self.gpu.cmd.control.read_enable() && !self.scheduler.contains(gx::cmd::consume)
+                if self.gpu.cmd.control.read_enable() && !self.scheduler.contains(gx::cmd::process)
                 {
-                    self.scheduler.schedule(512, gx::cmd::consume);
+                    self.scheduler.schedule(512, gx::cmd::process);
                 } else {
-                    self.scheduler.cancel(gx::cmd::consume);
+                    self.scheduler.cancel(gx::cmd::process);
                 }
             }
             Mmio::CpClear => {
@@ -384,8 +384,8 @@ impl System {
             }
             Mmio::CpStartLow => ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[0..2]),
             Mmio::CpStartHigh => ne!(self.gpu.cmd.fifo.start.as_mut_bytes()[2..4]),
-            Mmio::CpEndLow => ne!(self.gpu.cmd.fifo.end_inclusive.as_mut_bytes()[0..2]),
-            Mmio::CpEndHigh => ne!(self.gpu.cmd.fifo.end_inclusive.as_mut_bytes()[2..4]),
+            Mmio::CpEndLow => ne!(self.gpu.cmd.fifo.end_minus_4.as_mut_bytes()[0..2]),
+            Mmio::CpEndHigh => ne!(self.gpu.cmd.fifo.end_minus_4.as_mut_bytes()[2..4]),
             Mmio::CpHighMarkLow => ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[0..2]),
             Mmio::CpHighMarkHigh => ne!(self.gpu.cmd.fifo.high_mark.as_mut_bytes()[2..4]),
             Mmio::CpLowMarkLow => ne!(self.gpu.cmd.fifo.low_mark.as_mut_bytes()[0..2]),
@@ -466,7 +466,7 @@ impl System {
 
             // FIFO
             Mmio::ProcessorFifoStart => ne!(self.processor.fifo_start.as_mut_bytes()),
-            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end_inclusive.as_mut_bytes()),
+            Mmio::ProcessorFifoEnd => ne!(self.processor.fifo_end_minus_4.as_mut_bytes()),
             Mmio::ProcessorFifoCurrent => ne!(self.processor.fifo_current.as_mut_bytes()),
             Mmio::ProcessorDvdReset => {
                 let mut value = 0u32;

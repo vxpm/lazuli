@@ -221,7 +221,7 @@ impl Default for Control {
 #[derive(Debug, Clone, Default)]
 pub struct Fifo {
     pub start: Address,
-    pub end_inclusive: Address,
+    pub end_minus_4: Address,
     pub high_mark: u32,
     pub low_mark: u32,
     pub write_ptr: Address,
@@ -230,8 +230,8 @@ pub struct Fifo {
 }
 
 impl Fifo {
-    pub fn end_exclusive(&self) -> Address {
-        self.end_inclusive + 4
+    pub fn end(&self) -> Address {
+        self.end_minus_4 + 4
     }
 
     /// The FIFO count.
@@ -240,7 +240,7 @@ impl Fifo {
             self.write_ptr - self.read_ptr
         } else {
             let start = self.write_ptr - self.start;
-            let end = self.end_exclusive() - self.read_ptr;
+            let end = self.end() - self.read_ptr;
             start + end
         };
 
@@ -248,7 +248,7 @@ impl Fifo {
             count >= 0,
             "start: {}, end: {}; write: {}, read: {}",
             self.start,
-            self.end_exclusive(),
+            self.end(),
             self.write_ptr,
             self.read_ptr,
         );
@@ -661,7 +661,7 @@ fn fifo_pop(sys: &mut System) -> u8 {
     let data = sys.read_phys_slow::<u8>(sys.gpu.cmd.fifo.read_ptr);
     sys.gpu.cmd.fifo.read_ptr += 1;
 
-    if sys.gpu.cmd.fifo.read_ptr >= sys.gpu.cmd.fifo.end_exclusive() {
+    if sys.gpu.cmd.fifo.read_ptr >= sys.gpu.cmd.fifo.end() {
         std::hint::cold_path();
         sys.gpu.cmd.fifo.read_ptr = sys.gpu.cmd.fifo.start;
     }
@@ -669,8 +669,8 @@ fn fifo_pop(sys: &mut System) -> u8 {
     data
 }
 
-/// Consumes commands available in the CP FIFO.
-pub fn consume(sys: &mut System) {
+/// Consumes commands available in the CP FIFO and processes them.
+pub fn process(sys: &mut System) {
     if !sys.gpu.cmd.control.read_enable() {
         return;
     }
@@ -689,11 +689,11 @@ pub fn consume(sys: &mut System) {
         }
     }
 
-    sys.scheduler.schedule(512, gx::cmd::consume);
+    self::process_inner(sys);
+    sys.scheduler.schedule(1024, gx::cmd::process);
 }
 
-/// Process consumed CP commands until the queue is either empty or incomplete.
-pub fn process(sys: &mut System) {
+fn process_inner(sys: &mut System) {
     let current_token = sys.gpu.pix.token;
     loop {
         let draw_done = sys.gpu.pix.interrupt.finish();
@@ -768,13 +768,11 @@ pub fn process(sys: &mut System) {
             }
         }
     }
-
-    sys.scheduler.schedule(1 << 16, self::process);
 }
 
 /// Synchronizes the CP fifo to the PI fifo.
 pub fn sync_to_pi(sys: &mut System) {
     sys.gpu.cmd.fifo.start = sys.processor.fifo_start;
-    sys.gpu.cmd.fifo.end_inclusive = sys.processor.fifo_end_inclusive;
+    sys.gpu.cmd.fifo.end_minus_4 = sys.processor.fifo_end_minus_4;
     sys.gpu.cmd.fifo.write_ptr = sys.processor.fifo_current.address();
 }

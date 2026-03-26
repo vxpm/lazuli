@@ -26,7 +26,7 @@ impl AppWindow for Window {
         let core = &state.lazuli;
         let pi = &core.sys.processor;
         self.fifo_start = pi.fifo_start;
-        self.fifo_end = pi.fifo_end_inclusive;
+        self.fifo_end = pi.fifo_end_minus_4;
         self.fifo_current = pi.fifo_current.address();
     }
 
