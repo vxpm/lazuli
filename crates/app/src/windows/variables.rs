@@ -43,13 +43,11 @@ impl AppWindow for Window {
     fn prepare(&mut self, state: &mut State) {
         let emulator = &state.lazuli;
         for variable in self.variables.iter_mut() {
-            let physical = emulator
-                .sys
-                .mem
-                .translate_data_addr(variable.address)
-                .unwrap_or(0);
-
-            variable.value = emulator.sys.read_phys_pure(Address(physical)).unwrap_or(0);
+            if let Some(physical) = emulator.sys.mem.translate_data_addr(variable.address) {
+                variable.value = emulator.sys.read_phys_pure(Address(physical)).unwrap_or(0);
+            } else {
+                variable.value = 0xDEADBEEF;
+            }
         }
     }
 
@@ -76,11 +74,16 @@ impl AppWindow for Window {
                         });
 
                     if ui.button("Add").clicked() {
-                        let address = self.variable_address.trim_prefix("0x").replace("_", "");
+                        let address = self
+                            .variable_address
+                            .trim()
+                            .trim_prefix("0x")
+                            .replace("_", "");
                         let label = self.variable_label.clone();
                         let kind = self.variable_kind;
 
                         if let Ok(address) = u32::from_str_radix(&address, 16) {
+                            dbg!(Address(address));
                             self.variables.push(Variable {
                                 address,
                                 label,
