@@ -503,15 +503,15 @@ const CTX_HOOKS: Hooks = {
     }
 
     extern "C-unwind" fn dec_changed(ctx: &mut Context) {
-        ctx.sys.lazy.last_updated_dec = ctx.sys.scheduler.elapsed();
+        ctx.sys.lazy.last_updated_dec = ctx.sys.scheduler.elapsed_time_base();
         ctx.sys.scheduler.cancel(System::decrementer_overflow);
 
         let dec = ctx.sys.cpu.supervisor.misc.dec;
-        tracing::trace!("decrementer changed to {dec}");
+        tracing::trace!("decrementer changed to {dec} at {:?}", ctx.sys.cpu.pc);
 
         ctx.sys
             .scheduler
-            .schedule(dec as u64, System::decrementer_overflow);
+            .schedule((dec as u64 + 1) * 12, System::decrementer_overflow);
     }
 
     extern "C-unwind" fn tb_read(ctx: &mut Context) {
