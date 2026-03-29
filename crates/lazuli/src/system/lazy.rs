@@ -1,3 +1,4 @@
+use bitos::BitUtils;
 use gekko::Exception;
 
 use crate::system::System;
@@ -27,7 +28,7 @@ impl System {
 
     pub fn update_decrementer(&mut self) {
         let last_updated = self.lazy.last_updated_dec;
-        let now = self.scheduler.elapsed();
+        let now = self.scheduler.elapsed_time_base();
         let delta = now - last_updated;
 
         let prev = self.cpu.supervisor.misc.dec;
@@ -43,10 +44,14 @@ impl System {
 
     pub fn decrementer_overflow(&mut self) {
         self.update_decrementer();
+        assert!(self.cpu.supervisor.misc.dec.bit(31));
+
         if self.cpu.supervisor.config.msr.interrupts() {
             self.cpu.raise_exception(Exception::Decrementer);
-            self.scheduler
-                .schedule(u32::MAX as u64, System::decrementer_overflow);
+            self.scheduler.schedule(
+                (self.cpu.supervisor.misc.dec as u64 + 1) * 12,
+                System::decrementer_overflow,
+            );
         } else {
             self.scheduler.schedule(32, System::decrementer_overflow);
         }
