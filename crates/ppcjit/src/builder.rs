@@ -362,6 +362,10 @@ impl<'ctx> BlockBuilder<'ctx> {
     fn get(&mut self, reg: impl Into<Reg>) -> ir::Value {
         let reg = reg.into();
 
+        if matches!(reg, Reg::FPR(_)) {
+            assert!(self.floats_checked);
+        }
+
         if let Some(reg) = self.cache.get(&reg) {
             return reg.value;
         }
@@ -387,7 +391,10 @@ impl<'ctx> BlockBuilder<'ctx> {
 
         let value_ty = self.bd.func.dfg.value_type(value);
         match reg {
-            Reg::FPR(_) => assert_eq!(value_ty, ir::types::F64X2),
+            Reg::FPR(_) => {
+                assert!(self.floats_checked);
+                assert_eq!(value_ty, ir::types::F64X2);
+            }
             _ => assert_eq!(value_ty, ir::types::I32),
         }
 
