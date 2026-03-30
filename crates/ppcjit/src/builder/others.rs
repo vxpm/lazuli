@@ -154,18 +154,22 @@ impl BlockBuilder<'_> {
     }
 
     pub fn mtfsf(&mut self, ins: Ins) -> InstructionInfo {
+        self.check_floats();
+
         let fpr_b = self.get(ins.fpr_b());
         let fpr_b_ps0 = self.bd.ins().extractlane(fpr_b, 0);
-        let mask = self.ir_value(generate_mask(ins.field_mtfsf_fm()));
+
+        let mask = generate_mask(ins.field_mtfsf_fm()).with_bits(29, 31, 0);
+        let mask = self.ir_value(mask);
 
         let fpscr = self.get(Reg::FPSCR);
-        let bits = self
+        let fpr_b_ps0_bits = self
             .bd
             .ins()
             .bitcast(ir::types::I64, ir::MemFlags::new(), fpr_b_ps0);
-        let low = self.bd.ins().ireduce(ir::types::I32, bits);
+        let fpr_b_ps0_low = self.bd.ins().ireduce(ir::types::I32, fpr_b_ps0_bits);
 
-        let value = self.bd.ins().bitselect(mask, low, fpscr);
+        let value = self.bd.ins().bitselect(mask, fpr_b_ps0_low, fpscr);
         self.set(Reg::FPSCR, value);
 
         self.update_fpscr();
@@ -365,11 +369,15 @@ impl BlockBuilder<'_> {
     }
 
     pub fn mtfsb0(&mut self, ins: Ins) -> InstructionInfo {
-        let bit = 31 - ins.field_crbd();
-        let fpscr = self.get(Reg::FPSCR);
+        self.check_floats();
 
-        let value = self.set_bit(fpscr, bit, false);
-        self.set(Reg::FPSCR, value);
+        let bit = 31 - ins.field_crbd();
+        if !matches!(bit, 29 | 30) {
+            let fpscr = self.get(Reg::FPSCR);
+
+            let value = self.set_bit(fpscr, bit, false);
+            self.set(Reg::FPSCR, value);
+        }
 
         self.update_fpscr();
 
@@ -381,11 +389,15 @@ impl BlockBuilder<'_> {
     }
 
     pub fn mtfsb1(&mut self, ins: Ins) -> InstructionInfo {
-        let bit = 31 - ins.field_crbd();
-        let fpscr = self.get(Reg::FPSCR);
+        self.check_floats();
 
-        let value = self.set_bit(fpscr, bit, true);
-        self.set(Reg::FPSCR, value);
+        let bit = 31 - ins.field_crbd();
+        if !matches!(bit, 29 | 30) {
+            let fpscr = self.get(Reg::FPSCR);
+
+            let value = self.set_bit(fpscr, bit, true);
+            self.set(Reg::FPSCR, value);
+        }
 
         self.update_fpscr();
 
