@@ -1068,7 +1068,7 @@ impl BlockBuilder<'_> {
 
         let value = self.get(ins.fpr_s());
         let value = self.bd.ins().extractlane(value, 0);
-        let value = self.bd.ins().fdemote(ir::types::F32, value);
+        let value = self.truncate_f64_to_f32(value);
         let value = self
             .bd
             .ins()
@@ -1091,7 +1091,7 @@ impl BlockBuilder<'_> {
 
         let value = self.get(ins.fpr_s());
         let value = self.bd.ins().extractlane(value, 0);
-        let value = self.bd.ins().fdemote(ir::types::F32, value);
+        let value = self.truncate_f64_to_f32(value);
         let value = self
             .bd
             .ins()
@@ -1116,7 +1116,7 @@ impl BlockBuilder<'_> {
 
         let value = self.get(ins.fpr_s());
         let value = self.bd.ins().extractlane(value, 0);
-        let value = self.bd.ins().fdemote(ir::types::F32, value);
+        let value = self.truncate_f64_to_f32(value);
         let value = self
             .bd
             .ins()
@@ -1136,7 +1136,7 @@ impl BlockBuilder<'_> {
 
         let value = self.get(ins.fpr_s());
         let value = self.bd.ins().extractlane(value, 0);
-        let value = self.bd.ins().fdemote(ir::types::F32, value);
+        let value = self.truncate_f64_to_f32(value);
         let value = self
             .bd
             .ins()
