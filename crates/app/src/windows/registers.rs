@@ -174,6 +174,25 @@ impl Window {
                 });
             });
 
+            body.row(20.0, |mut row| {
+                let fpscr = self.cpu.user.fpscr.to_bits();
+                row.col(|ui| {
+                    let text = egui::RichText::new("FPSCR".to_string())
+                        .family(egui::FontFamily::Monospace)
+                        .color(Color32::LIGHT_BLUE);
+
+                    ui.label(text);
+                });
+
+                row.col(|ui| {
+                    let text = egui::RichText::new(format!("0x{fpscr:08X}"))
+                        .family(egui::FontFamily::Monospace)
+                        .color(Color32::LIGHT_GREEN);
+
+                    ui.label(text);
+                });
+            });
+
             for index in 0..8 {
                 let cr = self.cpu.user.cr.fields_at(7 - index).unwrap();
                 body.row(20.0, |mut row| {
