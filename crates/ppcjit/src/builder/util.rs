@@ -378,7 +378,60 @@ impl BlockBuilder<'_> {
     }
 
     pub fn update_fpscr(&mut self) {
-        // TODO: implement this
+        let fpscr = self.get(Reg::FPSCR);
+
+        // compute VX
+        let vxsnan = self.get_bit(fpscr, 24);
+        let vxisi = self.get_bit(fpscr, 23);
+        let vxidi = self.get_bit(fpscr, 22);
+        let vxzdz = self.get_bit(fpscr, 21);
+        let vximz = self.get_bit(fpscr, 20);
+        let vxvc = self.get_bit(fpscr, 19);
+        let vxsoft = self.get_bit(fpscr, 10);
+        let vxsqrt = self.get_bit(fpscr, 9);
+        let vxcvi = self.get_bit(fpscr, 8);
+
+        let mut vx = vxsnan;
+        for bit in [vxisi, vxidi, vxzdz, vximz, vxvc, vxsoft, vxsqrt, vxcvi] {
+            vx = self.bd.ins().bor(vx, bit);
+        }
+
+        // compute FEX
+        let ve = self.get_bit(fpscr, 7);
+        let v = self.bd.ins().band(vx, ve);
+
+        let ox = self.get_bit(fpscr, 28);
+        let oe = self.get_bit(fpscr, 6);
+        let o = self.bd.ins().band(ox, oe);
+
+        let ux = self.get_bit(fpscr, 27);
+        let ue = self.get_bit(fpscr, 5);
+        let u = self.bd.ins().band(ux, ue);
+
+        let zx = self.get_bit(fpscr, 26);
+        let ze = self.get_bit(fpscr, 4);
+        let z = self.bd.ins().band(zx, ze);
+
+        let xx = self.get_bit(fpscr, 25);
+        let xe = self.get_bit(fpscr, 3);
+        let x = self.bd.ins().band(xx, xe);
+
+        let mut fex = v;
+        for bit in [o, u, z, x] {
+            fex = self.bd.ins().bor(fex, bit);
+        }
+
+        // compute FX
+        let mut fx = self.get_bit(fpscr, 31);
+        for bit in [vx, ox, ux, zx, xx] {
+            fx = self.bd.ins().bor(fx, bit);
+        }
+
+        let fpscr = self.set_bit(fpscr, 29, vx);
+        let fpscr = self.set_bit(fpscr, 30, fex);
+        let fpscr = self.set_bit(fpscr, 31, fx);
+
+        self.set(Reg::FPSCR, fpscr);
     }
 
     /// Updates CR1 by copying bits 28..32 of FPSCR.
@@ -393,5 +446,22 @@ impl BlockBuilder<'_> {
         let updated = self.bd.ins().bitselect(mask, bits, cr);
 
         self.set(Reg::CR, updated);
+    }
+
+    pub fn truncate_f64_to_f32(&mut self, value: ir::Value) -> ir::Value {
+        let value = self
+            .bd
+            .ins()
+            .bitcast(ir::types::I64, ir::MemFlags::new(), value);
+
+        let top_bits = self.bd.ins().sshr_imm(value, 62);
+        let top_bits = self.bd.ins().ireduce(ir::types::I32, top_bits);
+        let top_bits = self.bd.ins().ishl_imm(top_bits, 30);
+
+        let bottom_bits = self.bd.ins().sshr_imm(value, 29);
+        let bottom_bits = self.bd.ins().ireduce(ir::types::I32, bottom_bits);
+        let bottom_bits = self.bd.ins().band_imm(bottom_bits, (1 << 30) - 1);
+
+        self.bd.ins().bor(top_bits, bottom_bits)
     }
 }
