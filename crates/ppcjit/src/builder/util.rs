@@ -439,6 +439,7 @@ impl BlockBuilder<'_> {
     }
 
     /// Rounds each lane in a F64X2 to single point precision (according to the codegen settings).
+    /// Returns a F64X2 with the lanes rounded.
     pub fn round_to_f32(&mut self, value: ir::Value) -> ir::Value {
         if !self.codegen.settings.round_to_single {
             return value;
@@ -448,10 +449,11 @@ impl BlockBuilder<'_> {
         self.bd.ins().fvpromote_low(single)
     }
 
-    /// Truncates a F64 to single point precision (according to the codegen settings).
+    /// Truncates a F64 to single point precision (according to the codegen settings). Returns an
+    /// F32.
     pub fn truncate_to_f32(&mut self, value: ir::Value) -> ir::Value {
         if !self.codegen.settings.round_to_single {
-            return value;
+            return self.bd.ins().fdemote(ir::types::F32, value);
         }
 
         let value = self
