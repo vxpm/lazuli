@@ -156,16 +156,6 @@ impl BlockBuilder<'_> {
         self.bd.ins().bor(value, rhs)
     }
 
-    /// Rounds each lane in a F64X2 to single point precision (according to the codegen settings).
-    pub fn round_to_single(&mut self, value: ir::Value) -> ir::Value {
-        if self.codegen.settings.round_to_single {
-            let single = self.bd.ins().fvdemote(value);
-            self.bd.ins().fvpromote_low(single)
-        } else {
-            value
-        }
-    }
-
     /// Given a F64X2, copies lane 0 to lane 1.
     pub fn copy_ps0_to_ps1(&mut self, value: ir::Value) -> ir::Value {
         let bytes = self.bd.ins().bitcast(
@@ -448,7 +438,22 @@ impl BlockBuilder<'_> {
         self.set(Reg::CR, updated);
     }
 
-    pub fn truncate_f64_to_f32(&mut self, value: ir::Value) -> ir::Value {
+    /// Rounds each lane in a F64X2 to single point precision (according to the codegen settings).
+    pub fn round_to_f32(&mut self, value: ir::Value) -> ir::Value {
+        if !self.codegen.settings.round_to_single {
+            return value;
+        }
+
+        let single = self.bd.ins().fvdemote(value);
+        self.bd.ins().fvpromote_low(single)
+    }
+
+    /// Truncates a F64 to single point precision (according to the codegen settings).
+    pub fn truncate_to_f32(&mut self, value: ir::Value) -> ir::Value {
+        if !self.codegen.settings.round_to_single {
+            return value;
+        }
+
         let value = self
             .bd
             .ins()

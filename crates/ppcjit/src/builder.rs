@@ -25,7 +25,7 @@ use crate::{
     NAMESPACE_USER_HOOKS, Sequence,
 };
 
-const MEMFLAGS: ir::MemFlags = ir::MemFlags::trusted();
+const MEMFLAGS: ir::MemFlags = ir::MemFlags::new().with_notrap();
 const MEMFLAGS_READONLY: ir::MemFlags = MEMFLAGS.with_can_move().with_readonly();
 
 // NOTE: make sure to keep this up to date if anything else is not just 32 bits
