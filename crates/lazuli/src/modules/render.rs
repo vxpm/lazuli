@@ -1,7 +1,6 @@
 //! Renderer module interface.
 
 use color::{Abgr8, Rgba, Rgba8, Rgba16};
-use gekko::Address;
 use glam::Mat4;
 use oneshot::Sender;
 use ordered_float::OrderedFloat;
@@ -169,12 +168,8 @@ pub struct XfbPart {
 /// RGBA8. For depth textures, it's encoded as a F32 (little-endian).
 pub type Texels = Vec<u32>;
 
-pub enum DebugAction {
-    DisplayList(Address),
-}
-
 pub enum Action {
-    Debug(DebugAction),
+    Debug(String),
     SetXfbDimensions(Dimensions),
     SetEfbFormat(BufferFormat),
     SetViewport(Viewport),

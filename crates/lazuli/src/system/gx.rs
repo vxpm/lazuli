@@ -1112,16 +1112,15 @@ fn draw(sys: &mut System, topology: Topology, stream: &VertexAttributeStream) {
 
 fn call(sys: &mut System, address: Address, length: u32) {
     tracing::debug!("called {} with length 0x{:08X}", address, length);
-    sys.modules
-        .render
-        .exec(render::Action::Debug(render::DebugAction::DisplayList(
-            address,
-        )));
+    sys.modules.render.exec(render::Action::Debug(format!(
+        "start display list {address}"
+    )));
 
     let address = address.value().with_bits(26, 32, 0) & !0x1F;
     // TODO: consider this
     // let length = length.value().with_bit(31, false) & !0x1F;
     let data = &sys.mem.ram()[address.value() as usize..][..length as usize];
+    sys.gpu.cmd.call_len = length;
     sys.gpu.cmd.queue.push_front_bytes(data);
 }
 

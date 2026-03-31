@@ -9,9 +9,10 @@ use strum::FromRepr;
 use zerocopy::IntoBytes;
 
 use crate::Primitive;
+use crate::modules::render;
 use crate::stream::{BinRingBuffer, BinaryStream};
 use crate::system::gx::cmd::attributes::{AttributeDescriptor, AttributeMode};
-use crate::system::gx::{self, Gpu, Reg as GxReg, Topology};
+use crate::system::gx::{self, Reg as GxReg, Topology};
 use crate::system::{System, pi};
 
 /// A command processor register.
@@ -392,6 +393,7 @@ pub struct Interface {
     pub fifo: Fifo,
     pub internal: Internal,
     pub queue: BinRingBuffer,
+    pub call_len: u32,
 }
 
 impl Interface {
@@ -414,155 +416,176 @@ impl Interface {
     }
 }
 
-impl Gpu {
-    /// Reads a command from the command queue.
-    pub fn read_command(&mut self) -> Option<Command> {
-        let mut reader = self.cmd.queue.reader();
+/// Reads a command from the GX's internal command queue.
+pub fn next(sys: &mut System) -> Option<Command> {
+    let mut reader = sys.gpu.cmd.queue.reader();
 
-        let opcode = Opcode::from_bits(reader.read_be()?);
-        let Some(operation) = opcode.operation() else {
-            panic!("unknown opcode 0x{:02X?}", opcode.0);
-        };
+    let opcode = Opcode::from_bits(reader.read_be()?);
+    let Some(operation) = opcode.operation() else {
+        panic!("unknown opcode 0x{:02X?}", opcode.0);
+    };
 
-        let command = match operation {
-            Operation::NOP => Command::Nop,
-            Operation::SetCP => {
-                let register = reader.read_be::<u8>()?;
-                let value = reader.read_be::<u32>()?;
+    let command = match operation {
+        Operation::NOP => Command::Nop,
+        Operation::SetCP => {
+            let register = reader.read_be::<u8>()?;
+            let value = reader.read_be::<u32>()?;
 
-                let Some(register) = Reg::from_repr(register) else {
-                    panic!("unknown internal CP register {register:02X}");
-                };
+            let Some(register) = Reg::from_repr(register) else {
+                panic!("unknown internal CP register {register:02X}");
+            };
 
-                Command::SetCP { register, value }
+            Command::SetCP { register, value }
+        }
+        Operation::SetXF => {
+            let length = reader.read_be::<u16>()? as u32 + 1;
+            if reader.remaining() < 4 * length as usize {
+                return None;
             }
-            Operation::SetXF => {
-                let length = reader.read_be::<u16>()? as u32 + 1;
-                if reader.remaining() < 4 * length as usize {
-                    return None;
-                }
 
-                let start = reader.read_be::<u16>()?;
-                let mut values = Vec::with_capacity(length as usize);
-                for _ in 0..length {
-                    values.push(reader.read_be::<u32>()?);
-                }
-
-                Command::SetXF { start, values }
+            let start = reader.read_be::<u16>()?;
+            let mut values = Vec::with_capacity(length as usize);
+            for _ in 0..length {
+                values.push(reader.read_be::<u32>()?);
             }
-            Operation::IndexedSetXFA => {
-                let config = reader.read_be::<u32>()?;
-                let base = config.bits(0, 12) as u16;
-                let length = config.bits(12, 16) as u8 + 1;
-                let index = config.bits(16, 32) as u16;
 
-                Command::IndexedSetXFA {
-                    base,
-                    length,
-                    index,
-                }
+            Command::SetXF { start, values }
+        }
+        Operation::IndexedSetXFA => {
+            let config = reader.read_be::<u32>()?;
+            let base = config.bits(0, 12) as u16;
+            let length = config.bits(12, 16) as u8 + 1;
+            let index = config.bits(16, 32) as u16;
+
+            Command::IndexedSetXFA {
+                base,
+                length,
+                index,
             }
-            Operation::IndexedSetXFB => {
-                let config = reader.read_be::<u32>()?;
-                let base = config.bits(0, 12) as u16;
-                let length = config.bits(12, 16) as u8 + 1;
-                let index = config.bits(16, 32) as u16;
+        }
+        Operation::IndexedSetXFB => {
+            let config = reader.read_be::<u32>()?;
+            let base = config.bits(0, 12) as u16;
+            let length = config.bits(12, 16) as u8 + 1;
+            let index = config.bits(16, 32) as u16;
 
-                Command::IndexedSetXFB {
-                    base,
-                    length,
-                    index,
-                }
+            Command::IndexedSetXFB {
+                base,
+                length,
+                index,
             }
-            Operation::IndexedSetXFC => {
-                let config = reader.read_be::<u32>()?;
-                let base = config.bits(0, 12) as u16;
-                let length = config.bits(12, 16) as u8 + 1;
-                let index = config.bits(16, 32) as u16;
+        }
+        Operation::IndexedSetXFC => {
+            let config = reader.read_be::<u32>()?;
+            let base = config.bits(0, 12) as u16;
+            let length = config.bits(12, 16) as u8 + 1;
+            let index = config.bits(16, 32) as u16;
 
-                Command::IndexedSetXFC {
-                    base,
-                    length,
-                    index,
-                }
+            Command::IndexedSetXFC {
+                base,
+                length,
+                index,
             }
-            Operation::IndexedSetXFD => {
-                let config = reader.read_be::<u32>()?;
-                let base = config.bits(0, 12) as u16;
-                let length = config.bits(12, 16) as u8 + 1;
-                let index = config.bits(16, 32) as u16;
+        }
+        Operation::IndexedSetXFD => {
+            let config = reader.read_be::<u32>()?;
+            let base = config.bits(0, 12) as u16;
+            let length = config.bits(12, 16) as u8 + 1;
+            let index = config.bits(16, 32) as u16;
 
-                Command::IndexedSetXFD {
-                    base,
-                    length,
-                    index,
-                }
+            Command::IndexedSetXFD {
+                base,
+                length,
+                index,
             }
-            Operation::Call => {
-                let address = Address(reader.read_be::<u32>()?);
-                let length = reader.read_be::<u32>()?;
+        }
+        Operation::Call => {
+            let address = Address(reader.read_be::<u32>()?);
+            let length = reader.read_be::<u32>()?;
 
-                Command::Call { address, length }
+            Command::Call { address, length }
+        }
+        Operation::InvalidateVtxCache => Command::InvalidateVtxCache,
+        Operation::SetBP => {
+            let register = reader.read_be::<u8>()?;
+            let value = u32::from_be_bytes([
+                0,
+                reader.read_be::<u8>()?,
+                reader.read_be::<u8>()?,
+                reader.read_be::<u8>()?,
+            ]);
+
+            let Some(register) = GxReg::from_repr(register) else {
+                panic!("unknown internal GX register {register:02X}");
+            };
+
+            Command::SetBP { register, value }
+        }
+        Operation::DrawQuadList
+        | Operation::DrawTriangleList
+        | Operation::DrawTriangleStrip
+        | Operation::DrawTriangleFan
+        | Operation::DrawLineList
+        | Operation::DrawLineStrip
+        | Operation::DrawPointList => {
+            let vertex_count = reader.read_be::<u16>()?;
+            let vertex_size = sys.gpu.cmd.internal.vertex_size(opcode.vat_index().value());
+
+            let attribute_stream_size = vertex_count as usize * vertex_size as usize;
+            if reader.remaining() < attribute_stream_size {
+                return None;
             }
-            Operation::InvalidateVtxCache => Command::InvalidateVtxCache,
-            Operation::SetBP => {
-                let register = reader.read_be::<u8>()?;
-                let value = u32::from_be_bytes([
-                    0,
-                    reader.read_be::<u8>()?,
-                    reader.read_be::<u8>()?,
-                    reader.read_be::<u8>()?,
-                ]);
 
-                let Some(register) = GxReg::from_repr(register) else {
-                    panic!("unknown internal GX register {register:02X}");
-                };
+            let vertex_attributes = reader.read_bytes(attribute_stream_size)?;
+            let vertex_attributes = VertexAttributeStream {
+                table: opcode.vat_index().value(),
+                count: vertex_count,
+                data: vertex_attributes,
+            };
 
-                Command::SetBP { register, value }
+            let topology = match operation {
+                Operation::DrawQuadList => Topology::QuadList,
+                Operation::DrawTriangleList => Topology::TriangleList,
+                Operation::DrawTriangleStrip => Topology::TriangleStrip,
+                Operation::DrawTriangleFan => Topology::TriangleFan,
+                Operation::DrawLineList => Topology::LineList,
+                Operation::DrawLineStrip => Topology::LineStrip,
+                Operation::DrawPointList => Topology::PointList,
+                _ => unreachable!(),
+            };
+
+            Command::Draw {
+                topology,
+                vertex_attributes,
             }
-            Operation::DrawQuadList
-            | Operation::DrawTriangleList
-            | Operation::DrawTriangleStrip
-            | Operation::DrawTriangleFan
-            | Operation::DrawLineList
-            | Operation::DrawLineStrip
-            | Operation::DrawPointList => {
-                let vertex_count = reader.read_be::<u16>()?;
-                let vertex_size = self.cmd.internal.vertex_size(opcode.vat_index().value());
+        }
+    };
 
-                let attribute_stream_size = vertex_count as usize * vertex_size as usize;
-                if reader.remaining() < attribute_stream_size {
-                    return None;
-                }
+    if sys.gpu.cmd.call_len != 0 {
+        if let Command::Draw {
+            vertex_attributes, ..
+        } = &command
+        {
+            sys.modules.render.exec(render::Action::Debug(format!(
+                "drawing with VCD {:?} and VAT {:?}\nattributes: {:?}\nposition array: {:?}",
+                sys.gpu.cmd.internal.vertex_descriptor,
+                sys.gpu.cmd.internal.vertex_attr_tables[vertex_attributes.table as usize],
+                vertex_attributes,
+                sys.gpu.cmd.internal.arrays.position,
+            )));
+        }
 
-                let vertex_attributes = reader.read_bytes(attribute_stream_size)?;
-                let vertex_attributes = VertexAttributeStream {
-                    table: opcode.vat_index().value(),
-                    count: vertex_count,
-                    data: vertex_attributes,
-                };
+        if sys.gpu.cmd.call_len == reader.consumed() as u32 {
+            sys.modules
+                .render
+                .exec(render::Action::Debug("end display list".into()));
+        }
 
-                let topology = match operation {
-                    Operation::DrawQuadList => Topology::QuadList,
-                    Operation::DrawTriangleList => Topology::TriangleList,
-                    Operation::DrawTriangleStrip => Topology::TriangleStrip,
-                    Operation::DrawTriangleFan => Topology::TriangleFan,
-                    Operation::DrawLineList => Topology::LineList,
-                    Operation::DrawLineStrip => Topology::LineStrip,
-                    Operation::DrawPointList => Topology::PointList,
-                    _ => unreachable!(),
-                };
-
-                Command::Draw {
-                    topology,
-                    vertex_attributes,
-                }
-            }
-        };
-
-        reader.finish();
-        Some(command)
+        sys.gpu.cmd.call_len -= reader.consumed() as u32;
     }
+
+    reader.finish();
+    Some(command)
 }
 
 /// Sets the value of an internal command processor register.
@@ -709,7 +732,7 @@ fn process_inner(sys: &mut System) {
             break;
         }
 
-        let Some(cmd) = sys.gpu.read_command() else {
+        let Some(cmd) = self::next(sys) else {
             break;
         };
 

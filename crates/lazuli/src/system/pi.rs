@@ -170,7 +170,7 @@ pub fn check_interrupts(sys: &mut System) {
 }
 
 /// Pushes a value into the PI FIFO. Values are queued up until 32 bytes are available, then
-/// written all at once.
+/// written all at once - this emulates the Write Gather Pipe.
 pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
     let queue = &mut sys.processor.fifo_queue;
     let queue_slice = &mut queue[sys.processor.fifo_queue_index..][..size_of::<P>()];
@@ -202,6 +202,8 @@ pub fn fifo_push<P: Primitive>(sys: &mut System, value: P) {
         .fifo_queue
         .copy_within(32..sys.processor.fifo_queue_index, 0);
     sys.processor.fifo_queue_index -= 32;
+
+    assert!(sys.processor.fifo_queue_index < 32);
 
     if sys.gpu.cmd.control.linked_mode() {
         gx::cmd::sync_to_pi(sys);

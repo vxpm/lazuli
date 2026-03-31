@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use glam::{Mat4, Vec2};
-use lazuli::modules::render::{Action, DebugAction, Sampler, Scaling, Viewport};
+use lazuli::modules::render::{Action, Sampler, Scaling, Viewport};
 use lazuli::system::gx::color::Rgba;
 use lazuli::system::gx::pix::{ConstantAlpha, Scissor};
 use lazuli::system::gx::tev::Fog;
@@ -204,11 +204,7 @@ impl Renderer {
 
     pub fn exec(&mut self, action: Action) {
         match action {
-            Action::Debug(action) => match action {
-                DebugAction::DisplayList(address) => self
-                    .current_pass
-                    .insert_debug_marker(&format!("display list {}", address)),
-            },
+            Action::Debug(msg) => self.current_pass.insert_debug_marker(&msg),
             Action::SetXfbDimensions(dims) => self.set_xfb_dimensions(dims),
             Action::SetEfbFormat(fmt) => self.set_efb_format(fmt),
             Action::SetViewport(viewport) => self.set_viewport(viewport),

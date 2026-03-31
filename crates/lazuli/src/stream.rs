@@ -72,6 +72,10 @@ impl<'a> BinReader<'a> {
         })
     }
 
+    pub fn consumed(&mut self) -> usize {
+        self.read
+    }
+
     /// Returns how many bytes of data are remaining in the data.
     pub fn remaining(&mut self) -> usize {
         self.data.data().len() - self.read
