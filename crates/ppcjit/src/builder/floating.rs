@@ -34,7 +34,7 @@ impl BlockBuilder<'_> {
 
         let fpr_b = self.get(ins.fpr_b());
 
-        let value = self.round_to_single(fpr_b);
+        let value = self.round_to_f32(fpr_b);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -101,7 +101,7 @@ impl BlockBuilder<'_> {
         let one = self.ir_value(1.0f64);
         let one = self.bd.ins().splat(ir::types::F64X2, one);
         let value = self.bd.ins().fdiv(one, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -158,7 +158,7 @@ impl BlockBuilder<'_> {
         let one = self.bd.ins().splat(ir::types::F64X2, one);
         let sqrt = self.bd.ins().sqrt(fpr_b);
         let value = self.bd.ins().fdiv(one, sqrt);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -177,7 +177,7 @@ impl BlockBuilder<'_> {
         let one = self.ir_value(1.0f64);
         let one = self.bd.ins().splat(ir::types::F64X2, one);
         let value = self.bd.ins().fdiv(one, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);

@@ -577,7 +577,7 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
 
         let value = self.bd.ins().fadd(fpr_a, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -634,7 +634,7 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
 
         let value = self.bd.ins().fsub(fpr_a, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -706,7 +706,7 @@ impl BlockBuilder<'_> {
         let fpr_c = self.get(ins.fpr_c());
 
         let value = self.bd.ins().fmul(fpr_a, fpr_c);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -726,7 +726,7 @@ impl BlockBuilder<'_> {
         let fpr_c = self.get(ins.fpr_c());
 
         let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -786,7 +786,7 @@ impl BlockBuilder<'_> {
 
         let neg_fpr_b = self.bd.ins().fneg(fpr_b);
         let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -827,7 +827,7 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
         let value = self.bd.ins().fneg(value);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -870,7 +870,7 @@ impl BlockBuilder<'_> {
         let neg_fpr_b = self.bd.ins().fneg(fpr_b);
         let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
         let value = self.bd.ins().fneg(value);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -907,7 +907,7 @@ impl BlockBuilder<'_> {
         let fpr_b = self.get(ins.fpr_b());
 
         let value = self.bd.ins().fdiv(fpr_a, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         let value = self.copy_ps0_to_ps1(value);
         self.set(ins.fpr_d(), value);
 
@@ -941,7 +941,7 @@ impl BlockBuilder<'_> {
         let fpr_c = self.get(ins.fpr_c());
 
         let value = self.bd.ins().fmul(fpr_a, fpr_c);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -980,7 +980,7 @@ impl BlockBuilder<'_> {
         let fpr_c_ps0 = self.copy_ps0_to_ps1(fpr_c);
 
         let value = self.bd.ins().fma(fpr_a, fpr_c_ps0, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -1001,7 +1001,7 @@ impl BlockBuilder<'_> {
         let fpr_c_ps1 = self.copy_ps1_to_ps0(fpr_c);
 
         let value = self.bd.ins().fma(fpr_a, fpr_c_ps1, fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -1021,7 +1021,7 @@ impl BlockBuilder<'_> {
 
         let neg_fpr_b = self.bd.ins().fneg(fpr_b);
         let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -1041,7 +1041,7 @@ impl BlockBuilder<'_> {
 
         let value = self.bd.ins().fma(fpr_a, fpr_c, fpr_b);
         let value = self.bd.ins().fneg(value);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -1062,7 +1062,7 @@ impl BlockBuilder<'_> {
         let neg_fpr_b = self.bd.ins().fneg(fpr_b);
         let value = self.bd.ins().fma(fpr_a, fpr_c, neg_fpr_b);
         let value = self.bd.ins().fneg(value);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -1081,7 +1081,7 @@ impl BlockBuilder<'_> {
         let fpr_c_ps0 = self.copy_ps0_to_ps1(fpr_c);
 
         let value = self.bd.ins().fmul(fpr_a, fpr_c_ps0);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);
@@ -1100,7 +1100,7 @@ impl BlockBuilder<'_> {
         let fpr_c_ps1 = self.copy_ps1_to_ps0(fpr_c);
 
         let value = self.bd.ins().fmul(fpr_a, fpr_c_ps1);
-        let value = self.round_to_single(value);
+        let value = self.round_to_f32(value);
         self.set(ins.fpr_d(), value);
 
         self.update_fprf_cmpz(value);

@@ -316,7 +316,7 @@ impl System {
         base.map(|base| {
             let offset = addr.value().bits(0, 17) as usize;
             let ptr = unsafe { base.add(offset) };
-            unsafe { ptr.cast::<P>().read().to_be() }
+            unsafe { ptr.cast::<P>().read_unaligned().to_be() }
         })
     }
 
@@ -688,7 +688,7 @@ impl System {
         if let Some(base) = base {
             let offset = addr.value().bits(0, 17) as usize;
             let ptr = unsafe { base.add(offset) };
-            unsafe { ptr.cast::<P>().write(value.to_be()) }
+            unsafe { ptr.cast::<P>().write_unaligned(value.to_be()) }
             true
         } else {
             false
