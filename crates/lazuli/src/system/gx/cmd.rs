@@ -562,23 +562,10 @@ pub fn next(sys: &mut System) -> Option<Command> {
     };
 
     if sys.gpu.cmd.call_len != 0 {
-        if let Command::Draw {
-            vertex_attributes, ..
-        } = &command
-        {
-            sys.modules.render.exec(render::Action::Debug(format!(
-                "drawing with VCD {:?} and VAT {:?}\nattributes: {:?}\nposition array: {:?}",
-                sys.gpu.cmd.internal.vertex_descriptor,
-                sys.gpu.cmd.internal.vertex_attr_tables[vertex_attributes.table as usize],
-                vertex_attributes,
-                sys.gpu.cmd.internal.arrays.position,
-            )));
-        }
-
         if sys.gpu.cmd.call_len == reader.consumed() as u32 {
             sys.modules
                 .render
-                .exec(render::Action::Debug("end display list".into()));
+                .exec(render::Action::Debug(render::DebugAction::DisplayListEnd));
         }
 
         sys.gpu.cmd.call_len -= reader.consumed() as u32;

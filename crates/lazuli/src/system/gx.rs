@@ -1128,9 +1128,9 @@ fn draw(sys: &mut System, topology: Topology, stream: &VertexAttributeStream) {
 
 fn call(sys: &mut System, address: Address, length: u32) {
     tracing::debug!("called {} with length 0x{:08X}", address, length);
-    sys.modules.render.exec(render::Action::Debug(format!(
-        "start display list {address}"
-    )));
+    sys.modules.render.exec(render::Action::Debug(
+        render::DebugAction::DisplayListStart(address),
+    ));
 
     let address = address.value().with_bits(26, 32, 0) & !0x1F;
     // TODO: consider this
