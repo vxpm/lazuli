@@ -92,6 +92,7 @@ fn main() {
             sideload: None,
             ipl_lle: false,
             perform_efb_copies: false,
+            uart_escape: false,
         },
     );
 
