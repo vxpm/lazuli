@@ -253,8 +253,9 @@ fn sram_transfer_write(sys: &mut System, current: u8) {
 fn uart_transfer_write(sys: &mut System) {
     assert!(!sys.external.channel0.control.dma());
     let value = sys.external.channel0.immediate;
+    let bytes = &value.to_be_bytes()[0..sys.external.channel0.control.imm_length() as usize];
 
-    for byte in value.to_be_bytes() {
+    for &byte in bytes {
         if !sys.config.uart_escape && byte == 0x1B {
             continue;
         }
