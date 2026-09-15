@@ -8,9 +8,10 @@ fn source(source: TexGenSource, kind: TexGenKind) -> wesl::syntax::Expression {
     match source {
         TexGenSource::Position => quote_expression! { vertex.position },
         TexGenSource::Normal => quote_expression! { vertex.normal },
+        // Color texgens consume the XF lighting results.
         TexGenSource::Color => match kind {
-            TexGenKind::ColorDiffuse => quote_expression! { vertex.chan0 },
-            TexGenKind::ColorSpecular => quote_expression! { vertex.chan1 },
+            TexGenKind::ColorDiffuse => quote_expression! { out.chan0 },
+            TexGenKind::ColorSpecular => quote_expression! { out.chan1 },
             _ => panic!("invalid texgen config"),
         },
         TexGenSource::TexCoord0 => quote_expression! { vec3f(vertex.tex_coord[0], 1.0) },
