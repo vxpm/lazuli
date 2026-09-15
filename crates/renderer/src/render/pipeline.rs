@@ -402,12 +402,12 @@ impl Renderer {
     pub fn set_depth_mode(&mut self, mode: DepthMode) {
         let compare = match mode.compare() {
             CompareMode::Never => wgpu::CompareFunction::Never,
-            CompareMode::Less => wgpu::CompareFunction::Less,
+            CompareMode::Less => wgpu::CompareFunction::Greater,
             CompareMode::Equal => wgpu::CompareFunction::Equal,
-            CompareMode::LessOrEqual => wgpu::CompareFunction::LessEqual,
-            CompareMode::Greater => wgpu::CompareFunction::Greater,
+            CompareMode::LessOrEqual => wgpu::CompareFunction::GreaterEqual,
+            CompareMode::Greater => wgpu::CompareFunction::Less,
             CompareMode::NotEqual => wgpu::CompareFunction::NotEqual,
-            CompareMode::GreaterOrEqual => wgpu::CompareFunction::GreaterEqual,
+            CompareMode::GreaterOrEqual => wgpu::CompareFunction::LessEqual,
             CompareMode::Always => wgpu::CompareFunction::Always,
         };
 

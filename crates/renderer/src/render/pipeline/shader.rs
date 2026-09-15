@@ -195,12 +195,11 @@ fn vertex_stage(texgen: &TexGenConfig) -> wesl::syntax::GlobalDeclaration {
             let vertex_local_norm = vec4f(vertex.normal, 0.0);
             let vertex_world_norm = normalize((render::matrices[vertex.normal_mtx_idx] * vertex_local_norm).xyz);
 
-            // GameCube's normalized device coordinates are -1.0..1.0 in x/y and -1.0..0.0 in z,
-            // while wgpu's normalized device coordinates are -1.0..1.0 in x/y and 0.0..1.0 in z.
-            //
-            // Therefore, we add the w component to z in order to convert it to the correct range.
+            // Map GX [-w, 0] to reversed [w, 0] depth. Adding w loses small
+            // depth differences in distant geometry, causing issues in games like
+            // Wind Waker. Example: Foam at the shoreline flickers due to rounding.
             out.clip = vertex_view_pos;
-            out.clip.z += out.clip.w;
+            out.clip.z = -out.clip.z;
 
             out.chan0 = vec4f(
                 render::lighting::color_channel(vertex_world_pos.xyz, vertex_world_norm, vertex.chan0.rgb, 0, config),
@@ -317,7 +316,7 @@ fn fragment_stage(texenv: &TexEnvConfig) -> wesl::syntax::GlobalDeclaration {
             @if(!constant_alpha)
             out.color = out.blend;
 
-            var frag_depth = in.clip.z;
+            var frag_depth = 1.0 - in.clip.z;
             @#depth_texture {}
             @#fog {}
 

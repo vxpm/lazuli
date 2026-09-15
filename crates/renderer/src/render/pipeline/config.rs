@@ -38,7 +38,7 @@ impl Default for DepthConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            compare: wgpu::CompareFunction::Less,
+            compare: wgpu::CompareFunction::Greater,
             write: true,
         }
     }

@@ -17,7 +17,7 @@ pub struct Embedded {
     color: wgpu::TextureView,
     /// Multisampled color component of the EFB.
     multisampled_color: wgpu::TextureView,
-    /// Depth component of the EFB.
+    /// Reversed depth component of the EFB (near = 1, far = 0).
     depth: wgpu::TextureView,
 }
 

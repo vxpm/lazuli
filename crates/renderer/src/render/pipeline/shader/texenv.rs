@@ -159,8 +159,8 @@ pub fn compute_depth_texture(config: &TexEnvConfig) -> wesl::syntax::Statement {
         {
             let depth_tex_sample = common::vec4f_to_vec4u(#sampled);
             let depth_tex_value = pack4xU8(vec4u(depth_tex_sample.x, #depth_mid, #depth_hi, 0)) + #bias;
-            out.depth = clamp(f32(depth_tex_value) / #depth_max, 0.0, 1.0);
-            frag_depth = out.depth;
+            frag_depth = clamp(f32(depth_tex_value) / #depth_max, 0.0, 1.0);
+            out.depth = 1.0 - frag_depth;
         }
     }
 }

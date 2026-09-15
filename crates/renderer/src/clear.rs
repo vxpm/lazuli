@@ -107,7 +107,7 @@ impl Cleaner {
 
         let state = State {
             color: color.unwrap_or_default(),
-            depth: depth.unwrap_or_default(),
+            depth: 1.0 - depth.unwrap_or_default(),
         };
 
         pass.set_pipeline(pipeline);

@@ -148,7 +148,7 @@ impl Renderer {
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: depth,
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
+                        load: wgpu::LoadOp::Clear(0.0),
                         store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
@@ -335,8 +335,8 @@ impl Renderer {
             self.viewport.top_left_y - scissor_offset_y as f32,
             self.viewport.width,
             self.viewport.height,
-            self.viewport.near_depth.clamp(0.0, 1.0),
-            self.viewport.far_depth.clamp(0.0, 1.0),
+            1.0 - self.viewport.far_depth.clamp(0.0, 1.0),
+            1.0 - self.viewport.near_depth.clamp(0.0, 1.0),
         );
     }
 

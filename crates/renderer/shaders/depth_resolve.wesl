@@ -43,7 +43,7 @@ fn fs_main(in: VertexOutput) -> @location(0) f32 {
     var min_sample = 1f;
     var max_sample = 0f;
     for (var i: u32 = 0; i < samples; i += 1) {
-        let sample = textureLoad(depth_texture, vec2u(x, y), i);
+        let sample = 1.0 - textureLoad(depth_texture, vec2u(x, y), i);
         acc += sample;
         min_sample = min(min_sample, sample);
         max_sample = max(max_sample, sample);
