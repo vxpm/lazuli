@@ -72,9 +72,9 @@ fn comparative_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     };
 
     let clamped = if clamp {
-        quote_expression! { color_compare }
-    } else {
         quote_expression! { clamp(color_compare, vec3f(0f), vec3f(1f)) }
+    } else {
+        quote_expression! { clamp(color_compare, vec3f(-1024f / 255f), vec3f(1023f / 255f)) }
     };
 
     wesl_quote::quote_statement! {
@@ -111,9 +111,9 @@ fn regular_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let output = stage.ops.color.output().index();
 
     let clamped = if clamp {
-        quote_expression! { color_add_mul }
-    } else {
         quote_expression! { clamp(color_add_mul, vec3f(0f), vec3f(1f)) }
+    } else {
+        quote_expression! { clamp(color_add_mul, vec3f(-1024f / 255f), vec3f(1023f / 255f)) }
     };
 
     wesl_quote::quote_statement! {

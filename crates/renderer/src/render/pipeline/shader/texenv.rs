@@ -7,7 +7,21 @@ use wesl_quote::{quote_expression, quote_statement};
 
 use crate::render::pipeline::shader::TexEnvConfig;
 
+fn swap_channels(value: wesl::syntax::Expression, table: [u8; 4]) -> wesl::syntax::Expression {
+    use wesl::syntax::*;
+
+    let components = table.map(|index| ['r', 'g', 'b', 'a'][index as usize]);
+    Expression::NamedComponent(NamedComponentExpression {
+        base: quote_expression!((#value)).into(),
+        component: Ident::new(components.into_iter().collect()),
+    })
+}
+
 fn sample_tex(stage: &TexEnvStage) -> wesl::syntax::Expression {
+    swap_channels(sample_tex_raw(stage), stage.texture_swap)
+}
+
+fn sample_tex_raw(stage: &TexEnvStage) -> wesl::syntax::Expression {
     use wesl::syntax::*;
 
     let map = stage.refs.map().value() as u32;
@@ -43,7 +57,7 @@ fn sample_tex(stage: &TexEnvStage) -> wesl::syntax::Expression {
 
 fn input_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
     use wesl::syntax::*;
-    match stage.refs.input() {
+    let channel = match stage.refs.input() {
         tev::InputChannel::Channel0 => quote_expression! { in.chan0 },
         tev::InputChannel::Channel1 => quote_expression! { in.chan1 },
         tev::InputChannel::AlphaBump => quote_expression! { vec4f(common::PLACEHOLDER_RGB, 0f) },
@@ -52,7 +66,8 @@ fn input_channel(stage: &TexEnvStage) -> wesl::syntax::Expression {
         }
         tev::InputChannel::Zero => quote_expression! { vec4f(0f) },
         _ => panic!("reserved color channel"),
-    }
+    };
+    swap_channels(channel, stage.rasterizer_swap)
 }
 
 fn constant(constant: tev::Constant) -> wesl::syntax::Expression {
@@ -120,7 +135,7 @@ pub fn compute_depth_texture(config: &TexEnvConfig) -> wesl::syntax::Statement {
     }
 
     let bias = config.depth_tex.bias;
-    let sampled = self::sample_tex(config.stages.last().unwrap());
+    let sampled = self::sample_tex_raw(config.stages.last().unwrap());
     let (depth_mid, depth_hi, depth_max) = match config.depth_tex.mode.format() {
         tev::depth::Format::U8 => (
             quote_expression!(0),

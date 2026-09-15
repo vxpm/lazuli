@@ -425,7 +425,7 @@ pub fn inspect_cso(input: PathBuf) -> Result<()> {
 
     ciso_properties.add_row(vec![
         Cell::new("Map Size"),
-        Cell::new(format!("{} bytes", ciso_header.map.len()))
+        Cell::new(format!("{} bytes", ciso_header.map.len())),
     ]);
 
     ciso_properties.add_row(vec![

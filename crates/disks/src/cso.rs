@@ -2,7 +2,9 @@
 //! to save space without the CPU overhead of actual compression
 
 use std::io::{Read, Seek, SeekFrom};
+
 use binrw::{BinRead, BinResult};
+
 use crate::{apploader, dol, iso};
 
 const CSO_HEADER_SIZE: usize = 0x8000; // 32KB
@@ -24,7 +26,7 @@ pub struct CsoHeader {
     pub block_size: u32,
     #[br(parse_with = parse_bool_array)]
     /// Used (1) or Unused (0)
-    pub map: [bool; CSO_MAP_SIZE]
+    pub map: [bool; CSO_MAP_SIZE],
 }
 
 /// A Gamecube .cso file.
@@ -34,33 +36,34 @@ pub struct Cso<R> {
     /// LUT
     map: Vec<Option<u64>>,
     /// Reader of the contents
-    reader: R
+    reader: R,
 }
 
 impl<R> Cso<R>
 where
-    R: Read + Seek
+    R: Read + Seek,
 {
     /// Creates a new [`Cso`] from the given reader.
     pub fn new(mut reader: R) -> Result<Self, binrw::Error> {
         let header = CsoHeader::read(&mut reader)?;
 
-        let mut map= Vec::with_capacity(CSO_MAP_SIZE);
+        let mut map = Vec::with_capacity(CSO_MAP_SIZE);
         let mut current_offset = CSO_HEADER_SIZE as u64;
 
         for is_present in header.map {
-            if is_present
-            {
+            if is_present {
                 map.push(Some(current_offset));
                 current_offset += header.block_size as u64;
-            }
-            else
-            {
+            } else {
                 map.push(None);
             }
         }
 
-        Ok(Self { header, map, reader })
+        Ok(Self {
+            header,
+            map,
+            reader,
+        })
     }
 
     pub fn header(&self) -> &CsoHeader {
@@ -83,7 +86,6 @@ where
         let mut remaining = out.len() as u64;
 
         while remaining > 0 {
-
             let block = (current_disk_offset / block_size) as usize;
             let data_offset = current_disk_offset % block_size;
             let to_read = remaining.min(block_size - data_offset);
@@ -141,10 +143,10 @@ where
         let read = match self.cso.read(self.position, buf) {
             Ok(read) => read,
             Err(e) => {
-                return Err(std::io::Error::other(
-                    format!("cso disk module failed: {e}"
+                return Err(std::io::Error::other(format!(
+                    "cso disk module failed: {e}"
                 )));
-            },
+            }
         };
 
         self.position += read;
@@ -160,12 +162,8 @@ where
         match pos {
             SeekFrom::Start(x) => self.position = x,
             SeekFrom::End(x) => {
-                self.position = self
-                    .cso
-                    .header()
-                    .block_size
-                    .saturating_sub_signed(x as i32) as u64;
-            },
+                self.position = self.cso.header().block_size.saturating_sub_signed(x as i32) as u64;
+            }
             SeekFrom::Current(x) => self.position = self.position.saturating_add_signed(x),
         }
 

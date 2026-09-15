@@ -632,7 +632,9 @@ impl BlockBuilder<'_> {
             .ins()
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
-        let paired = self.bd.ins().splat(ir::types::F64X2, value);
+        // Double loads replace only PS0; context restore may have already restored PS1.
+        let previous = self.get(ins.fpr_d());
+        let paired = self.bd.ins().insertlane(previous, value, 0);
         self.set(ins.fpr_d(), paired);
 
         LOAD_INFO
@@ -654,7 +656,8 @@ impl BlockBuilder<'_> {
             .ins()
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
-        let paired = self.bd.ins().splat(ir::types::F64X2, value);
+        let previous = self.get(ins.fpr_d());
+        let paired = self.bd.ins().insertlane(previous, value, 0);
         self.set(ins.fpr_d(), paired);
         self.set(ins.gpr_a(), addr);
 
@@ -678,7 +681,8 @@ impl BlockBuilder<'_> {
             .ins()
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
-        let paired = self.bd.ins().splat(ir::types::F64X2, value);
+        let previous = self.get(ins.fpr_d());
+        let paired = self.bd.ins().insertlane(previous, value, 0);
         self.set(ins.fpr_d(), paired);
 
         LOAD_INFO
@@ -697,7 +701,8 @@ impl BlockBuilder<'_> {
             .ins()
             .bitcast(ir::types::F64, ir::MemFlags::new(), value);
 
-        let paired = self.bd.ins().splat(ir::types::F64X2, value);
+        let previous = self.get(ins.fpr_d());
+        let paired = self.bd.ins().insertlane(previous, value, 0);
         self.set(ins.fpr_d(), paired);
         self.set(ins.gpr_a(), addr);
 

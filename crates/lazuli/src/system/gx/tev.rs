@@ -4,7 +4,7 @@ pub mod color;
 pub mod depth;
 
 use ::color::{Rgba8, Rgba16};
-use bitos::integer::{u3, u5, u11, u24};
+use bitos::integer::{u2, u3, u5, u11, u24};
 use bitos::{BitUtils, bitos};
 
 #[bitos(3)]
@@ -83,6 +83,10 @@ pub enum Constant {
 #[bitos(32)]
 #[derive(Debug, Default)]
 pub struct StageConstsPair {
+    #[bits(0..2)]
+    pub swap_rb: u2,
+    #[bits(2..4)]
+    pub swap_ga: u2,
     #[bits(4..9)]
     pub color_a: Constant,
     #[bits(9..14)]

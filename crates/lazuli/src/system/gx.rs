@@ -589,6 +589,17 @@ impl Default for Gpu {
 }
 
 pub fn update_texenv(sys: &mut System) {
+    let swap_table = |index: usize| {
+        let rg = &sys.gpu.env.stage_consts[2 * index];
+        let ba = &sys.gpu.env.stage_consts[2 * index + 1];
+        [
+            rg.swap_rb().value(),
+            rg.swap_ga().value(),
+            ba.swap_rb().value(),
+            ba.swap_ga().value(),
+        ]
+    };
+
     let stages = sys
         .gpu
         .env
@@ -607,11 +618,16 @@ pub fn update_texenv(sys: &mut System) {
                 (ref_pair.b(), const_pair.color_b(), const_pair.alpha_b())
             };
 
+            let texture_swap = swap_table(ops.alpha.texture_swap().value() as usize);
+            let rasterizer_swap = swap_table(ops.alpha.rasterizer_swap().value() as usize);
+
             render::TexEnvStage {
                 ops,
                 refs,
                 color_const,
                 alpha_const,
+                texture_swap,
+                rasterizer_swap,
             }
         })
         .collect::<Vec<_>>();

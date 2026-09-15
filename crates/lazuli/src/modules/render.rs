@@ -61,6 +61,8 @@ pub struct TexEnvStage {
     pub refs: tev::StageRefs,
     pub color_const: tev::Constant,
     pub alpha_const: tev::Constant,
+    pub texture_swap: [u8; 4],
+    pub rasterizer_swap: [u8; 4],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

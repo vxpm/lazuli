@@ -246,8 +246,23 @@ pub struct Channel {
 pub struct DefaultMatrices {
     #[bits(0..6)]
     pub view: u6,
-    #[bits(6..54)]
-    pub tex: [u6; 8],
+    #[bits(6..30)]
+    pub tex_low: [u6; 4],
+    #[bits(32..56)]
+    pub tex_high: [u6; 4],
+}
+
+impl DefaultMatrices {
+    pub fn tex(&self) -> [u6; 8] {
+        // Matrix index A ends with two unused bits; index B starts at bit 32.
+        let [a, b, c, d] = self.tex_low();
+        let [e, f, g, h] = self.tex_high();
+        [a, b, c, d, e, f, g, h]
+    }
+
+    pub fn tex_at(&self, index: usize) -> Option<u6> {
+        self.tex().get(index).copied()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -539,7 +554,7 @@ pub fn write(sys: &mut System, addr: u16, value: u32) {
 
             if let Some(light_offset) = addr.checked_sub(0x0600) {
                 let index = light_offset / 0x10;
-                if index < 7 {
+                if index < 8 {
                     sys.modules.render.exec(render::Action::SetLight(
                         index as u8,
                         *sys.gpu.xform.light(index as u8),

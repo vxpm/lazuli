@@ -10,7 +10,6 @@ type RenderDoc = renderdoc::RenderDoc<renderdoc::V140>;
 
 #[derive(Serialize, Deserialize)]
 pub struct Window {
-
     #[cfg(not(target_os = "macos"))]
     #[serde(skip)]
     renderdoc: Option<RenderDoc>,

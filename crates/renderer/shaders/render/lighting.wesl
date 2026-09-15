@@ -62,6 +62,10 @@ fn position_atten(specular: bool, light: render::Light, vertex_pos: vec3f, verte
         }
 
         let ang_atten = max(light.cos_atten.x + value * light.cos_atten.y + value * value * light.cos_atten.z, 0f);
+        if ang_atten == 0f {
+            return 0f;
+        }
+
         let dist_atten = light.dist_atten.x + value * light.dist_atten.y + value * value * light.dist_atten.z;
 
         return ang_atten / dist_atten;
@@ -73,6 +77,11 @@ fn position_atten(specular: bool, light: render::Light, vertex_pos: vec3f, verte
         let dist = length(vertex_to_light);
 
         let ang_atten = max(light.cos_atten.x + cos * light.cos_atten.y + cos * cos * light.cos_atten.z, 0f);
+        // This becomes 0/0 if coefs are all zero, special case it. This fixes the Twighlight Princess 2nd scene in-game.
+        if ang_atten == 0f {
+            return 0f;
+        }
+
         let dist_atten = light.dist_atten.x + dist * light.dist_atten.y + dist * dist * light.dist_atten.z;
 
         return ang_atten / dist_atten;

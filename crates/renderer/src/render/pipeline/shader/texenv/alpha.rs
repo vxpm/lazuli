@@ -59,9 +59,9 @@ fn comparative_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     };
 
     let clamped = if clamp {
-        quote_expression! { alpha_compare }
-    } else {
         quote_expression! { clamp(alpha_compare, 0f, 1f) }
+    } else {
+        quote_expression! { clamp(alpha_compare, -1024f / 255f, 1023f / 255f) }
     };
 
     wesl_quote::quote_statement! {
@@ -98,9 +98,9 @@ fn regular_stage(stage: &TexEnvStage) -> wesl::syntax::Statement {
     let output = stage.ops.alpha.output().index();
 
     let clamped = if clamp {
-        quote_expression! { alpha_add_mul }
-    } else {
         quote_expression! { clamp(alpha_add_mul, 0f, 1f) }
+    } else {
+        quote_expression! { clamp(alpha_add_mul, -1024f / 255f, 1023f / 255f) }
     };
 
     wesl_quote::quote_statement! {
