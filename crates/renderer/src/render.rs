@@ -221,6 +221,7 @@ impl Renderer {
             Action::SetClearDepth(depth) => self.set_clear_depth(depth),
             Action::SetBlendMode(mode) => self.set_blend_mode(mode),
             Action::SetDepthMode(mode) => self.set_depth_mode(mode),
+            Action::SetZFreeze(plane) => self.set_zfreeze(plane),
             Action::SetAlphaTest(test) => self.set_alpha_test(test),
             Action::SetConstantAlpha(mode) => self.set_constant_alpha_mode(mode),
             Action::SetProjectionMatrix(mtx) => self.set_projection_mtx(mtx.value()),

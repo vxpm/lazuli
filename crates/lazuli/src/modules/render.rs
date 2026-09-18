@@ -186,6 +186,7 @@ pub enum Action {
     SetClearColor(Rgba),
     SetClearDepth(f32),
     SetDepthMode(DepthMode),
+    SetZFreeze(Option<crate::system::gx::depth::DepthPlane>),
     SetBlendMode(BlendMode),
     SetConstantAlpha(ConstantAlpha),
     SetAlphaTest(tev::alpha::Test),

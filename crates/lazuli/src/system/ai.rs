@@ -64,7 +64,8 @@ pub struct Interface {
     pub control: Control,
     pub dma_base: Address,
     pub dma_control: DmaControl,
-    pub current_dma_block: u16,
+    pub current_dma_address: Address,
+    pub remaining_dma_blocks: u16,
     pub sample_counter: u32,
     pub interrupt_sample: u32,
 }
@@ -92,7 +93,7 @@ impl Interface {
 
     /// How many DMA bytes are remaining to be transferred.
     pub fn dma_remaining(&self) -> u16 {
-        32 * (self.dma_control.length_by_32().value() - self.current_dma_block)
+        32 * self.remaining_dma_blocks
     }
 }
 
@@ -132,8 +133,7 @@ pub struct Frame {
 }
 
 fn push_data_dma_block(sys: &mut System, ctx: HandlerCtx) {
-    let addr =
-        Address(sys.audio.dma_base.0.with_bit(31, false)) + 32 * sys.audio.current_dma_block as u32;
+    let addr = sys.audio.current_dma_address;
     let frames: [Frame; 8] = std::array::from_fn(|i| Frame {
         left: sys.read_phys_slow::<i16>(addr + 4 * i as u32 + 2),
         right: sys.read_phys_slow::<i16>(addr + 4 * i as u32),
@@ -143,13 +143,12 @@ fn push_data_dma_block(sys: &mut System, ctx: HandlerCtx) {
         sys.modules.audio.play(frame);
     }
 
-    sys.audio.current_dma_block += 1;
+    sys.audio.current_dma_address += 32;
+    sys.audio.remaining_dma_blocks = sys.audio.remaining_dma_blocks.saturating_sub(1);
 
-    let total_blocks = sys.audio.dma_control.length_by_32().value();
-    if sys.audio.current_dma_block >= total_blocks {
-        sys.dsp.control.set_ai_dma_interrupt(true);
-        sys.audio.current_dma_block = 0;
-        pi::check_interrupts(sys);
+    if sys.audio.remaining_dma_blocks == 0 {
+        latch_data_dma(sys);
+        data_dma_interrupt(sys);
 
         // NOTE: it's important to only check this at the end of transfers - if a transfer is
         // started, it must execute until completion! (breaks Mario Sunshine otherwise)
@@ -164,12 +163,26 @@ fn push_data_dma_block(sys: &mut System, ctx: HandlerCtx) {
     );
 }
 
+fn latch_data_dma(sys: &mut System) {
+    // Latch the active transfer so register writes only affect the next buffer.
+    sys.audio.current_dma_address = Address(sys.audio.dma_base.0.with_bit(31, false));
+    sys.audio.remaining_dma_blocks = sys.audio.dma_control.length_by_32().value();
+}
+
+fn data_dma_interrupt(sys: &mut System) {
+    sys.dsp.control.set_ai_dma_interrupt(true);
+    pi::check_interrupts(sys);
+}
+
 pub fn start_data_dma(sys: &mut System) {
     sys.modules
         .audio
         .set_sample_rate(sys.audio.control.dsp_sample_rate());
 
     if !sys.scheduler.contains_full(self::push_data_dma_block) {
+        latch_data_dma(sys);
+        // Starting the first DMA transfer also raises an AI DMA interrupt.
+        sys.scheduler.schedule(200, self::data_dma_interrupt); // TODO: Verify 200?
         sys.scheduler.schedule_full(
             sys.audio.control.dsp_sample_rate().cycles_per_block(),
             self::push_data_dma_block,

@@ -1,5 +1,6 @@
 //! Graphics subsystem (GX).
 pub mod cmd;
+pub mod depth;
 pub mod pix;
 pub mod tev;
 pub mod tex;
@@ -561,6 +562,7 @@ pub struct XfbCopy {
 }
 
 pub struct Gpu {
+    pub zfreeze_plane: depth::DepthPlane,
     pub mode: GenMode,
     pub cmd: cmd::Interface,
     pub xform: xform::Interface,
@@ -575,6 +577,7 @@ pub struct Gpu {
 impl Default for Gpu {
     fn default() -> Self {
         Self {
+            zfreeze_plane: Default::default(),
             mode: Default::default(),
             cmd: Default::default(),
             xform: Default::default(),
@@ -714,6 +717,9 @@ pub fn set_register(sys: &mut System, reg: Reg, value: u32) {
     match reg {
         Reg::GenMode => {
             write_masked!(sys.gpu.mode);
+            sys.modules.render.exec(render::Action::SetZFreeze(
+                sys.gpu.mode.z_freeze().then_some(sys.gpu.zfreeze_plane),
+            ));
             sys.gpu.env.stages_dirty = true;
             sys.gpu.xform.internal.stages_dirty = true;
             sys.modules
@@ -1090,6 +1096,10 @@ fn extract_vertices(sys: &mut System, stream: &VertexAttributeStream) -> VertexS
 }
 
 fn draw(sys: &mut System, topology: Topology, stream: &VertexAttributeStream) {
+    if stream.count() == 0 {
+        return;
+    }
+
     if std::mem::take(&mut sys.gpu.xform.internal.viewport_dirty) {
         let viewport = &sys.gpu.xform.internal.viewport;
         let viewport = render::Viewport {
@@ -1121,6 +1131,20 @@ fn draw(sys: &mut System, topology: Topology, stream: &VertexAttributeStream) {
     }
 
     let vertices = self::extract_vertices(sys, stream);
+
+    if !sys.gpu.mode.z_freeze() {
+        sys.gpu.zfreeze_plane.update(
+            topology,
+            vertices.vertices(),
+            &sys.gpu.xform,
+            sys.gpu.pix.scissor,
+        );
+    }
+
+    if sys.gpu.mode.culling_mode() == CullingMode::All {
+        return;
+    }
+
     sys.modules
         .render
         .exec(render::Action::Draw(topology, vertices));

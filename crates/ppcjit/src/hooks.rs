@@ -59,6 +59,7 @@ pub enum HookKind {
     TbChanged,
     DecRead,
     DecChanged,
+    ResetGatherPipe,
 }
 
 /// External functions that JITed code calls.
@@ -84,6 +85,7 @@ pub struct Hooks {
     pub invalidate_icache: InvalidateICache,
     pub clear_icache: GenericHook,
     pub dcache_dma: GenericHook,
+    pub reset_gather_pipe: GenericHook,
 
     // msr
     pub msr_changed: GenericHook,
@@ -138,6 +140,7 @@ impl Hooks {
             tb_changed: stub!(),
             dec_read: stub!(),
             dec_changed: stub!(),
+            reset_gather_pipe: stub!(),
         }
     }
 

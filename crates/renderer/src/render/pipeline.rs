@@ -310,6 +310,18 @@ fn logic_blend_approx(
 }
 
 impl Renderer {
+    pub fn set_zfreeze(&mut self, plane: Option<lazuli::system::gx::depth::DepthPlane>) {
+        let enabled = plane.is_some();
+        if self.pipeline_config.shader.texenv.zfreeze != enabled {
+            self.flush(format_args!("Z-freeze changed"));
+            self.pipeline_config.shader.texenv.zfreeze = enabled;
+        }
+        if let Some(plane) = plane {
+            self.current_config.zfreeze_plane = plane.coefficients.extend(0.0).to_array();
+            self.current_config_dirty = true;
+        }
+    }
+
     pub fn set_texenv_config(&mut self, config: TexEnvConfig) {
         self.flush(format_args!("texenv changed"));
         self.pipeline_config
