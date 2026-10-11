@@ -370,9 +370,10 @@ impl System {
                     gx::cmd::sync_to_pi(self);
                 }
 
-                if self.gpu.cmd.control.read_enable() && !self.scheduler.contains(gx::cmd::process)
-                {
-                    self.scheduler.schedule(512, gx::cmd::process);
+                if self.gpu.cmd.control.read_enable() {
+                    if !self.scheduler.contains(gx::cmd::process) {
+                        self.scheduler.schedule_now(gx::cmd::process);
+                    }
                 } else {
                     self.scheduler.cancel(gx::cmd::process);
                 }
