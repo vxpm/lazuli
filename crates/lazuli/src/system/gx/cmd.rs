@@ -383,6 +383,45 @@ impl VertexAttributeStream {
     pub fn stride(&self) -> usize {
         self.data.len() / self.count as usize
     }
+
+    /// Reserved position indices disable the whole vertex without restarting
+    /// the primitive. Compact before either vertex module fetches attributes.
+    fn remove_disabled_vertices(&mut self, vcd: VertexDescriptor) {
+        let index_size = match vcd.position() {
+            AttributeMode::Index8 => 1,
+            AttributeMode::Index16 => 2,
+            _ => return,
+        };
+        if self.count == 0 {
+            return;
+        }
+
+        let offset = usize::from(vcd.pos_mtx_index())
+            + (0..8)
+                .filter(|&i| vcd.tex_coord_mtx_index_at(i).unwrap())
+                .count();
+        let stride = self.stride();
+        
+        let mut write = 0;
+        for read in (0..self.data.len()).step_by(stride) {
+            if self.data[read + offset..read + offset + index_size]
+                .iter()
+                .all(|&byte| byte == 0xff)
+            {
+                continue;
+            }
+
+            if write != read {
+                self.data.copy_within(read..read + stride, write);
+            }
+            
+            write += stride;
+        }
+
+        // Truncation retains the allocation's padding for JIT vector loads.
+        self.data.truncate(write);
+        self.count = (write / stride) as u16;
+    }
 }
 
 /// CP interface
@@ -537,11 +576,12 @@ pub fn next(sys: &mut System) -> Option<Command> {
             }
 
             let vertex_attributes = reader.read_bytes(attribute_stream_size)?;
-            let vertex_attributes = VertexAttributeStream {
+            let mut vertex_attributes = VertexAttributeStream {
                 table: opcode.vat_index().value(),
                 count: vertex_count,
                 data: vertex_attributes,
             };
+            vertex_attributes.remove_disabled_vertices(sys.gpu.cmd.internal.vertex_descriptor);
 
             let topology = match operation {
                 Operation::DrawQuadList => Topology::QuadList,

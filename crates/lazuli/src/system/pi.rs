@@ -127,6 +127,11 @@ impl Default for Interface {
 }
 
 impl Interface {
+    /// A WPAR write discards the partial burst before the pipe is redirected.
+    pub fn reset_gather_pipe(&mut self) {
+        self.fifo_queue_index = 0;
+    }
+
     pub fn fifo_end(&self) -> Address {
         self.fifo_end_minus_4 + 4
     }

@@ -33,6 +33,7 @@ struct Config {
     alpha_refs: array<u32, 2>,
     _pad0: u32,
     fog: fog::Params,
+    zfreeze_plane: vec4f,
 }
 
 struct VertexInput {

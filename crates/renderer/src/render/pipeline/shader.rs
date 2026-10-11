@@ -110,6 +110,7 @@ pub struct TexEnvConfig {
     pub stages: Vec<TexEnvStage>,
     pub alpha_test: AlphaTestConfig,
     pub depth_tex: tev::depth::Texture,
+    pub zfreeze: bool,
     pub fog: FogConfig,
     pub constant_alpha: bool,
 }
@@ -317,6 +318,13 @@ fn fragment_stage(texenv: &TexEnvConfig) -> wesl::syntax::GlobalDeclaration {
             out.color = out.blend;
 
             var frag_depth = 1.0 - in.clip.z;
+
+            // Reuse the last unfrozen triangle's z = A*x + B*y + C plane at
+            // this EFB pixel.
+            @if(zfreeze)
+            frag_depth = clamp(dot(config.zfreeze_plane.xyz, vec3f(in.clip.xy, 1.0)), 0.0, 1.0);
+            @if(frag_depth)
+            out.depth = 1.0 - frag_depth;
             #stmt@depth_texture {}
             #stmt@fog {}
 
@@ -384,7 +392,8 @@ pub fn compile(config: &Config) -> String {
     };
 
     wesl.set_feature("sample_shading", !config.texenv.alpha_test.is_noop());
-    wesl.set_feature("frag_depth", needs_frag_depth);
+    wesl.set_feature("frag_depth", needs_frag_depth || config.texenv.zfreeze);
+    wesl.set_feature("zfreeze", config.texenv.zfreeze);
     wesl.set_feature("constant_alpha", config.texenv.constant_alpha);
 
     let compiled = match wesl.compile(&"package::main".parse().unwrap()) {

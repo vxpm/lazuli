@@ -453,6 +453,10 @@ const CTX_HOOKS: Hooks = {
         ctx.icache.clear();
     }
 
+    extern "C-unwind" fn reset_gather_pipe(ctx: &mut Context) {
+        ctx.sys.processor.reset_gather_pipe();
+    }
+
     extern "C-unwind" fn dcache_dma(ctx: &mut Context) {
         let dma = ctx.sys.cpu.supervisor.config.dma.clone();
 
@@ -564,6 +568,8 @@ const CTX_HOOKS: Hooks = {
             transmute::<_, InvalidateICache>(invalidate_icache as extern "C-unwind" fn(_, _));
         let clear_icache = transmute::<_, GenericHook>(clear_icache as extern "C-unwind" fn(_));
         let dcache_dma = transmute::<_, GenericHook>(dcache_dma as extern "C-unwind" fn(_));
+        let reset_gather_pipe =
+            transmute::<_, GenericHook>(reset_gather_pipe as extern "C-unwind" fn(_));
 
         let msr_changed = transmute::<_, GenericHook>(msr_changed as extern "C-unwind" fn(_));
 
@@ -596,6 +602,7 @@ const CTX_HOOKS: Hooks = {
             invalidate_icache,
             clear_icache,
             dcache_dma,
+            reset_gather_pipe,
 
             msr_changed,
 

@@ -226,6 +226,7 @@ impl Codegen {
                     HookKind::TbChanged => self.hooks.tb_changed as usize,
                     HookKind::DecRead => self.hooks.dec_read as usize,
                     HookKind::DecChanged => self.hooks.dec_changed as usize,
+                    HookKind::ResetGatherPipe => self.hooks.reset_gather_pipe as usize,
                 };
 
                 jitclif::write_relocation(code, reloc, addr);

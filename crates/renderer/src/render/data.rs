@@ -125,4 +125,5 @@ pub struct Config {
     pub alpha_refs: [u32; 2],
     pub _pad0: u32,
     pub fog: FogParams,
+    pub zfreeze_plane: [f32; 4],
 }

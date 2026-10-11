@@ -72,7 +72,6 @@ impl BlockBuilder<'_> {
         match spr {
             SPR::DEC => self.call_generic_hook(self.hooks.dec_read),
             SPR::TBL | SPR::TBU => self.call_generic_hook(self.hooks.tb_read),
-            SPR::WPAR => tracing::warn!("read from WPAR"),
             _ => (),
         }
 
@@ -85,13 +84,35 @@ impl BlockBuilder<'_> {
     pub fn mtspr(&mut self, ins: Ins) -> InstructionInfo {
         let value = self.get(ins.gpr_s());
         let spr = ins.spr();
+        let value = if spr == SPR::WPAR {
+            // BNE is read-only. Complete gather bursts are transferred synchronously.
+            self.bd.ins().band_imm_u(value, !1u32 as i64)
+        } else {
+            value
+        };
         self.set(spr, value);
 
         match spr {
             SPR::DEC => self.call_generic_hook(self.hooks.dec_changed),
             SPR::TBL | SPR::TBU => self.call_generic_hook(self.hooks.tb_changed),
             SPR::DMAL | SPR::DMAU => self.call_generic_hook(self.hooks.dcache_dma),
-            SPR::WPAR => tracing::warn!("write to WPAR"),
+            SPR::WPAR => {
+                // Let's import on demand? most blocks never reset the write-gather pipe.
+                let name = self
+                    .bd
+                    .func
+                    .declare_imported_user_function(ir::UserExternalName::new(
+                        crate::NAMESPACE_USER_HOOKS,
+                        crate::hooks::HookKind::ResetGatherPipe as u32,
+                    ));
+                let hook = self.bd.import_function(ir::ExtFuncData {
+                    name: ir::ExternalName::User(name),
+                    signature: self.consts.signatures.generic_hook,
+                    colocated: false,
+                    patchable: false,
+                });
+                self.call_generic_hook(hook);
+            }
             spr if spr.is_data_bat() => self.dbat_changed = true,
             spr if spr.is_instr_bat() => self.ibat_changed = true,
             _ => (),
